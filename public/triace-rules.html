@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TRIACE 2.0 – Official Tournament Rules</title>
+<!-- Copy this font link into your page's <head> -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ===== TRIACE 2.0 – all styles scoped to .triace ===== */
+.triace{
+  --bg:#0B1724; --panel:#132538; --panel2:#18304A; --line:#27425E;
+  --ball:#D9F24B; --clay:#FF8A4C; --sky:#5FD3F3;
+  --text:#FFFFFF; --soft:#C3CFDC; --mute:#8DA0B5;
+  --display:'Barlow Condensed',system-ui,sans-serif;
+  --body:'Inter',system-ui,sans-serif;
+  background:var(--bg); color:var(--text); font-family:var(--body);
+  line-height:1.5; overflow:hidden; position:relative;
+}
+.triace *,.triace *::before,.triace *::after{box-sizing:border-box}
+.triace h1,.triace h2,.triace h3,.triace p{margin:0}
+.triace .wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+
+/* ---------- HERO ---------- */
+.triace .hero{position:relative;padding:96px 0 72px;isolation:isolate}
+.triace .court{position:absolute;inset:0;z-index:-1;opacity:.14;pointer-events:none}
+.triace .court svg{width:100%;height:100%}
+.triace .kicker{display:inline-flex;align-items:center;gap:10px;font-weight:700;font-size:14px;letter-spacing:.18em;color:var(--ball);text-transform:uppercase}
+.triace .kicker .dot{width:10px;height:10px;border-radius:50%;background:var(--ball);box-shadow:0 0 0 0 rgba(217,242,75,.6);animation:triace-pulse 2s infinite}
+.triace .title{font-family:var(--display);font-weight:800;font-style:italic;font-size:clamp(88px,16vw,200px);line-height:.85;letter-spacing:-.01em;margin-top:18px;text-transform:uppercase}
+.triace .title span{color:var(--ball);text-shadow:0 0 40px rgba(217,242,75,.35)}
+.triace .tag{font-size:clamp(18px,2.2vw,24px);color:var(--soft);margin-top:18px;max-width:640px}
+.triace .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:48px}
+.triace .stat{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px 22px}
+.triace .stat b{display:block;font-family:var(--display);font-weight:800;font-size:52px;line-height:1;color:var(--ball)}
+.triace .stat small{display:block;margin-top:6px;font-size:15px;color:var(--soft)}
+
+/* ---------- SECTIONS ---------- */
+.triace section.blk{padding:56px 0;border-top:1px solid var(--line)}
+.triace .head{display:flex;align-items:baseline;gap:16px;margin-bottom:28px;flex-wrap:wrap}
+.triace .num{font-family:var(--display);font-weight:800;font-size:22px;color:var(--bg);background:var(--ball);border-radius:8px;padding:2px 10px;transform:skewX(-8deg)}
+.triace h2{font-family:var(--display);font-weight:800;font-size:clamp(38px,5vw,56px);line-height:1;text-transform:uppercase;letter-spacing:.01em}
+.triace .pill-note{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--clay);border:1.5px solid var(--clay);border-radius:999px;padding:4px 10px}
+.triace .lead{color:var(--soft);font-size:18px;max-width:760px;margin-bottom:24px}
+.triace .card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:28px}
+.triace .label{font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--ball)}
+.triace .big{font-family:var(--display);font-weight:800;font-size:40px;line-height:1.05;margin-top:8px}
+.triace .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.triace .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.triace ul.ticks{list-style:none;padding:0;margin:16px 0 0;display:grid;gap:10px}
+.triace ul.ticks li{position:relative;padding-left:28px;color:var(--soft);font-size:16px}
+.triace ul.ticks li::before{content:"";position:absolute;left:0;top:5px;width:14px;height:14px;border-radius:50%;background:var(--ball);box-shadow:inset -3px -3px 0 rgba(0,0,0,.18)}
+
+/* players */
+.triace .player{display:flex;flex-direction:column;align-items:center;gap:8px;padding:30px 20px;text-align:center;position:relative;overflow:hidden}
+.triace .player .ball{width:84px;height:84px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#F2FF8A,var(--ball) 55%,#A9C21E);display:grid;place-items:center;font-family:var(--display);font-weight:800;font-size:36px;color:var(--bg);position:relative}
+.triace .player .ball::before,.triace .player .ball::after{content:"";position:absolute;width:84px;height:84px;border-radius:50%;border:3px solid rgba(255,255,255,.75);clip-path:inset(0 60% 0 0)}
+.triace .player .ball::before{left:-46px}
+.triace .player .ball::after{right:-46px;clip-path:inset(0 0 0 60%)}
+.triace .formula{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:18px;font-size:18px}
+.triace .formula .eq{font-family:var(--display);font-weight:800;font-size:30px;color:var(--ball)}
+.triace .chip{display:inline-flex;align-items:center;border-radius:999px;padding:9px 18px;font-weight:700;font-size:17px;border:2px solid var(--line);background:var(--panel2)}
+.triace .chip.on{background:var(--ball);border-color:var(--ball);color:var(--bg)}
+.triace .chip.off{border-style:dashed;color:var(--mute);text-decoration:line-through;background:transparent}
+
+/* tiers scale */
+.triace .scale{margin-top:8px}
+.triace .bar{position:relative;height:74px;border-radius:14px;background:repeating-linear-gradient(135deg,#1A2E44 0 8px,#142639 8px 16px);overflow:hidden}
+.triace .band{position:absolute;top:0;bottom:0;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;font-size:clamp(22px,3.2vw,34px);letter-spacing:.06em;text-transform:uppercase;transform-origin:left;color:var(--bg)}
+.triace .band.rise{left:0;width:52.381%;background:linear-gradient(90deg,#3FC1E6,var(--sky))}
+.triace .band.goat{left:57.143%;width:42.857%;background:linear-gradient(90deg,var(--ball),#F2FF8A)}
+.triace .ticksrow{position:relative;height:44px;margin-top:8px;font-family:var(--display);font-weight:700;font-size:20px}
+.triace .ticksrow span{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap}
+.triace .ticksrow span::before{content:"";display:block;width:2px;height:10px;background:var(--mute);margin:0 auto 4px}
+.triace .ticksrow .t0{left:0;transform:none}.triace .ticksrow .t0::before{margin-left:0}
+.triace .ticksrow .t3{left:auto;right:0;transform:none}.triace .ticksrow .t3::before{margin-right:0}
+.triace .tiercards{margin-top:20px}
+.triace .tier{border-radius:18px;padding:26px;border:2px solid}
+.triace .tier.rise{border-color:var(--sky);background:linear-gradient(160deg,rgba(95,211,243,.14),transparent 60%)}
+.triace .tier.goat{border-color:var(--ball);background:linear-gradient(160deg,rgba(217,242,75,.14),transparent 60%)}
+.triace .tier h3{font-family:var(--display);font-weight:800;font-size:44px;text-transform:uppercase;line-height:1}
+.triace .tier.rise h3{color:var(--sky)}.triace .tier.goat h3{color:var(--ball)}
+.triace .tier .rng{font-family:var(--display);font-weight:700;font-size:28px;margin-top:6px}
+.triace .tier .rng small{font-family:var(--body);font-size:14px;color:var(--mute);font-weight:500;margin-left:6px}
+
+/* steps */
+.triace .steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;counter-reset:s}
+.triace .step{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px;position:relative}
+.triace .step::before{counter-increment:s;content:counter(s);position:absolute;top:-14px;left:18px;width:30px;height:30px;border-radius:50%;background:var(--ball);color:var(--bg);font-family:var(--display);font-weight:800;font-size:18px;display:grid;place-items:center}
+.triace .step h3{font-family:var(--display);font-weight:800;font-size:24px;text-transform:uppercase;margin-top:6px}
+.triace .step p{color:var(--soft);font-size:15px;margin-top:6px}
+
+/* eligibility */
+.triace .ring{--p:40;width:220px;height:220px;border-radius:50%;background:conic-gradient(var(--ball) calc(var(--p)*1%),#21384F 0);display:grid;place-items:center;margin:0 auto;position:relative}
+.triace .ring::before{content:"";position:absolute;inset:22px;border-radius:50%;background:var(--panel)}
+.triace .ring b{position:relative;font-family:var(--display);font-weight:800;font-size:72px;line-height:1}
+.triace .ring small{position:relative;display:block;text-align:center;font-size:13px;letter-spacing:.14em;color:var(--soft);font-weight:700}
+.triace .calc{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:10px;margin-top:22px}
+.triace .calc .box{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 16px;text-align:center}
+.triace .calc .box b{display:block;font-family:var(--display);font-weight:800;font-size:34px;line-height:1}
+.triace .calc .box small{font-size:12px;color:var(--mute);letter-spacing:.08em;text-transform:uppercase;font-weight:700}
+.triace .calc .box.win{background:var(--ball);border-color:var(--ball);color:var(--bg)}
+.triace .calc .box.win small{color:var(--bg)}
+.triace .calc .arr{color:var(--ball);font-size:26px;font-weight:700}
+.triace table{width:100%;border-collapse:collapse;margin-top:12px;font-size:17px}
+.triace th{text-align:left;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);padding:10px 0;border-bottom:2px solid var(--line)}
+.triace td{padding:12px 0;border-bottom:1px solid var(--line)}
+.triace td:last-child{font-family:var(--display);font-weight:800;font-size:24px}
+.triace tr.hl td{color:var(--ball)}
+.triace .warn{margin-top:18px;display:flex;gap:12px;align-items:flex-start;background:rgba(255,138,76,.1);border:1px solid rgba(255,138,76,.45);border-radius:12px;padding:14px 16px;color:#FFD2BA;font-size:15px}
+.triace .warn svg{flex:none;margin-top:2px}
+
+/* qualification */
+.triace .qual .q{display:flex;align-items:center;gap:22px}
+.triace .q .n{font-family:var(--display);font-weight:800;font-size:96px;line-height:.9;color:var(--ball)}
+.triace .q .n sup{font-size:36px;vertical-align:top;color:var(--text)}
+.triace .seats{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.triace .seats i{width:26px;height:26px;border-radius:50%;background:#21384F;display:block}
+.triace .seats i.in{background:var(--ball);box-shadow:0 0 14px rgba(217,242,75,.45)}
+
+/* challenge */
+.triace .chal{display:grid;grid-template-columns:1.1fr 1fr;gap:18px;margin-top:22px}
+.triace .ladder{display:grid;gap:8px}
+.triace .rung{display:flex;align-items:center;gap:14px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 16px;font-weight:600}
+.triace .rung .pos{font-family:var(--display);font-weight:800;font-size:26px;width:44px}
+.triace .rung .lab{flex:1;color:var(--soft);font-size:15px}
+.triace .rung.lock{opacity:.7}
+.triace .rung.target{border-color:var(--sky)}
+.triace .rung.target .pos{color:var(--sky)}
+.triace .rung.chal{border-color:var(--clay);background:rgba(255,138,76,.12)}
+.triace .rung.chal .pos{color:var(--clay)}
+.triace .outcome{display:grid;gap:12px;align-content:start}
+.triace .oc{border-radius:14px;padding:18px 20px;display:flex;gap:16px;align-items:center}
+.triace .oc.w{background:var(--ball);color:var(--bg)}
+.triace .oc.l{background:var(--panel2);border:1px solid var(--line)}
+.triace .oc b{font-family:var(--display);font-weight:800;font-size:28px;text-transform:uppercase;min-width:84px}
+.triace .oc span{font-size:16px;font-weight:600}
+
+/* bracket */
+.triace .bracket{display:grid;grid-template-columns:1fr 60px 1fr;align-items:center}
+.triace .mcol{display:grid;gap:22px}
+.triace .match{background:var(--panel2);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.triace .match .mt{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);padding:10px 16px 0}
+.triace .match .tm{display:flex;align-items:center;gap:12px;padding:10px 16px;font-weight:600;font-size:16px}
+.triace .match .tm + .tm{border-top:1px solid var(--line)}
+.triace .seed{width:34px;height:34px;border-radius:8px;background:var(--bg);display:grid;place-items:center;font-family:var(--display);font-weight:800;font-size:20px;color:var(--ball)}
+.triace .conn{height:100%;position:relative}
+.triace .conn::before{content:"";position:absolute;left:0;right:50%;top:25%;bottom:25%;border:2px solid var(--line);border-left:0}
+.triace .conn::after{content:"";position:absolute;left:50%;right:0;top:50%;border-top:2px solid var(--line)}
+.triace .conn.single::before{display:none}
+.triace .conn.single::after{left:0}
+.triace .final{border:2px solid var(--ball);background:linear-gradient(160deg,rgba(217,242,75,.16),var(--panel2) 70%);box-shadow:0 0 40px rgba(217,242,75,.12)}
+.triace .final .mt{color:var(--ball)}
+.triace .trophy{display:flex;align-items:center;gap:8px}
+
+/* best of 5 */
+.triace .bo5{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.triace .rub{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px 12px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px}
+.triace .rub .ic{width:52px;height:52px;border-radius:50%;background:var(--panel2);display:grid;place-items:center;color:var(--ball)}
+.triace .rub b{font-family:var(--display);font-weight:800;font-size:24px;text-transform:uppercase;line-height:1.05}
+.triace .rub small{color:var(--mute);font-size:13px;font-weight:600}
+.triace .rub.stb{background:var(--ball);border-color:var(--ball);color:var(--bg)}
+.triace .rub.stb .ic{background:var(--bg)}
+.triace .rub.stb small{color:var(--bg)}
+.triace .first3{margin-top:18px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px 24px}
+.triace .first3 .n{font-family:var(--display);font-weight:800;font-style:italic;font-size:48px;color:var(--ball);line-height:1;text-transform:uppercase}
+.triace .first3 .dots{display:flex;gap:8px}
+.triace .first3 .dots i{width:20px;height:20px;border-radius:50%;background:#21384F;display:block}
+.triace .first3 .dots i.in{background:var(--ball)}
+
+.triace footer{border-top:1px solid var(--line);padding:32px 0 48px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;color:var(--mute);font-size:15px}
+.triace footer b{font-family:var(--display);font-weight:800;font-style:italic;font-size:28px;color:var(--ball);text-transform:uppercase}
+
+/* reveal animation (only when JS is on and motion allowed) */
+.triace.js .rv{opacity:0;transform:translateY(24px);transition:opacity .7s ease,transform .7s ease}
+.triace.js .rv.in{opacity:1;transform:none}
+.triace.js .band{transform:scaleX(0);transition:transform 1.1s cubic-bezier(.2,.8,.2,1)}
+.triace.js .scale.in .band{transform:scaleX(1)}
+.triace.js .scale.in .band.goat{transition-delay:.25s}
+.triace.js .ring{--p:0;transition:--p 1.4s ease}
+.triace.js .ring.in{--p:40}
+@property --p{syntax:'<number>';inherits:false;initial-value:0}
+@keyframes triace-pulse{0%{box-shadow:0 0 0 0 rgba(217,242,75,.6)}70%{box-shadow:0 0 0 12px rgba(217,242,75,0)}100%{box-shadow:0 0 0 0 rgba(217,242,75,0)}}
+@media (prefers-reduced-motion:reduce){
+  .triace .kicker .dot{animation:none}
+  .triace.js .rv,.triace.js .band{opacity:1;transform:none;transition:none}
+  .triace.js .ring{--p:40;transition:none}
+}
+
+
+/* ===== FLASH-CARD MODE (phones + installed PWA) – enabled by script adding .deck ===== */
+.triace .swipe,.triace .dnav{display:none}
+.triace.deck{height:100vh;height:100dvh;display:flex;flex-direction:column;outline:none}
+.triace.deck .track{flex:1;min-height:0;display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
+.triace.deck .track::-webkit-scrollbar{display:none}
+.triace.deck .track>header,.triace.deck .track>section{flex:0 0 100%;min-width:0;scroll-snap-align:center;scroll-snap-stop:always;overflow-y:auto;overscroll-behavior-y:contain;padding:calc(14px + env(safe-area-inset-top)) 14px 6px;border-top:0;position:relative}
+.triace.deck .track>*>.wrap{position:relative;min-height:100%;padding:26px 18px 24px;border-radius:26px;border:1px solid var(--line);background:linear-gradient(165deg,#173250 0%,#0F2236 55%,#0C1B2B 100%);box-shadow:0 18px 40px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.06);transform:scale(.92) rotate(-1.5deg);opacity:.55;transition:transform .45s cubic-bezier(.2,.8,.2,1),opacity .45s ease}
+.triace.deck .track>.active>.wrap{transform:none;opacity:1}
+.triace.deck .track>*>.wrap::after{content:"";position:absolute;top:0;left:24px;right:24px;height:4px;border-radius:0 0 4px 4px;background:var(--ball)}
+.triace.deck .hero{padding-top:calc(14px + env(safe-area-inset-top))}
+.triace.deck .hero .court{inset:14px;border-radius:26px;overflow:hidden;z-index:1;opacity:.12}
+.triace.deck .hero .wrap{display:flex;flex-direction:column;justify-content:center}
+.triace.deck .title{font-size:clamp(64px,20vw,150px)}
+.triace.deck .stats{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:28px;gap:10px}
+.triace.deck .stat{padding:14px 16px;background:rgba(11,23,36,.6)}
+.triace.deck .stat b{font-size:40px}
+.triace.deck .swipe{display:inline-flex;align-items:center;gap:10px;margin-top:26px;font-weight:700;font-size:15px;color:var(--ball);letter-spacing:.04em}
+.triace.deck .swipe span{display:inline-block;animation:triace-nudge 1.2s ease-in-out infinite}
+.triace.deck h2{font-size:clamp(30px,9vw,44px)}
+.triace.deck .head{margin-bottom:18px;gap:12px}
+.triace.deck .lead{font-size:16px;margin-bottom:16px}
+.triace.deck .card{background:rgba(11,23,36,.55);padding:20px}
+.triace.deck .grid2,.triace.deck .grid3,.triace.deck .chal{grid-template-columns:1fr;gap:12px}
+.triace.deck .grid3.rv{grid-template-columns:repeat(3,minmax(0,1fr))}
+.triace.deck .player{padding:18px 6px}
+.triace.deck .player .ball{width:60px;height:60px;font-size:26px}
+.triace.deck .player .ball::before,.triace.deck .player .ball::after{display:none}
+.triace.deck .steps{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;row-gap:24px}
+.triace.deck .step{padding:18px 14px;background:rgba(11,23,36,.55)}
+.triace.deck .step h3{font-size:20px}
+.triace.deck .step p{font-size:13.5px}
+.triace.deck .ring{width:170px;height:170px}
+.triace.deck .ring b{font-size:54px}
+.triace.deck .bracket{grid-template-columns:1fr;gap:12px}
+.triace.deck .conn{display:none}
+.triace.deck .bo5{grid-template-columns:repeat(2,minmax(0,1fr))}
+.triace.deck .rub{background:rgba(11,23,36,.55)}
+.triace.deck .rub.stb{grid-column:1 / -1;background:var(--ball)}
+.triace.deck .q .n{font-size:64px}
+.triace.deck .seats i{width:18px;height:18px}
+.triace.deck footer{display:none}
+.triace.deck section.blk,.triace.deck .hero{padding-bottom:6px}
+.triace.deck .dnav{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 16px calc(12px + env(safe-area-inset-bottom));background:var(--bg)}
+.triace .dnav button{width:48px;height:48px;flex:none;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--ball);display:grid;place-items:center;cursor:pointer;transition:transform .15s,opacity .2s}
+.triace .dnav button:active{transform:scale(.92)}
+.triace .dnav button:disabled{opacity:.3;cursor:default}
+.triace .dnav button:focus-visible,.triace .dnav .dots button:focus-visible{outline:2px solid var(--ball);outline-offset:3px}
+.triace .dnav .mid{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:8px}
+.triace .dnav .count{font-family:var(--display);font-weight:700;font-size:17px;letter-spacing:.04em;color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.triace .dnav .count b{color:var(--ball)}
+.triace .dnav .dots{display:flex;gap:4px;align-items:center}
+.triace .dnav .dots button{width:20px;height:24px;border:0;background:none;padding:0;border-radius:0;display:grid;place-items:center}
+.triace .dnav .dots button::before{content:"";width:8px;height:8px;border-radius:999px;background:#2C4762;transition:width .3s,background .3s}
+.triace .dnav .dots button[aria-current="true"]{width:30px}
+.triace .dnav .dots button[aria-current="true"]::before{width:24px;background:var(--ball)}
+@keyframes triace-nudge{0%,100%{transform:translateX(0)}50%{transform:translateX(8px)}}
+@media (prefers-reduced-motion:reduce){
+  .triace.deck .track>*>.wrap{transform:none;opacity:1;transition:none}
+  .triace.deck .swipe span{animation:none}
+}
+
+
+/* ===== NINJA STYLE ===== */
+.triace h2{position:relative;z-index:0}
+.triace h2::after{content:"";position:absolute;z-index:-1;left:-6px;right:20%;bottom:.06em;height:.32em;background:linear-gradient(90deg,rgba(217,242,75,.55),rgba(217,242,75,0));transform:skewX(-24deg);clip-path:polygon(0 30%,100% 0,96% 100%,2% 80%)}
+.triace .claws{position:absolute;right:4%;top:40px;width:240px;height:260px;pointer-events:none;opacity:.9}
+.triace .claws i{position:absolute;top:0;height:100%;width:7px;border-radius:7px;background:linear-gradient(180deg,rgba(255,138,76,0),#FF8A4C 40%,rgba(255,138,76,0));transform:rotate(24deg);transform-origin:top}
+.triace .claws i:nth-child(1){left:40px}.triace .claws i:nth-child(2){left:110px;height:110%}.triace .claws i:nth-child(3){left:180px}
+.triace.js .claws i{clip-path:inset(0 0 100% 0);transition:clip-path .45s cubic-bezier(.7,0,.3,1)}
+.triace.js .claws.in i,.triace.js .hero .rv.in~.claws i{clip-path:inset(0)}
+.triace .shuri{color:var(--ball);pointer-events:none}
+.triace .shuri svg{width:100%;height:100%;display:block}
+.triace .hero-shuri{position:absolute;right:60px;top:330px;width:90px;height:90px;opacity:.9;animation:triace-spin 3.2s linear infinite;filter:drop-shadow(0 0 14px rgba(217,242,75,.45))}
+.triace .hero .wrap{position:relative}
+.triace .num{box-shadow:4px 4px 0 #FF8A4C}
+.triace .chip.off{position:relative}
+.triace .chip.off::after{content:"";position:absolute;left:-6px;right:-6px;top:50%;height:3px;background:#FF8A4C;transform:rotate(-12deg);border-radius:3px;box-shadow:0 0 8px #FF8A4C}
+
+/* slash effect layer (card mode) */
+.triace .slashfx{display:none}
+.triace.deck .slashfx{display:block;position:absolute;inset:0;pointer-events:none;z-index:5;overflow:hidden}
+.triace .slashfx i{position:absolute;left:-20%;width:140%;height:4px;top:50%;border-radius:4px;background:linear-gradient(90deg,transparent,#fff 45%,var(--ball) 55%,transparent);box-shadow:0 0 18px #fff,0 0 36px var(--ball);opacity:0;transform:rotate(-24deg) scaleX(0)}
+.triace .slashfx i.b2{top:58%;height:2px;background:linear-gradient(90deg,transparent,#FF8A4C 50%,transparent);box-shadow:0 0 16px #FF8A4C}
+.triace .slashfx .flash{position:absolute;inset:0;background:radial-gradient(circle at 50% 50%,rgba(255,255,255,.35),transparent 60%);opacity:0}
+.triace .slashfx .fly{position:absolute;width:56px;height:56px;top:30%;left:-80px;opacity:0;filter:drop-shadow(0 0 12px rgba(217,242,75,.7))}
+.triace .slashfx.go i.b1{animation:triace-slash .42s cubic-bezier(.7,0,.2,1) forwards}
+.triace .slashfx.go i.b2{animation:triace-slash .42s .07s cubic-bezier(.7,0,.2,1) forwards}
+.triace .slashfx.go .flash{animation:triace-flash .35s ease-out}
+.triace .slashfx.go.rev i{transform-origin:right}
+.triace .slashfx.go .fly{animation:triace-fly .6s cubic-bezier(.3,.1,.3,1) forwards}
+.triace .slashfx.go.rev .fly{animation-name:triace-fly-rev}
+.triace.deck .track>.active>.wrap.cut{animation:triace-cut .5s cubic-bezier(.2,.8,.2,1)}
+.triace.deck.shake .track{animation:triace-shake .22s linear}
+.triace .dnav .dots button[aria-current="true"]::before{border-radius:2px;transform:skewX(-35deg);box-shadow:0 0 10px rgba(217,242,75,.6)}
+.triace .dnav .next svg,.triace .dnav .prev svg{transition:transform .3s}
+.triace .dnav .next:active svg{transform:translateX(4px)}
+.triace .dnav .prev:active svg{transform:translateX(-4px)}
+.triace .dnav .snd{position:absolute;z-index:6;top:calc(26px + env(safe-area-inset-top));right:26px;width:40px;height:40px;color:var(--soft);background:rgba(11,23,36,.7)}
+.triace .dnav .snd .off{display:none}
+.triace .dnav .snd[aria-pressed="false"] .on{display:none}
+.triace .dnav .snd[aria-pressed="false"] .off{display:block}
+.triace.deck .claws{right:8px;top:30px;width:150px;height:170px;opacity:.6}
+.triace.deck .claws i:nth-child(1){left:20px}.triace.deck .claws i:nth-child(2){left:65px}.triace.deck .claws i:nth-child(3){left:110px}
+.triace.deck .hero-shuri{width:64px;height:64px;right:18px;top:auto;bottom:22px}
+@keyframes triace-spin{to{transform:rotate(360deg)}}
+@keyframes triace-slash{0%{opacity:1;transform:rotate(-24deg) scaleX(0)}55%{opacity:1;transform:rotate(-24deg) scaleX(1)}100%{opacity:0;transform:rotate(-24deg) scaleX(1) translateY(6px)}}
+@keyframes triace-flash{0%{opacity:0}30%{opacity:1}100%{opacity:0}}
+@keyframes triace-fly{0%{opacity:1;left:-80px;transform:rotate(0)}100%{opacity:0;left:110%;transform:rotate(900deg)}}
+@keyframes triace-fly-rev{0%{opacity:1;left:110%;transform:rotate(0)}100%{opacity:0;left:-80px;transform:rotate(-900deg)}}
+@keyframes triace-cut{0%{clip-path:polygon(0 0,0 0,-40% 100%,-40% 100%);transform:translateX(-8px)}100%{clip-path:polygon(0 0,140% 0,100% 100%,-40% 100%);transform:none}}
+@keyframes triace-shake{0%,100%{transform:none}25%{transform:translate(-3px,1px)}50%{transform:translate(3px,-1px)}75%{transform:translate(-2px,0)}}
+@media (prefers-reduced-motion:reduce){
+  .triace .hero-shuri{animation:none}
+  .triace .slashfx{display:none!important}
+  .triace.deck .track>.active>.wrap.cut,.triace.deck.shake .track{animation:none}
+  .triace.js .claws i{clip-path:none;transition:none}
+}
+
+/* responsive */
+@media (max-width:880px){
+  .triace .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .triace .grid3{grid-template-columns:1fr}
+  .triace .grid2,.triace .chal{grid-template-columns:1fr}
+  .triace .steps{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:28px}
+  .triace .bo5{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .triace .rub.stb{grid-column:1 / -1}
+  .triace .bracket{grid-template-columns:1fr;gap:16px}
+  .triace .conn{display:none}
+}
+@media (max-width:520px){
+  .triace .steps{grid-template-columns:1fr}
+  .triace .ticksrow{font-size:16px}
+  .triace .q .n{font-size:64px}
+  .triace .seats i{width:18px;height:18px}
+}
+</style>
+</head>
+<body style="margin:0">
+
+<!-- ===== TRIACE 2.0 START – paste from here ===== -->
+<div class="triace" id="triace" tabindex="-1">
+<div class="track">
+
+  <header class="hero" data-title="TRIACE 2.0">
+    <div class="court" aria-hidden="true">
+      <svg viewBox="0 0 1200 600" preserveAspectRatio="xMidYMid slice" fill="none" stroke="#D9F24B" stroke-width="3">
+        <rect x="100" y="60" width="1000" height="480"/>
+        <line x1="100" y1="120" x2="1100" y2="120"/><line x1="100" y1="480" x2="1100" y2="480"/>
+        <line x1="600" y1="60" x2="600" y2="540" stroke-dasharray="8 8"/>
+        <line x1="330" y1="120" x2="330" y2="480"/><line x1="870" y1="120" x2="870" y2="480"/>
+        <line x1="330" y1="300" x2="870" y2="300"/>
+      </svg>
+    </div>
+    <div class="wrap">
+      <div class="claws" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div class="shuri hero-shuri" aria-hidden="true"><svg viewBox="0 0 100 100" aria-hidden="true"><path d="M50 2 L60 40 L98 50 L60 60 L50 98 L40 60 L2 50 L40 40 Z" fill="currentColor"/><circle cx="50" cy="50" r="9" fill="#0B1724"/></svg></div>
+      <div class="kicker rv"><span class="dot"></span>Official Tournament Rules</div>
+      <h1 class="title rv">Triace <span>2.0</span></h1>
+      <p class="tag rv">Three players per team. Three on court each week.</p>
+      <div class="swipe" aria-hidden="true">Swipe to flip through the rules <span>→</span></div>
+      <div class="stats rv">
+        <div class="stat"><b>3</b><small>players per team</small></div>
+        <div class="stat"><b>2</b><small>tiers: GOAT &amp; Rising</small></div>
+        <div class="stat"><b>40%</b><small>singles days per player</small></div>
+        <div class="stat"><b>Bo5</b><small>playoff encounters</small></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- 01 TEAM -->
+  <section class="blk" data-title="Team composition">
+    <div class="wrap">
+      <div class="head rv"><span class="num">01</span><h2>Team composition</h2></div>
+      <div class="grid3 rv">
+        <div class="card player"><div class="ball">P1</div><div class="label">Player 1</div></div>
+        <div class="card player"><div class="ball">P2</div><div class="label">Player 2</div></div>
+        <div class="card player"><div class="ball">P3</div><div class="label">Player 3</div></div>
+      </div>
+      <div class="card rv" style="margin-top:18px">
+        <div class="label">Each player's UTR</div>
+        <div class="formula">
+          <span class="eq">=&nbsp;the higher of</span>
+          <span class="chip">Singles UTR</span>
+          <span style="color:var(--mute)">or</span>
+          <span class="chip">Doubles UTR</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 TIERS -->
+  <section class="blk" data-title="UTR &amp; tiers">
+    <div class="wrap">
+      <div class="head rv"><span class="num">02</span><h2>Team UTR &amp; tiers</h2></div>
+      <p class="lead rv">Combined team UTR = P1 + P2 + P3, each counted at their highest applicable UTR. Both ends of each range count.</p>
+      <div class="scale rv">
+        <div class="bar" role="img" aria-label="UTR scale from 11.50 to 22.00: Rising covers 11.50 to 17.00, GOAT covers 17.50 to 22.00">
+          <div class="band rise">Rising</div>
+          <div class="band goat">GOAT</div>
+        </div>
+        <div class="ticksrow" aria-hidden="true">
+          <span class="t0">11.50</span>
+          <span style="left:52.381%">17.00</span>
+          <span style="left:57.143%;padding-top:20px">17.50</span>
+          <span class="t3">22.00</span>
+        </div>
+      </div>
+      <div class="grid2 tiercards">
+        <div class="tier goat rv"><div class="label" style="color:var(--ball)">Tier</div><h3>GOAT</h3><div class="rng">17.50 – 22.00<small>combined UTR</small></div></div>
+        <div class="tier rise rv"><div class="label" style="color:var(--sky)">Tier</div><h3>Rising</h3><div class="rng">11.50 – 17.00<small>combined UTR</small></div></div>
+      </div>
+      <div class="card rv" style="margin-top:18px">
+        <div class="label">How teams are placed</div>
+        <ul class="ticks">
+          <li>When registering, a team can state a tier preference or choose <b style="color:#fff">“Interested in a higher UTR tier.”</b></li>
+          <li>A team is placed in the <b style="color:#fff">highest active tier</b> whose range includes its combined UTR, even if it preferred a lower tier.</li>
+          <li>If tier ranges overlap, the admin's tier order decides placement.</li>
+          <li>A team whose combined UTR is outside every active tier can't register.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 03 MATCH FORMAT -->
+  <section class="blk" data-title="Match format">
+    <div class="wrap">
+      <div class="head rv"><span class="num">03</span><h2>Match format</h2></div>
+      <div class="grid2">
+        <div class="card rv">
+          <div class="label">Singles</div>
+          <div class="big">Any 2 players</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">
+            <span class="chip on">P1</span><span class="chip on">P2</span><span class="chip on">P3</span>
+          </div>
+          <p style="color:var(--soft);margin-top:14px">Pick any two of the three on a given match day.</p>
+        </div>
+        <div class="card rv" style="border-color:var(--ball)">
+          <div class="label">Doubles</div>
+          <div class="big">P3 + a partner</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">
+            <span class="chip on">P1 + P3</span><span class="chip on">P2 + P3</span><span class="chip off">P1 + P2</span>
+          </div>
+          <p style="color:var(--soft);margin-top:14px">Only these two pairings are allowed.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 ELIGIBILITY -->
+  <section class="blk" data-title="Playoff eligibility">
+    <div class="wrap">
+      <div class="head rv"><span class="num">04</span><h2>Playoff eligibility</h2></div>
+      <div class="grid2">
+        <div class="card rv" style="text-align:center">
+          <div class="ring"><div><b>40%</b><small>SINGLES DAYS</small></div></div>
+          <p style="color:var(--soft);margin-top:20px;font-size:17px">Every player must play <b style="color:#fff">singles</b> on at least 40% of the team's scheduled match days, <b style="color:#fff">rounded down</b>.</p>
+          <div class="calc">
+            <div class="box"><b>8</b><small>match days</small></div><span class="arr">→</span>
+            <div class="box"><b>3.2</b><small>40%</small></div><span class="arr">→</span>
+            <div class="box win"><b>3</b><small>singles days</small></div>
+          </div>
+        </div>
+        <div class="card rv">
+          <div class="label">Minimum singles days, per player</div>
+          <table>
+            <thead><tr><th>Match days</th><th>Singles needed</th></tr></thead>
+            <tbody>
+              <tr><td>5 – 7</td><td>2</td></tr>
+              <tr class="hl"><td>8 (example)</td><td>3</td></tr>
+              <tr><td>9</td><td>3</td></tr>
+              <tr><td>10 – 12</td><td>4</td></tr>
+            </tbody>
+          </table>
+          <div class="warn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF8A4C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 21h20L12 3z"/><path d="M12 10v5M12 18h.01"/></svg>
+            <span>Rotate your singles players. Teams that miss the minimum won't qualify for the playoffs.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 05 QUALIFICATION -->
+  <section class="blk" data-title="Qualification">
+    <div class="wrap">
+      <div class="head rv"><span class="num">05</span><h2>Playoff qualification</h2></div>
+      <div class="grid2 qual">
+        <div class="card rv">
+          <div class="label">More than 7 teams</div>
+          <div class="q"><div class="n">4</div><div><div style="font-family:var(--display);font-weight:800;font-size:30px;text-transform:uppercase">Top 4 qualify</div><div class="seats"><i class="in"></i><i class="in"></i><i class="in"></i><i class="in"></i><i></i><i></i><i></i><i></i></div></div></div>
+        </div>
+        <div class="card rv">
+          <div class="label">7 or fewer teams</div>
+          <div class="q"><div class="n">3</div><div><div style="font-family:var(--display);font-weight:800;font-size:30px;text-transform:uppercase">Top 3 qualify</div><div class="seats"><i class="in"></i><i class="in"></i><i class="in"></i><i></i><i></i><i></i><i></i></div></div></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 05b CHALLENGE -->
+  <section class="blk" data-title="Challenge rule">
+    <div class="wrap">
+      <div class="head rv" style="margin-bottom:14px"><span class="num">05</span><h2>The challenge rule</h2><span class="pill-note">Provisional</span></div>
+      <p class="lead rv">We'll review this rule before team enrolments are finalised.</p>
+      <div class="steps rv">
+        <div class="step"><h3>Be 5th or 6th</h3><p>Only the teams in 5th and 6th place can challenge.</p></div>
+        <div class="step"><h3>No slippage</h3><p>You must have completed all scheduled weeks on time.</p></div>
+        <div class="step"><h3>Beat the clock</h3><p>Challenge before the last 3 weeks of the season.</p></div>
+        <div class="step"><h3>Once only</h3><p>Each team can use its challenge just once.</p></div>
+      </div>
+      <div class="chal">
+        <div class="card rv">
+          <div class="label">Who you can challenge</div>
+          <div class="ladder" style="margin-top:14px">
+            <div class="rung lock"><span class="pos">1st</span><span class="lab">Safe – can't be challenged</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8DA0B5" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+            <div class="rung target"><span class="pos">2nd</span><span class="lab">Can be challenged</span></div>
+            <div class="rung target"><span class="pos">3rd</span><span class="lab">Can be challenged</span></div>
+            <div class="rung target"><span class="pos">4th</span><span class="lab">Can be challenged</span></div>
+            <div class="rung chal"><span class="pos">5th</span><span class="lab">Challenger</span></div>
+            <div class="rung chal"><span class="pos">6th</span><span class="lab">Challenger</span></div>
+          </div>
+        </div>
+        <div class="outcome">
+          <div class="oc w rv"><b>Win</b><span>The two teams swap positions in the table.</span></div>
+          <div class="oc l rv"><b>Lose</b><span>Both teams keep their current positions.</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 06 PLAYOFF FORMAT -->
+  <section class="blk" data-title="Playoff brackets">
+    <div class="wrap">
+      <div class="head rv"><span class="num">06</span><h2>Playoff format</h2></div>
+      <div class="grid2">
+        <div class="card rv">
+          <div class="label">If the top 4 qualify</div>
+          <div class="bracket" style="margin-top:18px">
+            <div class="mcol">
+              <div class="match"><div class="mt">Semifinal 1</div><div class="tm"><span class="seed">1</span>1st place</div><div class="tm"><span class="seed">3</span>3rd place</div></div>
+              <div class="match"><div class="mt">Semifinal 2</div><div class="tm"><span class="seed">2</span>2nd place</div><div class="tm"><span class="seed">4</span>4th place</div></div>
+            </div>
+            <div class="conn"></div>
+            <div class="match final"><div class="mt trophy">Final</div><div class="tm">Winner SF1</div><div class="tm">Winner SF2</div></div>
+          </div>
+        </div>
+        <div class="card rv">
+          <div class="label">If the top 3 qualify</div>
+          <div class="bracket" style="margin-top:18px">
+            <div class="mcol">
+              <div class="match"><div class="mt">Eliminator</div><div class="tm"><span class="seed">2</span>2nd place</div><div class="tm"><span class="seed">3</span>3rd place</div></div>
+            </div>
+            <div class="conn single"></div>
+            <div class="match final"><div class="mt">Final</div><div class="tm"><span class="seed">1</span>1st place</div><div class="tm">Winner Eliminator</div></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 06b BEST OF 5 -->
+  <section class="blk" data-title="Best of 5">
+    <div class="wrap">
+      <div class="head rv" style="margin-bottom:18px"><span class="num">06</span><h2>Every playoff encounter · best of 5</h2></div>
+      <div class="bo5 rv">
+        <div class="rub"><div class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="7" r="3"/><path d="M6 21v-3a6 6 0 0 1 12 0v3"/></svg></div><b>Singles</b><small>Match 1</small></div>
+        <div class="rub"><div class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="7" r="3"/><path d="M6 21v-3a6 6 0 0 1 12 0v3"/></svg></div><b>Singles</b><small>Match 2</small></div>
+        <div class="rub"><div class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="8" cy="7" r="3"/><circle cx="16" cy="7" r="3"/><path d="M2 21v-2a5 5 0 0 1 10 0v2M12 21v-2a5 5 0 0 1 10 0v2"/></svg></div><b>Doubles</b><small>Match 3</small></div>
+        <div class="rub"><div class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="8" cy="7" r="3"/><circle cx="16" cy="7" r="3"/><path d="M2 21v-2a5 5 0 0 1 10 0v2M12 21v-2a5 5 0 0 1 10 0v2"/></svg></div><b>Doubles</b><small>Match 4</small></div>
+        <div class="rub stb"><div class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#D9F24B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg></div><b>Super tiebreak</b><small>10 points</small></div>
+      </div>
+      <div class="first3 rv">
+        <div class="n">First to 3</div>
+        <div class="dots" aria-hidden="true"><i class="in"></i><i class="in"></i><i class="in"></i><i></i><i></i></div>
+        <div style="color:var(--soft);font-size:17px;flex:1;min-width:220px">The first team to win 3 of the 5 matches advances to the next round.</div>
+      </div>
+    </div>
+  </section>
+
+</div><!-- /track -->
+  <div class="slashfx" aria-hidden="true"><i class="b1"></i><i class="b2"></i><span class="flash"></span><div class="shuri fly"><svg viewBox="0 0 100 100" aria-hidden="true"><path d="M50 2 L60 40 L98 50 L60 60 L50 98 L40 60 L2 50 L40 40 Z" fill="currentColor"/><circle cx="50" cy="50" r="9" fill="#0B1724"/></svg></div></div>
+
+  <nav class="dnav" aria-label="Rule cards">
+    <button type="button" class="prev" aria-label="Previous card"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <div class="mid"><div class="count" aria-live="polite"></div><div class="dots"></div></div>
+    <button type="button" class="snd" aria-label="Sound on" aria-pressed="true"><svg class="on" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg><svg class="off" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="M22 9l-6 6M16 9l6 6"/></svg></button>
+    <button type="button" class="next" aria-label="Next card"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg></button>
+  </nav>
+
+  <footer class="wrap">
+    <span>Questions? Ask in the group.</span>
+    <b>Triace 2.0</b>
+  </footer>
+</div>
+<script>
+(function(){
+  var root=document.getElementById('triace'); if(!root) return;
+  var track=root.querySelector('.track');
+  var cards=[].slice.call(track.children).filter(function(el){return el.tagName==='HEADER'||el.tagName==='SECTION';});
+  var nav=root.querySelector('.dnav'), dotsBox=nav.querySelector('.dots'), count=nav.querySelector('.count');
+  var prev=nav.querySelector('.prev'), next=nav.querySelector('.next');
+  var reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var cur=0;
+
+  /* ---- ninja sound (synthesised, no files) ---- */
+  var sndBtn=nav.querySelector('.snd'), soundOn=true, ac=null;
+  try{ soundOn=localStorage.getItem('triace-sound')!=='off'; }catch(e){}
+  function syncSnd(){ sndBtn.setAttribute('aria-pressed',soundOn?'true':'false'); sndBtn.setAttribute('aria-label',soundOn?'Sound on':'Sound off'); }
+  syncSnd();
+  function ctx(){
+    if(!ac){ var A=window.AudioContext||window.webkitAudioContext; if(!A) return null; ac=new A(); }
+    if(ac.state==='suspended') ac.resume(); return ac;
+  }
+  function noise(c,dur){
+    var b=c.createBuffer(1,Math.floor(c.sampleRate*dur),c.sampleRate),d=b.getChannelData(0);
+    for(var i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+    var src=c.createBufferSource(); src.buffer=b; return src;
+  }
+  function whoosh(rev){
+    var c=ctx(); if(!c) return; var t=c.currentTime;
+    var n=noise(c,.32), f=c.createBiquadFilter(), g=c.createGain();
+    f.type='bandpass'; f.Q.value=1.4;
+    f.frequency.setValueAtTime(rev?600:3200,t); f.frequency.exponentialRampToValueAtTime(rev?3200:500,t+.28);
+    g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(.55,t+.06); g.gain.exponentialRampToValueAtTime(.0001,t+.3);
+    n.connect(f); f.connect(g); g.connect(c.destination); n.start(t); n.stop(t+.32);
+  }
+  function shing(){
+    var c=ctx(); if(!c) return; var t=c.currentTime+.08;
+    [[2900,.16],[4350,.10],[6100,.06]].forEach(function(p){
+      var o=c.createOscillator(), g=c.createGain(); o.type='sine'; o.frequency.setValueAtTime(p[0]*1.04,t); o.frequency.exponentialRampToValueAtTime(p[0],t+.05);
+      g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(p[1],t+.008); g.gain.exponentialRampToValueAtTime(.0001,t+.55);
+      o.connect(g); g.connect(c.destination); o.start(t); o.stop(t+.6);
+    });
+    var n=noise(c,.08), h=c.createBiquadFilter(), g2=c.createGain(); h.type='highpass'; h.frequency.value=5000;
+    g2.gain.setValueAtTime(.25,t); g2.gain.exponentialRampToValueAtTime(.0001,t+.08);
+    n.connect(h); h.connect(g2); g2.connect(c.destination); n.start(t); n.stop(t+.08);
+  }
+  function tick(){
+    var c=ctx(); if(!c) return; var t=c.currentTime, o=c.createOscillator(), g=c.createGain();
+    o.type='triangle'; o.frequency.setValueAtTime(1400,t); o.frequency.exponentialRampToValueAtTime(700,t+.06);
+    g.gain.setValueAtTime(.2,t); g.gain.exponentialRampToValueAtTime(.0001,t+.08);
+    o.connect(g); g.connect(c.destination); o.start(t); o.stop(t+.09);
+  }
+  sndBtn.addEventListener('click',function(){
+    soundOn=!soundOn; syncSnd(); try{ localStorage.setItem('triace-sound',soundOn?'on':'off'); }catch(e){}
+    if(soundOn) tick();
+  });
+
+  /* ---- slash effect on card change ---- */
+  var fx=root.querySelector('.slashfx');
+  function ninja(rev){
+    if(reduce) return;
+    if(soundOn){ whoosh(rev); shing(); }
+    if(navigator.vibrate){ try{ navigator.vibrate(18); }catch(e){} }
+    fx.classList.remove('go','rev'); void fx.offsetWidth; fx.classList.add('go'); if(rev) fx.classList.add('rev');
+    root.classList.remove('shake'); void root.offsetWidth; root.classList.add('shake');
+    var w=cards[cur].querySelector('.wrap'); if(w){ w.classList.remove('cut'); void w.offsetWidth; w.classList.add('cut'); }
+    setTimeout(function(){ root.classList.remove('shake'); },260);
+  }
+
+  /* reveal-on-scroll animations */
+  if('IntersectionObserver' in window){
+    root.classList.add('js');
+    var io=new IntersectionObserver(function(es){
+      es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
+    },{threshold:0.15});
+    root.querySelectorAll('.rv,.scale,.ring,.claws').forEach(function(el){ io.observe(el); });
+  }
+
+  /* dots */
+  var dots=cards.map(function(c,i){
+    var b=document.createElement('button'); b.type='button';
+    b.setAttribute('aria-label','Card '+(i+1)+': '+(c.getAttribute('data-title')||''));
+    b.addEventListener('click',function(){ if(soundOn && i===cur) tick(); go(i); });
+    dotsBox.appendChild(b); return b;
+  });
+
+  function setActive(i,silent){
+    var was=cur;
+    cur=Math.max(0,Math.min(cards.length-1,i));
+    if(!silent && root.classList.contains('deck') && was!==cur) ninja(cur<was);
+    cards.forEach(function(c,k){ c.classList.toggle('active',k===cur); });
+    dots.forEach(function(d,k){ d.setAttribute('aria-current',k===cur?'true':'false'); });
+    count.innerHTML='<b>'+(cur+1)+'</b> / '+cards.length+' · '+(cards[cur].getAttribute('data-title')||'');
+    prev.disabled=cur===0; next.disabled=cur===cards.length-1;
+    cards[cur].querySelectorAll('.rv,.scale,.ring,.claws').forEach(function(el){ el.classList.add('in'); });
+  }
+  function go(i){
+    i=Math.max(0,Math.min(cards.length-1,i));
+    track.scrollTo({left:i*track.clientWidth,behavior:reduce?'auto':'smooth'});
+    setActive(i);
+  }
+  prev.addEventListener('click',function(){ go(cur-1); });
+  next.addEventListener('click',function(){ go(cur+1); });
+  var t; track.addEventListener('scroll',function(){
+    if(!root.classList.contains('deck')) return;
+    clearTimeout(t); t=setTimeout(function(){ setActive(Math.round(track.scrollLeft/track.clientWidth)); },60);
+  },{passive:true});
+  root.addEventListener('keydown',function(e){
+    if(!root.classList.contains('deck')) return;
+    if(e.key==='ArrowRight'){ e.preventDefault(); go(cur+1); }
+    if(e.key==='ArrowLeft'){ e.preventDefault(); go(cur-1); }
+  });
+
+  /* flash cards on phones and when installed as an app (PWA); normal page elsewhere */
+  var mq=window.matchMedia?matchMedia('(max-width: 760px), (display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui)'):null;
+  function apply(){
+    var on=(mq&&mq.matches)||window.navigator.standalone===true;
+    root.classList.toggle('deck',on);
+    if(on){ setActive(cur,true); track.scrollLeft=cur*track.clientWidth; }
+    else { cards.forEach(function(c){ c.classList.remove('active'); }); }
+  }
+  if(mq){ mq.addEventListener?mq.addEventListener('change',apply):mq.addListener(apply); }
+  window.addEventListener('resize',function(){ if(root.classList.contains('deck')) track.scrollLeft=cur*track.clientWidth; });
+  apply();
+})();
+</script>
+<!-- ===== TRIACE 2.0 END ===== -->
+
+</body>
+</html>
