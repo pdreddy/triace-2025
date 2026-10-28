@@ -1,0 +1,202 @@
+/* Sports-app theme: dark navy surfaces, lime accent, condensed italic display type.
+   Matches the look of the Rules page across the whole site. */
+:root{--bg:#0b1724;--bg-2:#10283d;--panel:#132b42;--panel-2:#193954;--ink:#f4f8ff;--muted:#a9bccd;--line:#31506a;--green:#132b42;--lime:#d9f24b;--lime-2:#edff88;--blue:#5fd3f3;--danger:#ff8a6b;color:var(--ink);background:var(--bg);color-scheme:dark;--display:"Barlow Condensed",Impact,"Arial Narrow",sans-serif}
+body{background:radial-gradient(circle at 85% -5%,#1b4262,transparent 45%),var(--bg);background-attachment:fixed;min-height:100vh}
+::selection{background:var(--lime);color:var(--bg)}
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline-color:var(--lime)}
+h1,h2,h3{font-family:var(--display);font-weight:800;text-transform:uppercase;font-style:italic;letter-spacing:.01em;color:#fff}
+h1{font-size:clamp(52px,7vw,96px);line-height:.92;letter-spacing:-.01em}
+h1 em{color:var(--lime);font-style:italic}
+h2{font-size:34px;letter-spacing:.01em}
+h3{font-size:22px}
+small,.small{color:var(--muted)}
+.eyebrow,.section-label{font-family:var(--display);font-size:14px;letter-spacing:.18em;font-weight:800;color:var(--lime);text-transform:uppercase}
+.section-label{border-color:var(--line)}
+
+/* header + nav */
+header{height:84px;border-bottom:1px solid var(--line)}
+.brand{font-family:var(--display);font-style:italic;font-weight:800;font-size:34px;letter-spacing:.01em;color:#fff}
+.brand b{color:var(--bg);background:var(--lime);border:0;border-radius:4px;font-style:normal;font-size:12px;padding:2px 7px;font-weight:800}
+.brand img{border-radius:50%;box-shadow:0 0 0 2px var(--lime)}
+nav{font-family:var(--display);font-size:17px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;gap:8px}
+nav a,.nav-locked,.text-button{padding:7px 14px;border-radius:999px;color:var(--muted)}
+nav a:hover,.text-button:hover{color:#fff;background:#ffffff14}
+nav a.active{background:var(--lime);color:var(--bg);text-decoration:none}
+.nav-locked{color:#6f8398}
+.text-button{font-family:inherit;font-size:inherit;letter-spacing:inherit;text-transform:inherit;color:var(--lime)}
+.environment{color:var(--muted)}
+.dot{background:#6f8398}.dot.online{background:var(--lime);box-shadow:0 0 8px var(--lime)}
+
+/* hero */
+.hero-logo{box-shadow:0 22px 50px #0009;border:1px solid var(--line)}
+.court{background:var(--panel)}
+.brand-banner{background:var(--panel);border:1px solid var(--line);color:var(--lime);font-family:var(--display);font-size:15px}
+
+/* cards + panels */
+.summary,.recalculate,.settings-card,.team-card,.stats>div,.tier-option,.admin-save-bar{background:linear-gradient(160deg,var(--panel-2),var(--bg-2));border:1px solid var(--line);color:var(--ink)}
+.summary{border-radius:14px}
+.settings-card,.team-card,.stats>div{border-radius:14px;box-shadow:0 10px 28px #0006}
+.team-card{transition:transform .15s ease,border-color .15s ease}
+.team-card:hover{transform:translateY(-3px);border-color:var(--lime)}
+.admin-save-bar{background:#10283df2}
+.total,.privacy,.player,.team-name-row,.team-card .combined,.team-card details{border-color:var(--line)}
+.total output{font-family:var(--display);font-style:italic;font-weight:800;color:var(--lime);font-size:72px;letter-spacing:-.01em}
+.total>span,.summary dt,.player-heading>span{font-family:var(--display);font-size:13px;letter-spacing:.14em;color:var(--muted)}
+.summary .assignment{color:var(--ink)}
+.summary .assignment strong{color:var(--lime)}
+.stats strong{font-family:var(--display);font-style:italic;font-weight:800;color:var(--lime);font-size:42px}
+.stats span{color:var(--muted)}
+.badge{background:var(--lime);color:var(--bg);font-family:var(--display);font-style:italic;font-weight:800;font-size:14px;border-radius:4px;padding:3px 10px;letter-spacing:.06em}
+.team-card .badge{font-size:14px}
+.team-name-row span{background:#ffffff14;color:#fff;border-radius:999px;font-weight:600;padding:4px 11px}
+.team-name-row span:first-child{background:var(--lime);color:var(--bg);font-weight:800}
+.team-card dd{color:var(--lime);font-family:var(--display);font-size:19px;font-weight:700}
+.team-card .combined dt{font-family:var(--display);text-transform:uppercase;letter-spacing:.08em}
+.team-card .combined dd{font-size:24px}
+.group-heading>span{color:var(--muted)}
+
+/* tier picker */
+.tier-option{border-radius:12px;transition:border-color .15s,transform .15s}
+.tier-option:hover:not(:has(input:disabled)){border-color:var(--lime)}
+.tier-option.selected{background:linear-gradient(160deg,#1f4a2e55,var(--bg-2));border-color:var(--lime);box-shadow:0 0 0 1px var(--lime) inset}
+.tier-option strong{font-family:var(--display);font-style:italic;text-transform:uppercase;font-size:20px;color:#fff}
+.tier-option small{color:var(--muted);font-size:12px}
+input[type=checkbox],input[type=radio]{accent-color:var(--lime)}
+
+/* forms */
+legend,label{color:#dbe7f3;font-weight:600}
+.field input,select{background:var(--bg);border:1px solid var(--line);border-radius:8px;color:#fff;padding:12px 14px;color-scheme:dark}
+.field input::placeholder{color:#6f8398}
+.field input:focus,select:focus{border-color:var(--lime);outline:2px solid #d9f24b55;outline-offset:0}
+.player{border-top-color:var(--line)}
+
+/* buttons */
+.button,.secondary,.danger{border-radius:999px;font-family:var(--display);text-transform:uppercase;letter-spacing:.08em;font-weight:800;font-size:18px;min-height:46px;padding:11px 26px;transition:background .15s,transform .15s}
+.button{background:var(--lime);border-color:var(--lime);color:var(--bg)}
+.button:hover:not(:disabled){background:var(--lime-2);transform:translateY(-1px)}
+.secondary{border:1px solid var(--lime);color:var(--lime);font-size:17px}
+.secondary:hover:not(:disabled){background:#d9f24b22}
+.danger{border-color:var(--danger);color:var(--danger);font-size:14px;min-height:34px;padding:6px 14px}
+.filters button{border-color:var(--line);color:var(--ink);font-family:var(--display);font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.filters button:hover{border-color:var(--lime)}
+.filters button[aria-pressed=true]{background:var(--lime);color:var(--bg);border-color:var(--lime)}
+
+/* messages */
+.message{background:#d9f24b18;border-color:#d9f24b55;color:#eaf6a8}
+.message.error{background:#ff8a6b1c;border-color:#ff8a6b66;color:#ffc4b3}
+.rules-confirmed{background:#d9f24b18;border-left-color:var(--lime);color:#eaf6a8}
+.rules-confirmed a,.message a{color:var(--lime)}
+
+/* rules page blends with the shared background */
+.rules-page{background:linear-gradient(160deg,#102a40,#0d1f31);border:1px solid var(--line)}
+
+footer{border-top:1px solid var(--line)}
+footer>span{font-family:var(--display);font-style:italic;font-size:16px;letter-spacing:.1em;text-transform:uppercase;color:var(--lime)}
+
+@media(max-width:900px){h2{font-size:30px}}
+@media(max-width:620px){h1{font-size:56px}.brand{font-size:28px}nav{font-size:15px;gap:4px}nav a,.nav-locked,.text-button{padding:6px 10px}.total output{font-size:56px}.button,.secondary{font-size:17px}}
+
+/* agreement bar + PWA safe areas */
+.rules-agreement{background:var(--bg-2);border-color:var(--lime)}
+.rules-agreement button{border-radius:999px;font-family:var(--display);font-size:18px;letter-spacing:.08em;text-transform:uppercase}
+.rules-review .rules-agreement button:disabled{background:#506378;color:#d2deea}
+.rules-register{border-radius:999px;font-family:var(--display);font-size:20px;letter-spacing:.08em;text-transform:uppercase}
+header,footer{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+footer{padding-bottom:calc(30px + env(safe-area-inset-bottom))}
+@media(display-mode:standalone){body{overscroll-behavior-y:none}header{padding-top:env(safe-area-inset-top)}}
+
+/* compact rules page */
+header{height:auto;min-height:72px;flex-wrap:wrap;padding:10px 0}
+.embedded-rules{margin:8px 0 40px}
+.rules-review{display:flex;flex-direction:column;gap:10px;margin-top:14px;padding:12px 14px;background:var(--bg-2);border:1px solid var(--line);border-radius:14px;}
+.rules-review-top{display:flex;align-items:center;gap:14px}
+.rules-review-top strong{font-family:var(--display);font-size:22px;color:var(--lime);white-space:nowrap}
+.rules-review-top strong span{font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.rules-progress{flex:1;height:6px;border-radius:9px;background:var(--line);overflow:hidden;margin:0}
+.rules-progress span{display:block;height:100%;background:var(--lime);transition:width .3s}
+.rules-review-top button{font-family:var(--display);font-size:17px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--lime);background:transparent;color:var(--lime);border-radius:999px;padding:6px 18px;white-space:nowrap}
+.rules-review-top button:disabled{opacity:.35}
+.rules-review .rules-agreement{margin:0;padding:0;border:0;background:none;gap:12px;flex-direction:row;align-items:center;justify-content:space-between}
+.rules-agreement label{font-size:14px;font-weight:500;color:var(--ink)}
+.rules-review .rules-agreement button{background:var(--lime);color:var(--bg);font-size:17px;padding:8px 22px;white-space:nowrap}
+.rules-agreement.done{justify-content:space-between}
+.rules-agreement.done>span{color:var(--lime);font-weight:700}
+.rules-register{display:inline-block;margin:0;max-width:none;font-size:17px;padding:8px 22px;background:var(--lime);color:var(--bg)}
+@media(max-width:700px){.rules-review{padding:10px 12px}.rules-review-top strong span{display:none}.rules-agreement{flex-direction:row;align-items:center}.rules-agreement button{width:auto}.rules-agreement label{font-size:13px}}
+
+.rules-review .rules-agreement button:disabled{background:#506378;color:#d2deea}
+@media(max-width:700px){.rules-review .rules-agreement{flex-direction:row}}
+
+/* UX pass: contrast, tap targets, lineup tools, mobile register */
+.field input,select{border-color:#5a7a94;background:#0e2033}
+.field input::placeholder{color:#8da3b8}
+label,legend{font-size:14px}
+.player-heading>span,.total>span,.summary dt{font-size:13px;color:#b9cadb}
+small,.small{font-size:12px}
+.lineup-tools{display:flex;gap:12px;margin:0 0 8px}
+.lineup-tools input,.lineup-tools select{margin:0;background:#0e2033;border:1px solid #5a7a94;border-radius:999px;color:#fff;padding:10px 16px;font-size:14px;color-scheme:dark}
+.lineup-tools input{flex:1;min-width:0}.lineup-tools select{width:auto}
+.empty-state{display:flex;flex-direction:column;align-items:flex-start;gap:12px;padding:22px;margin-top:18px;border:1px dashed var(--line);border-radius:14px;color:var(--muted)}
+.empty-state strong{font-family:var(--display);font-size:20px;color:#fff;letter-spacing:.04em;text-transform:uppercase}
+.skeleton-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:18px}
+.skeleton-card{height:190px;border-radius:14px;background:linear-gradient(100deg,var(--bg-2) 30%,var(--panel-2) 50%,var(--bg-2) 70%) 0 0/300% 100%;animation:skeleton 1.4s linear infinite}
+@keyframes skeleton{to{background-position:-300% 0}}
+@media(prefers-reduced-motion:reduce){.skeleton-card{animation:none}.team-card{transition:none}.team-card:hover{transform:none}}
+nav a,.nav-locked,.text-button{min-height:44px;display:inline-flex;align-items:center}
+.filters button,.rules-review-top button,.rules-review .rules-agreement button{min-height:44px}
+@media(max-width:620px){
+ .skeleton-list{grid-template-columns:1fr}.lineup-tools{flex-direction:column}
+ nav{width:100%;justify-content:space-between}
+ .intro .hero-logo{display:none}.intro{padding:12px 0 20px}.intro h1{font-size:48px}
+ .summary{position:sticky;top:0;z-index:7;padding:10px 14px;border-radius:0 0 14px 14px;margin:0 -2px;backdrop-filter:blur(8px)}
+ .summary>.eyebrow,.summary>p:not(.assignment),.summary dl,.summary .privacy{display:none}
+ .summary .total{border:0;padding:0;align-items:center}.summary .total output{font-size:40px}
+ .summary .assignment{padding:4px 0 0;font-size:13px}
+ .registration-grid{flex-direction:column-reverse}
+}
+
+/* lighter type, in sync with the rules document */
+h1,h2,h3,.brand,.tier-option strong,.badge,.total output,.stats strong,.team-card dd,.rules-review-top strong{font-weight:700;font-style:normal}
+h1{font-size:clamp(40px,5.5vw,68px);line-height:1}
+h2{font-size:clamp(26px,3vw,34px)}
+.brand{font-style:normal;font-weight:700}
+.button,.secondary,.danger,.filters button,nav,.rules-register,.rules-agreement button,.rules-review-top button{font-weight:700;letter-spacing:.06em}
+.total output{font-size:56px}.stats strong{font-size:34px}
+footer>span{font-style:normal;font-weight:600}
+/* rules frame fits the viewport on desktop Safari/Chrome and phones */
+.rules-frame-wrap iframe{height:clamp(440px,calc(100vh - 250px),780px);min-height:0}
+@supports(height:100dvh){.rules-frame-wrap iframe{height:clamp(440px,calc(100dvh - 250px),780px)}}
+@media(max-width:700px){.rules-frame-wrap{border-width:2px;border-radius:12px}.rules-frame-wrap iframe{height:clamp(420px,calc(100vh - 290px),640px)}@supports(height:100dvh){.rules-frame-wrap iframe{height:clamp(420px,calc(100dvh - 290px),640px)}}h1{font-size:40px}}
+
+/* Rules route: whole experience fits one screen, no page scroll */
+.app-rules{height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+.app-rules>header{flex:none;min-height:60px;padding:6px 0}
+.app-rules>footer,.app-rules .environment{display:none}
+.app-rules>main{flex:1;min-height:0;display:flex;flex-direction:column;padding-bottom:max(10px,env(safe-area-inset-bottom))}
+.app-rules .embedded-rules{flex:1;min-height:0;display:flex;flex-direction:column;margin:8px 0 0}
+.app-rules .rules-frame-wrap{flex:1;min-height:0}
+.app-rules .rules-frame-wrap iframe{height:100%;min-height:0}
+.app-rules .rules-review{flex:none;margin-top:8px;padding:8px 12px;gap:6px}
+@media(max-width:700px){.app-rules>header{min-height:0}.app-rules .brand{font-size:24px}.app-rules nav a,.app-rules .nav-locked{min-height:36px;padding:4px 10px}}
+
+/* App shell for every page: fixed header, scrolling content, tab bar on phones */
+.app{height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+.app>header{flex:none;min-height:60px;padding:6px 0}
+.app>footer{display:none}
+.app>main{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--line) transparent;padding-bottom:max(24px,env(safe-area-inset-bottom))}
+.app-rules>main{overflow:hidden}
+.page,.intro,.registration-grid{animation:page-in .3s ease both}
+@keyframes page-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.page,.intro,.registration-grid{animation:none}}
+.summary,.settings-card,.recalculate{border-color:#3e6a54}
+.page{padding:20px 0 32px}
+.page>h1{margin:12px 0}
+@media(max-width:620px){
+ .app>header{flex-wrap:nowrap}
+ .app>header nav{position:fixed;left:0;right:0;bottom:0;z-index:20;width:100%;justify-content:space-around;gap:0;padding:6px 8px calc(6px + env(safe-area-inset-bottom));background:#0b1724f2;border-top:1px solid var(--line);backdrop-filter:blur(10px)}
+ .app>header nav a,.app>header nav .nav-locked,.app>header nav .text-button{flex:1;justify-content:center;font-size:14px;padding:6px 4px;min-height:44px;text-align:center}
+ .app>main{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+ .app-rules>main{padding-bottom:calc(66px + env(safe-area-inset-bottom))}
+ .summary{top:0}
+}
+@media(max-width:620px){.brand-banner{display:none}}
