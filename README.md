@@ -170,7 +170,7 @@ Masking enabled means admin cards hide Ace names by default, with an authenticat
 
 ## Rules homepage and mobile installation
 
-The homepage embeds the uploaded `triace-rules.html` byte for byte, including its original desktop layout, mobile/PWA card deck, flash effects, and sound control. Visitors confirm each of the nine original sections in the rulebook before the Register tab and route become available. Locked sections cannot be skipped with the embedded document controls. The backend also requires the rules-accepted flag. The supplied challenge rule remains marked provisional. The web app includes a manifest and production-only service worker for installation and offline access to the app shell; registration still requires a live connection.
+The homepage embeds the uploaded `triace-rules.html` byte for byte, including its original desktop layout, mobile/PWA card deck, flash effects, and sound control. Visitors confirm each of the nine original sections in the rulebook before the Register tab and route become available. The rulebook provides the navigation controls; the embedded document’s duplicate mobile controls are hidden in the app. Locked sections cannot be skipped. The backend also requires the rules-accepted flag. The supplied challenge rule remains marked provisional. The web app includes a manifest and production-only service worker for installation and offline access to the app shell; registration still requires a live connection.
 
 ## Deploy the web app to Netlify
 

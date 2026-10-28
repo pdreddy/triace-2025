@@ -36,6 +36,12 @@ export default function Rules() {
       link.rel = 'stylesheet'; link.href = '/fonts/fonts.css'; link.dataset.localFonts = 'true';
       doc.head.appendChild(link);
     }
+    if (!doc.querySelector('style[data-rulebook-controls]')) {
+      const style = doc.createElement('style');
+      style.dataset.rulebookControls = 'true';
+      style.textContent = '.triace.deck .dnav,.triace.deck .swipe{display:none!important}.triace.deck .track{overflow-x:hidden!important;touch-action:pan-y}';
+      doc.head.appendChild(style);
+    }
     setReady(true);
     const observer = new frame.current.contentWindow.IntersectionObserver(entries => {
       for (const entry of entries) if (entry.isIntersecting && entry.intersectionRatio >= .35 && !root.classList.contains('deck')) {
@@ -101,6 +107,6 @@ export default function Rules() {
         <div className="rules-frame-wrap">{current > 0 && <span className="rules-bounce" key={current} aria-hidden="true" />}<iframe ref={frame} src="/triace-rules.html" title="Complete Triace 2.0 tournament rules" onLoad={attach} /></div>
       </div>
     </div>
-    <div className="rulebook-actions"><label><input type="checkbox" checked={confirmed.includes(current) || accepted} disabled={!ready || accepted} onChange={e => confirmCurrent(e.target.checked)} /><span>{accepted ? 'Rules accepted' : 'I have read this section'}</span></label><div><button type="button" className="rulebook-back" disabled={current === 0} onClick={() => show(current - 1)}>Back</button><button type="button" className="rulebook-continue" disabled={!ready || (!accepted && !confirmed.includes(current)) || (current === SECTIONS.length - 1 && !accepted && !allConfirmed)} onClick={continueReading}>{current === SECTIONS.length - 1 ? accepted ? 'Register →' : 'Agree & register →' : 'Continue →'}</button></div></div>
+    <div className="rulebook-actions"><label><input type="checkbox" checked={confirmed.includes(current) || accepted} disabled={!ready || accepted} onChange={e => confirmCurrent(e.target.checked)} /><span>{accepted ? 'Rules accepted' : confirmed.includes(current) ? 'Section confirmed' : 'Check to confirm this section'}</span></label><div><button type="button" className="rulebook-back" disabled={current === 0} onClick={() => show(current - 1)}>Back</button><button type="button" className="rulebook-continue" disabled={!ready || (!accepted && !confirmed.includes(current)) || (current === SECTIONS.length - 1 && !accepted && !allConfirmed)} onClick={continueReading}>{current === SECTIONS.length - 1 ? accepted ? 'Register →' : 'Agree & register →' : 'Continue →'}</button></div></div>
   </section>;
 }
