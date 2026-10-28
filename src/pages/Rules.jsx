@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useRulesAccess } from '../hooks/useRulesAccess';
 import './rules.css';
@@ -8,6 +8,7 @@ export default function Rules() {
   const frame = useRef(null), cleanup = useRef(() => {});
   const [seen, setSeen] = useState([0]), [current, setCurrent] = useState(0), [checked, setChecked] = useState(false), [ready, setReady] = useState(false);
   const allSeen = seen.length === CARD_COUNT;
+  useEffect(() => () => cleanup.current(), []);
   function record(index) { setSeen(old => old.includes(index) ? old : [...old, index]); }
   function attach() {
     cleanup.current();
@@ -16,6 +17,7 @@ export default function Rules() {
     if (!track) return;
     const cards = [...track.children].filter(el => el.matches('header,section'));
     if (cards.length !== CARD_COUNT) return;
+    if (!doc.querySelector('link[data-local-fonts]')) { const link = doc.createElement('link'); link.rel = 'stylesheet'; link.href = '/fonts/fonts.css'; link.dataset.localFonts = 'true'; doc.head.appendChild(link); }
     setReady(true); record(0);
     const observer = new frame.current.contentWindow.IntersectionObserver(entries => {
       for (const entry of entries) if (entry.isIntersecting && entry.intersectionRatio >= .35) {
@@ -43,6 +45,6 @@ export default function Rules() {
   return <section className="embedded-rules" aria-label="Official Triace tournament rules">
     <div className="rules-frame-wrap">{current > 0 && <span className="rules-bounce" key={current} aria-hidden="true" />}<iframe ref={frame} src="/triace-rules.html" title="Complete Triace 2.0 tournament rules" onLoad={attach} /></div>
     <div className="rules-review"><div className="rules-review-top"><strong>{seen.length}/{CARD_COUNT} <span>sections read</span></strong><div className="rules-progress" role="progressbar" aria-label="Rules read" aria-valuemin="0" aria-valuemax={CARD_COUNT} aria-valuenow={seen.length}><span style={{ width: `${seen.length / CARD_COUNT * 100}%` }} /></div><button type="button" onClick={next} disabled={!ready || current >= CARD_COUNT - 1} aria-label="Next rule card">{current >= CARD_COUNT - 1 ? 'Last rule' : 'Next →'}</button></div>
-      {accepted ? <div className="rules-agreement done"><span>✓ Rules accepted</span><Link className="rules-register" to="/register">Register team ↗</Link></div> : <div className="rules-agreement"><label><input type="checkbox" checked={checked} disabled={!allSeen} onChange={e => setChecked(e.target.checked)} /> {allSeen ? 'I have read all rules and agree.' : `Swipe or tap Next — ${CARD_COUNT - seen.length} left to read.`}</label><button type="button" disabled={!allSeen || !checked} onClick={accept}>Agree to rules</button></div>}</div>
+      {accepted ? <div className="rules-agreement done"><span>✓ Rules accepted</span><Link className="rules-register" to="/register">Register team →</Link></div> : <div className="rules-agreement"><label><input type="checkbox" checked={checked} disabled={!allSeen} onChange={e => setChecked(e.target.checked)} /> {allSeen ? 'I have read all rules and agree.' : `Swipe or tap Next — ${CARD_COUNT - seen.length} left to read.`}</label><button type="button" disabled={!allSeen || !checked} onClick={accept}>Agree to rules</button></div>}</div>
   </section>;
 }
