@@ -167,3 +167,14 @@ footer>span{font-style:normal;font-weight:600}
 .rules-frame-wrap iframe{height:clamp(440px,calc(100vh - 250px),780px);min-height:0}
 @supports(height:100dvh){.rules-frame-wrap iframe{height:clamp(440px,calc(100dvh - 250px),780px)}}
 @media(max-width:700px){.rules-frame-wrap{border-width:2px;border-radius:12px}.rules-frame-wrap iframe{height:clamp(420px,calc(100vh - 290px),640px)}@supports(height:100dvh){.rules-frame-wrap iframe{height:clamp(420px,calc(100dvh - 290px),640px)}}h1{font-size:40px}}
+
+/* Rules route: whole experience fits one screen, no page scroll */
+.app-rules{height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+.app-rules>header{flex:none;min-height:60px;padding:6px 0}
+.app-rules>footer,.app-rules .environment{display:none}
+.app-rules>main{flex:1;min-height:0;display:flex;flex-direction:column;padding-bottom:max(10px,env(safe-area-inset-bottom))}
+.app-rules .embedded-rules{flex:1;min-height:0;display:flex;flex-direction:column;margin:8px 0 0}
+.app-rules .rules-frame-wrap{flex:1;min-height:0}
+.app-rules .rules-frame-wrap iframe{height:100%;min-height:0}
+.app-rules .rules-review{flex:none;margin-top:8px;padding:8px 12px;gap:6px}
+@media(max-width:700px){.app-rules>header{min-height:0}.app-rules .brand{font-size:24px}.app-rules nav a,.app-rules .nav-locked{min-height:36px;padding:4px 10px}}
