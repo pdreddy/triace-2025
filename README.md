@@ -1,6 +1,6 @@
 # Traice
 
-A mobile-friendly tennis tournament app built with React, Vite, Firebase Authentication, Realtime Database, and callable Cloud Functions. Includes four routes: registration (`/`), public tier lists (`/tiers`), admin login (`/admin/login`), and the protected dashboard (`/admin`).
+A mobile-friendly tennis tournament app built with React, Vite, Firebase Authentication, Realtime Database, and callable Cloud Functions. Includes a swipeable rules homepage (`/`), registration (`/register`), public tier lists (`/tiers`), admin login (`/admin/login`), and the protected dashboard (`/admin`).
 
 ## Quick local test — no Firebase account required
 
@@ -19,7 +19,7 @@ npm run demo
 
 Open the address printed by Vite (default local port 3000). Sign in at `/admin/login` with username **`reddi2026`** and the password you set. In this prepared workspace, `.env.demo.local` already contains the requested temporary local admin password. It is ignored by Git and never sent to the browser.
 
-This mode runs a local server with cookie-based admin sessions, protected APIs, and file persistence in `.local-demo/state.json`. Public responses contain no Ace names. It uses exactly the same validation, tier assignment, configuration, and recalculation operations as Firebase Functions. It does **not** use Firebase or establish that your live Firebase project is configured. The banner always identifies it as local demo mode. It binds to loopback and must not be deployed or exposed as a production server.
+This mode runs a local server with cookie-based admin sessions, protected APIs, and file persistence in `.local-demo/state.json`. Public responses mask Ace names by default; an admin can publish or hide them by saving the masking setting. It uses exactly the same validation, tier assignment, configuration, and recalculation operations as Firebase Functions. It does **not** use Firebase or establish that your live Firebase project is configured. The banner always identifies it as local demo mode. It binds to loopback and must not be deployed or exposed as a production server.
 
 The local data directory and environment files cannot be served by the Vite server. To reset local test data, stop the server and remove only `.local-demo/`. This deletes local demo registrations, not Firebase data. Demo sessions expire after eight hours or when the server stops. Restart the demo after changing its username or password.
 
@@ -110,7 +110,7 @@ Deploy database rules after merging them with the shared project’s existing ru
 npx firebase deploy --project multiclub-890ea --only database
 ```
 
-The supplied project’s previous rules, users, billing, functions and hosting have not been changed by this work. Before going live, execute the Firebase integration suite, verify the merged rules, test the real admin account and an authorized registration, and confirm public responses omit Ace names.
+The supplied project’s previous rules, users, billing, functions and hosting have not been changed by this work. Before going live, execute the Firebase integration suite, verify the merged rules, test the real admin account and an authorized registration, and confirm public name visibility follows the saved masking setting.
 
 Once deployed, sign in and **Save configuration** in the admin dashboard to initialize a fresh tournament. Existing settings are not overwritten during deployment. Do not deploy over incompatible legacy data without a reviewed migration and backup.
 
@@ -138,9 +138,9 @@ traice2_0/
                             combinedUtr, assignedTier, registeredAt, teamId
 ```
 
-All UTR values are **integer hundredths** (`1700` = 17.00), including tier configuration. UI, CSV, and messages display normal decimal UTR. This makes range endpoints exact. A player supplies a required UTR/singles rating and an optional doubles rating; the higher counts. The captain supplies a first name only. Ace full names are retained only in private registrations. Anonymous browser authentication supplies the owner UID server-side; clients cannot choose it.
+All UTR values are **integer hundredths** (`1700` = 17.00), including tier configuration. UI, CSV, and messages display normal decimal UTR. This makes range endpoints exact. A player supplies a required UTR/singles rating and an optional doubles rating; the higher counts. The captain supplies a first name only. Ace full names remain in private registrations and appear in public tier records only when the admin disables masking. Anonymous browser authentication supplies the owner UID server-side; clients cannot choose it.
 
-The public projection contains no Ace names or owner UID. Public pages read only `settings`, `tierConfig`, `configRevision`, and `tiers`. Private records are readable only with `admin: true`. The `registerTeam` callable authenticates an anonymous or signed-in user and validates their payload before atomically creating both records. `saveConfiguration` and `recalculateTiers` require an admin claim. Direct client writes are denied, so clients cannot bypass assignment validation, alter settings or inject names into public records. This intentionally enforces registration creation through the backend rather than permissive direct-write rules.
+The public projection contains no owner UID. Ace names appear only when the saved masking setting is off; saving the setting immediately rebuilds public name visibility for registrations made with the current name-publication consent. Earlier registrations remain masked. Public pages read only `settings`, `tierConfig`, `configRevision`, and `tiers`. Private records are readable only with `admin: true`. The `registerTeam` callable authenticates an anonymous or signed-in user and validates their payload before atomically creating both records. `saveConfiguration` and `recalculateTiers` require an admin claim. Direct client writes are denied, so clients cannot bypass assignment validation, alter settings or inject names into public records. This intentionally enforces registration creation through the backend rather than permissive direct-write rules.
 
 The server transaction creates or moves both private/public representations in one commit. Retrying the same team ID with the same payload and owner is idempotent. New registrations use new random IDs, so an anonymous user can register more than one team. Anonymous auth alone is not an anti-spam identity check; enforce appropriate Firebase quotas/App Check or event-specific admission controls before a public event. Full tournament transactions are suitable for a small event; assess transaction size/contention before scaling to very large datasets.
 
@@ -153,7 +153,7 @@ Masking enabled means admin cards hide Ace names by default, with an authenticat
 - Options are all active tiers plus “Interested in a higher UTR tier.” A GOAT-qualified team may enter GOAT, Rising, or both public lists; a Rising-qualified team cannot enter GOAT. The higher-tier option assigns the highest eligible tier. Recalculation preserves the chosen tier when still eligible.
 - For overlaps, lower `sortOrder` is higher priority; each tier must have a unique order. Tier IDs are immutable; names, ranges, order, and active status are editable. Up to 20 tiers are supported.
 - Totals in gaps or outside all active ranges cannot register. Existing teams can become **Unassigned** after a configuration change and recalculation; they stay in private records and disappear from public tier paths.
-- Saving configuration updates new registrations. Use **Recalculate Tiers** to update existing teams. It rebuilds the entire public tier tree from private registrations, removes stale entries, updates private assignments, and returns reviewed/moved/unchanged/unassigned counts. `moved + unchanged = reviewed`; `unassigned` is a subset that may include unchanged unassigned teams.
+- Saving masking changes immediately updates public name visibility. Use **Recalculate Tiers** after changing ranges or active tiers to update existing teams. It rebuilds the entire public tier tree from private registrations, removes stale entries, updates private assignments, and returns reviewed/moved/unchanged/unassigned counts. `moved + unchanged = reviewed`; `unassigned` is a subset that may include unchanged unassigned teams.
 - To remove a populated tier safely: deactivate it, save, recalculate, then remove it and save again. Removal is checked on the server, not just disabled in the UI.
 - Config revisions reject stale writes from another admin session. Reload saved settings to resolve a conflict rather than silently overwriting someone else’s changes.
 
@@ -167,3 +167,7 @@ Masking enabled means admin cards hide Ace names by default, with an authenticat
 - `functions/index.js`: authenticated callable endpoints and atomic database transactions.
 - `scripts/`: local demo server plugin, emulator seed, trusted admin-role helper.
 - `tests/unit/`, `tests/browser/`, `tests/firebase/`: domain, local end-to-end, and real emulator integration checks.
+
+## Rules homepage and mobile installation
+
+The homepage presents the uploaded match and playoff rules as swipeable cards with a reduced-motion-aware flash transition. Tier ranges come from saved admin settings so the page stays accurate. Registration requires a separate rules acceptance checkbox, validated again by the backend. The supplied challenge rule remains marked provisional. The web app includes a manifest and production-only service worker for installation and offline access to the app shell; registration still requires a live connection.

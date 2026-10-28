@@ -10,7 +10,7 @@ const app=initializeApp({projectId:'demo-traice-2',databaseURL:'https://demo-tra
 let guestToken,adminToken;
 async function token(admin=false){const email=`${randomUUID()}@example.test`,password='emulator-test-only-password';const user=await auth.createUser({email,password});if(admin)await auth.setCustomUserClaims(user.uid,{admin:true});const response=await fetch('http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=demo-local-key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password,returnSecureToken:true})});const result=await response.json();assert.ok(result.idToken);return result.idToken;}
 async function call(name,data,bearer=guestToken){const response=await fetch(`http://127.0.0.1:5001/demo-traice-2/us-central1/${name}`,{method:'POST',headers:{'Content-Type':'application/json',...(bearer?{Authorization:`Bearer ${bearer}`}:{})},body:JSON.stringify({data})});return {status:response.status,...await response.json()};}
-const team=()=>({teamId:randomUUID(),captain:{firstName:'John',singlesUtr:600,doublesUtr:null},ace1:{fullName:'Secret Alpha',singlesUtr:600,doublesUtr:null},ace2:{fullName:'Secret Beta',singlesUtr:600,doublesUtr:null},selectedTier:'higher',consent:true});
+const team=()=>({teamId:randomUUID(),captain:{firstName:'John',singlesUtr:600,doublesUtr:null},ace1:{fullName:'Secret Alpha',singlesUtr:600,doublesUtr:null},ace2:{fullName:'Secret Beta',singlesUtr:600,doublesUtr:null},selectedTier:'higher',consent:true,rulesAccepted:true});
 before(async()=>{guestToken=await token();adminToken=await token(true);});
 after(async()=>{await deleteApp(app);});
 beforeEach(async()=>{await database.ref('traice2_0').set(initialState());});
