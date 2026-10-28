@@ -1,0 +1,14 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "traice2_0": {
+      ".read": "auth != null && auth.token.admin === true",
+      "settings": { ".read": true },
+      "tierConfig": { ".read": true },
+      "configRevision": { ".read": true },
+      "tiers": { ".read": true },
+      "registrations": { ".read": "auth != null && auth.token.admin === true" }
+    }
+  }
+}

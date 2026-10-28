@@ -1,0 +1,12 @@
+node_modules/
+functions/node_modules/
+dist/
+.env.local
+.env.*.local
+.env.demo
+firebase-config.json
+*-debug.log
+.firebase/
+.local-demo/
+test-results/
+playwright-report/

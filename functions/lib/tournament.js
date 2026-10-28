@@ -1,0 +1,118 @@
+export const DEFAULT_SETTINGS = { registrationEnabled: true, aceNameMaskingEnabled: true, minPlayerUtr: 1, maxPlayerUtr: 1650 };
+export const DEFAULT_TIERS = {
+  goat: { name: 'GOAT Tier', minCombinedUtr: 1700, maxCombinedUtr: 2200, sortOrder: 1, active: true },
+  rising: { name: 'Rising Tier', minCombinedUtr: 1150, maxCombinedUtr: 1650, sortOrder: 2, active: true }
+};
+export class ValidationError extends Error { constructor(message) { super(message); this.name = 'ValidationError'; } }
+export const formatUtr = value => (value / 100).toFixed(2);
+export function parseUtr(value) {
+  const text = String(value ?? '').trim();
+  if (!/^\d{1,2}(\.\d{1,2})?$/.test(text)) throw new ValidationError('Enter a numeric UTR with up to two decimal places.');
+  return Math.round(Number(text) * 100);
+}
+function assert(condition, message) { if (!condition) throw new ValidationError(message); }
+function exact(value, keys, message) { assert(value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every(k => Object.hasOwn(value, k)), message); }
+function integer(value, min, max) { return Number.isInteger(value) && value >= min && value <= max; }
+function name(value, label, max = 80) { assert(typeof value === 'string' && value.trim().length > 0 && value.trim().length <= max && !/[\u0000-\u001f\u007f]/.test(value), `${label} is required (up to ${max} characters).`); return value.trim(); }
+export function validateSettings(value) {
+  exact(value, Object.keys(DEFAULT_SETTINGS), 'Invalid registration settings.');
+  assert(typeof value.registrationEnabled === 'boolean' && typeof value.aceNameMaskingEnabled === 'boolean', 'Registration and masking settings must be on or off.');
+  assert(integer(value.minPlayerUtr, 1, 1650) && integer(value.maxPlayerUtr, value.minPlayerUtr, 1650), 'Individual UTR limits must be between 0.01 and 16.50, with minimum ≤ maximum.');
+  return { ...value };
+}
+export function validateTierConfig(value) {
+  assert(value && typeof value === 'object' && !Array.isArray(value), 'Tier configuration is required.');
+  assert(Object.keys(value).length <= 20, 'A tournament supports at most 20 tiers.');
+  const result = {};
+  for (const [id, tier] of Object.entries(value)) {
+    assert(/^[a-z][a-z0-9_-]{0,39}$/.test(id) && !['higher', 'constructor', 'prototype'].includes(id), 'Tier IDs must use lowercase letters, numbers, hyphens or underscores, and cannot be "higher".');
+    exact(tier, ['name', 'minCombinedUtr', 'maxCombinedUtr', 'sortOrder', 'active'], 'Invalid tier fields.');
+    assert(integer(tier.minCombinedUtr, 1, 4950) && integer(tier.maxCombinedUtr, tier.minCombinedUtr, 4950), 'Combined UTR limits must be between 0.01 and 49.50, with minimum ≤ maximum.');
+    assert(integer(tier.sortOrder, 1, 999) && typeof tier.active === 'boolean', 'Each tier needs an order from 1 to 999 and an active status.');
+    result[id] = { ...tier, name: name(tier.name, 'Tier name', 50) };
+  }
+  assert(new Set(Object.values(result).map(t => t.sortOrder)).size === Object.keys(result).length, 'Each tier must have a unique order. Order 1 is highest.');
+  return result;
+}
+export function orderedTiers(config, activeOnly = false) {
+  return Object.entries(config || {}).map(([id, tier]) => ({ ...tier, id })).filter(t => !activeOnly || t.active).sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
+}
+export function assignTier(combinedUtr, config) {
+  return orderedTiers(config, true).find(tier => combinedUtr >= tier.minCombinedUtr && combinedUtr <= tier.maxCombinedUtr)?.id ?? null;
+}
+function player(value, captain, settings) {
+  exact(value, [captain ? 'firstName' : 'fullName', 'singlesUtr', 'doublesUtr'], 'Invalid player fields.');
+  const key = captain ? 'firstName' : 'fullName';
+  const label = captain ? 'Captain first name' : 'Ace full name';
+  const clean = name(value[key], label, captain ? 40 : 80);
+  if (captain) assert(!/\s/.test(clean), 'Enter only the captain’s first name, without a surname.');
+  assert(integer(value.singlesUtr, settings.minPlayerUtr, settings.maxPlayerUtr), `${label}: UTR must be ${formatUtr(settings.minPlayerUtr)}–${formatUtr(settings.maxPlayerUtr)}.`);
+  assert(value.doublesUtr === null || integer(value.doublesUtr, settings.minPlayerUtr, settings.maxPlayerUtr), `${label}: optional doubles UTR must be within the individual limits.`);
+  return { [key]: clean, singlesUtr: value.singlesUtr, doublesUtr: value.doublesUtr, utr: Math.max(value.singlesUtr, value.doublesUtr ?? 0) };
+}
+export function validateRegistration(payload, settings, tiers) {
+  validateSettings(settings); validateTierConfig(tiers);
+  assert(settings.registrationEnabled, 'Registration is currently closed.');
+  exact(payload, ['teamId', 'captain', 'ace1', 'ace2', 'selectedTier', 'consent'], 'Invalid registration fields.');
+  assert(typeof payload.teamId === 'string' && /^[a-zA-Z0-9_-]{16,80}$/.test(payload.teamId), 'Invalid registration identifier.');
+  assert(payload.consent === true, 'Player consent is required.');
+  assert(payload.selectedTier === 'higher' || (typeof payload.selectedTier === 'string' && Object.hasOwn(tiers, payload.selectedTier) && tiers[payload.selectedTier].active), 'Select an active tier or the higher-tier interest option.');
+  const captain = player(payload.captain, true, settings), ace1 = player(payload.ace1, false, settings), ace2 = player(payload.ace2, false, settings);
+  const combinedUtr = captain.utr + ace1.utr + ace2.utr, assignedTier = assignTier(combinedUtr, tiers);
+  assert(assignedTier, 'Your combined UTR does not fit an active tier. Please contact the tournament admin.');
+  return { teamId: payload.teamId, captain, ace1, ace2, combinedUtr, selectedTier: payload.selectedTier, assignedTier };
+}
+export function publicRecord(team) {
+  return { teamId: team.teamId, captainFirstName: team.captain.firstName, captainUtr: team.captain.utr, ace1Utr: team.ace1.utr, ace2Utr: team.ace2.utr, combinedUtr: team.combinedUtr, assignedTier: team.assignedTier, registeredAt: team.registeredAt };
+}
+export function initialState() { return { settings: { ...DEFAULT_SETTINGS }, tierConfig: structuredClone(DEFAULT_TIERS), configRevision: 1, registrations: {}, tiers: {} }; }
+export function publicState(state) { return { settings: state.settings, tierConfig: state.tierConfig || {}, configRevision: state.configRevision || 0, tiers: state.tiers || {} }; }
+function canonical(value) { return JSON.stringify(value, (_, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).filter(key => item[key] !== null && item[key] !== undefined).sort().map(key => [key, item[key]])) : item); }
+export function applyRegistration(current, payload, uid, now = Date.now()) {
+  assert(typeof uid === 'string' && uid.length > 0, 'Sign in before registering.');
+  assert(current?.settings, 'The admin must initialize tournament settings first.');
+  const team = validateRegistration(payload, current.settings, current.tierConfig || {});
+  const state = structuredClone(current), previous = state.registrations?.[team.teamId];
+  if (previous) {
+    const { ownerUid, registeredAt, ...saved } = previous;
+    assert(ownerUid === uid && canonical(saved) === canonical(team), 'This registration identifier is already in use.');
+    return { state, result: { teamId: previous.teamId, assignedTier: previous.assignedTier, combinedUtr: previous.combinedUtr } };
+  }
+  const record = { ...team, ownerUid: uid, registeredAt: now };
+  state.registrations ||= {}; state.registrations[team.teamId] = record;
+  state.tiers ||= {}; state.tiers[team.assignedTier] ||= { teams: {} }; state.tiers[team.assignedTier].teams ||= {};
+  state.tiers[team.assignedTier].teams[team.teamId] = publicRecord(record);
+  return { state, result: { teamId: record.teamId, assignedTier: record.assignedTier, combinedUtr: record.combinedUtr } };
+}
+export function applyConfiguration(current, payload) {
+  exact(payload, ['settings', 'tierConfig', 'expectedRevision'], 'Invalid configuration request.');
+  const state = structuredClone(current || initialState());
+  assert(payload.expectedRevision === (current?.configRevision || 0), 'Configuration changed in another session. Reload settings before saving.');
+  const settings = validateSettings(payload.settings), tiers = validateTierConfig(payload.tierConfig);
+  const removed = Object.keys(state.tierConfig || {}).filter(id => !Object.hasOwn(tiers, id));
+  assert(!Object.values(state.registrations || {}).some(team => removed.includes(team.assignedTier)), 'A removed tier still has teams. Deactivate it, save, and recalculate before removing it.');
+  state.settings = settings; state.tierConfig = tiers; state.configRevision = (current?.configRevision || 0) + 1;
+  for (const id of removed) if (state.tiers) delete state.tiers[id];
+  return { state, result: { configRevision: state.configRevision } };
+}
+export function applyRecalculation(current) {
+  assert(current?.settings, 'Save the initial tournament configuration first.');
+  validateTierConfig(current.tierConfig || {});
+  const state = structuredClone(current), summary = { reviewed: 0, moved: 0, unchanged: 0, unassigned: 0 };
+  state.tiers = {};
+  for (const team of Object.values(state.registrations || {})) {
+    const total = team.captain.utr + team.ace1.utr + team.ace2.utr;
+    const assigned = assignTier(total, state.tierConfig);
+    summary.reviewed++; if (assigned === (team.assignedTier ?? null)) summary.unchanged++; else summary.moved++;
+    if (!assigned) summary.unassigned++;
+    team.combinedUtr = total; team.assignedTier = assigned;
+    if (assigned) { state.tiers[assigned] ||= { teams: {} }; state.tiers[assigned].teams[team.teamId] = publicRecord(team); }
+  }
+  return { state, result: summary };
+}
+export function registrationsCsv(teams, tiers) {
+  const columns = ['Team ID', 'Captain first name', 'Captain UTR', 'Ace 1 full name', 'Ace 1 UTR', 'Ace 2 full name', 'Ace 2 UTR', 'Combined UTR', 'Selected tier', 'Assigned tier', 'Registered at'];
+  const cell = value => { let text = String(value ?? ''); if (/^[\s]*[=+@-]/.test(text)) text = "'" + text; return '"' + text.replaceAll('"', '""') + '"'; };
+  const rows = Object.values(teams || {}).map(t => [t.teamId, t.captain.firstName, formatUtr(t.captain.utr), t.ace1.fullName, formatUtr(t.ace1.utr), t.ace2.fullName, formatUtr(t.ace2.utr), formatUtr(t.combinedUtr), tiers[t.selectedTier]?.name || t.selectedTier, tiers[t.assignedTier]?.name || 'Unassigned', new Date(t.registeredAt).toISOString()]);
+  return [columns, ...rows].map(row => row.map(cell).join(',')).join('\r\n');
+}

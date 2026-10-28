@@ -1,0 +1,12 @@
+import { before, after, beforeEach, test } from 'node:test';
+import { readFile } from 'node:fs/promises';
+import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
+import { ref, get, set } from 'firebase/database';
+import { initialState } from '../../functions/lib/tournament.js';
+let env;
+before(async()=>{env=await initializeTestEnvironment({projectId:'demo-traice-2',database:{rules:await readFile('database.rules.json','utf8')}});});
+after(async()=>env?.cleanup());
+beforeEach(async()=>{await env.clearDatabase();await env.withSecurityRulesDisabled(async context=>set(ref(context.database(),'traice2_0'),initialState()));});
+test('public may read only safe tier data and form configuration',async()=>{const db=env.unauthenticatedContext().database();for(const key of ['settings','tierConfig','tiers','configRevision'])await assertSucceeds(get(ref(db,`traice2_0/${key}`)));for(const key of ['traice2_0','traice2_0/registrations'])await assertFails(get(ref(db,key)));});
+test('anonymous and admin clients cannot bypass callable validation through direct writes',async()=>{for(const context of [env.unauthenticatedContext(),env.authenticatedContext('guest'),env.authenticatedContext('admin',{admin:true})]){const db=context.database();for(const key of ['settings','tierConfig','registrations/fake','tiers/goat/teams/fake'])await assertFails(set(ref(db,`traice2_0/${key}`),{}));}});
+test('only admin claims allow private reads',async()=>{const admin=env.authenticatedContext('owner',{admin:true}).database(),guest=env.authenticatedContext('guest').database();await assertSucceeds(get(ref(admin,'traice2_0/registrations')));await assertFails(get(ref(guest,'traice2_0/registrations')));});

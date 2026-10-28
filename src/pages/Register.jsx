@@ -1,0 +1,35 @@
+import { useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useTournament } from '../hooks/useTournament';
+import { Field, Message } from '../components/UI';
+import { assignTier, orderedTiers, parseUtr, formatUtr, validateRegistration } from '../../functions/lib/tournament.js';
+const empty = () => ({ captain: { name: '', singles: '', doubles: '' }, ace1: { name: '', singles: '', doubles: '' }, ace2: { name: '', singles: '', doubles: '' } });
+export default function Register() {
+  const { data, service, user, connected } = useTournament();
+  const [players, setPlayers] = useState(empty), [selectedTier, setSelectedTier] = useState('higher'), [consent, setConsent] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(''), [success, setSuccess] = useState(null);
+  const id = useRef(crypto.randomUUID());
+  const config = data?.tierConfig || {}, active = orderedTiers(config, true), settings = data?.settings;
+  let combined = 0, complete = true;
+  for (const value of Object.values(players)) { try { if (!value.singles) complete = false; combined += Math.max(value.singles ? parseUtr(value.singles) : 0, value.doubles ? parseUtr(value.doubles) : 0); } catch { complete = false; } }
+  const assigned = complete ? assignTier(combined, config) : null;
+  function change(key, field, value) { setPlayers(old => ({ ...old, [key]: { ...old[key], [field]: value } })); setError(''); setSuccess(null); }
+  async function submit(event) {
+    event.preventDefault(); if (busy) return;
+    if (!settings || !connected || !user?.uid) { setError('Registration is not connected. Please wait or contact the admin.'); return; }
+    setError(''); setSuccess(null);
+    try {
+      const payload = { teamId: id.current, selectedTier, consent };
+      for (const [key, value] of Object.entries(players)) payload[key] = { [key === 'captain' ? 'firstName' : 'fullName']: value.name.trim(), singlesUtr: parseUtr(value.singles), doublesUtr: value.doubles.trim() ? parseUtr(value.doubles) : null };
+      validateRegistration(payload, settings, config);
+      setBusy(true); const result = await service.register(payload); setSuccess(result); setPlayers(empty()); setConsent(false); id.current = crypto.randomUUID();
+    } catch (e) { setError(e.message); } finally { setBusy(false); }
+  }
+  return <><section className="intro"><div><div className="eyebrow">THREE PLAYERS. ONE TEAM.</div><h1>Your team.<br />Your next <em>challenge.</em></h1><p>Find your tier. Bring your trio.<br />Register for Traice and let your game do the talking.</p></div><div className="court" aria-hidden="true"><span>TRAICE / PLAY TOGETHER</span><div className="court-lines" /><i className="ball" /></div></section>
+    {success && <Message>Team registered successfully! Assigned to {config[success.assignedTier]?.name || success.assignedTier}, combined UTR {formatUtr(success.combinedUtr)}. Registration ID: {success.teamId}. <Link to="/tiers">View the lineup →</Link></Message>}
+    <div className="registration-grid"><form onSubmit={submit} aria-label="Team registration"><div className="section-label">01 / TEAM REGISTRATION</div><h2>Let’s meet your team.</h2>
+      <fieldset disabled={busy}><legend>Choose your tier preference</legend><div className="tier-options">{active.map(t => <label className={`tier-option ${selectedTier === t.id ? 'selected' : ''}`} key={t.id}><input type="radio" name="tier" value={t.id} checked={selectedTier === t.id} onChange={() => setSelectedTier(t.id)} /><span><strong>{t.name}</strong><small>{formatUtr(t.minCombinedUtr)}–{formatUtr(t.maxCombinedUtr)} combined UTR</small></span></label>)}<label className={`tier-option ${selectedTier === 'higher' ? 'selected' : ''}`}><input type="radio" name="tier" value="higher" checked={selectedTier === 'higher'} onChange={() => setSelectedTier('higher')} /><span><strong>Interested in a higher UTR tier</strong><small>Place us in the highest eligible tier</small></span></label></div>
+      {['captain', 'ace1', 'ace2'].map((key, i) => <section className="player" key={key}><div className="player-heading"><h3>0{i + 1} · {i === 0 ? 'Captain' : `Ace ${i}`}</h3><span>{i === 0 ? 'FIRST NAME PUBLIC' : 'FULL NAME PRIVATE'}</span></div><Field id={`${key}-name`} label={i === 0 ? 'Captain first name' : `Ace ${i} full name`} value={players[key].name} onChange={e => change(key, 'name', e.target.value)} required maxLength={i === 0 ? 40 : 80} autoComplete={i === 0 ? 'given-name' : 'off'} placeholder={i === 0 ? 'First name only' : 'Full name'} />
+        <div className="ratings"><Field id={`${key}-utr`} label="UTR / singles UTR" value={players[key].singles} onChange={e => change(key, 'singles', e.target.value)} required type="number" inputMode="decimal" step="0.01" min={(settings?.minPlayerUtr || 1) / 100} max={(settings?.maxPlayerUtr || 1650) / 100} placeholder="e.g. 6.50" /><Field id={`${key}-doubles`} label="Doubles UTR (optional)" value={players[key].doubles} onChange={e => change(key, 'doubles', e.target.value)} type="number" inputMode="decimal" step="0.01" min={(settings?.minPlayerUtr || 1) / 100} max={(settings?.maxPlayerUtr || 1650) / 100} placeholder="If applicable" /></div></section>)}
+      <label className="checkbox"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} required /><span>I have permission to register these players and publish the captain’s first name and all three UTR values.</span></label><Message error>{error}</Message><button className="button" disabled={busy || !settings?.registrationEnabled || !connected || !user?.uid || !active.length}>{busy ? 'Saving registration…' : 'Register team ↗'}</button></fieldset>
+    </form><aside className="summary"><div className="eyebrow">YOUR TEAM AT A GLANCE</div><div className="total"><output aria-label="Combined UTR">{formatUtr(combined)}</output><span>COMBINED UTR</span></div><p className="assignment" role="status">Assigned tier: <strong>{assigned ? config[assigned].name : complete ? 'No eligible active tier' : 'Add all three UTR values'}</strong></p><p>Your preference is considered, and you will always be placed in the highest eligible active tier. Order 1 is the highest tier when ranges overlap.</p><dl><div><dt>TEAM SIZE</dt><dd>Exactly 3 players</dd></div><div><dt>RATING RULE</dt><dd>Higher of singles or doubles</dd></div></dl><div className="privacy"><strong>A little privacy, by default.</strong><p>Only the captain’s first name is public. Ace 1 and Ace 2 names stay private. All three UTRs are visible.</p></div>{settings && !settings.registrationEnabled && <Message>Registration is closed.</Message>}{data && !settings && <Message>An admin must save the initial tournament configuration.</Message>}</aside></div></>;
+}
