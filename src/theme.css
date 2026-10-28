@@ -99,8 +99,30 @@ footer>span{font-family:var(--display);font-style:italic;font-size:16px;letter-s
 /* agreement bar + PWA safe areas */
 .rules-agreement{background:var(--bg-2);border-color:var(--lime)}
 .rules-agreement button{border-radius:999px;font-family:var(--display);font-size:18px;letter-spacing:.08em;text-transform:uppercase}
-.rules-agreement button:disabled{background:#506378;color:#d2deea}
+.rules-review .rules-agreement button:disabled{background:#506378;color:#d2deea}
 .rules-register{border-radius:999px;font-family:var(--display);font-size:20px;letter-spacing:.08em;text-transform:uppercase}
 header,footer{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
 footer{padding-bottom:calc(30px + env(safe-area-inset-bottom))}
 @media(display-mode:standalone){body{overscroll-behavior-y:none}header{padding-top:env(safe-area-inset-top)}}
+
+/* compact rules page */
+header{height:auto;min-height:72px;flex-wrap:wrap;padding:10px 0}
+.embedded-rules{margin:8px 0 40px}
+.rules-review{display:flex;flex-direction:column;gap:10px;margin-top:14px;padding:12px 14px;background:var(--bg-2);border:1px solid var(--line);border-radius:14px;}
+.rules-review-top{display:flex;align-items:center;gap:14px}
+.rules-review-top strong{font-family:var(--display);font-size:22px;color:var(--lime);white-space:nowrap}
+.rules-review-top strong span{font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.rules-progress{flex:1;height:6px;border-radius:9px;background:var(--line);overflow:hidden;margin:0}
+.rules-progress span{display:block;height:100%;background:var(--lime);transition:width .3s}
+.rules-review-top button{font-family:var(--display);font-size:17px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--lime);background:transparent;color:var(--lime);border-radius:999px;padding:6px 18px;white-space:nowrap}
+.rules-review-top button:disabled{opacity:.35}
+.rules-review .rules-agreement{margin:0;padding:0;border:0;background:none;gap:12px;flex-direction:row;align-items:center;justify-content:space-between}
+.rules-agreement label{font-size:14px;font-weight:500;color:var(--ink)}
+.rules-review .rules-agreement button{background:var(--lime);color:var(--bg);font-size:17px;padding:8px 22px;white-space:nowrap}
+.rules-agreement.done{justify-content:space-between}
+.rules-agreement.done>span{color:var(--lime);font-weight:700}
+.rules-register{display:inline-block;margin:0;max-width:none;font-size:17px;padding:8px 22px;background:var(--lime);color:var(--bg)}
+@media(max-width:700px){.rules-review{padding:10px 12px}.rules-review-top strong span{display:none}.rules-agreement{flex-direction:row;align-items:center}.rules-agreement button{width:auto}.rules-agreement label{font-size:13px}}
+
+.rules-review .rules-agreement button:disabled{background:#506378;color:#d2deea}
+@media(max-width:700px){.rules-review .rules-agreement{flex-direction:row}}
