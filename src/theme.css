@@ -95,3 +95,12 @@ footer>span{font-family:var(--display);font-style:italic;font-size:16px;letter-s
 
 @media(max-width:900px){h2{font-size:30px}}
 @media(max-width:620px){h1{font-size:56px}.brand{font-size:28px}nav{font-size:15px;gap:4px}nav a,.nav-locked,.text-button{padding:6px 10px}.total output{font-size:56px}.button,.secondary{font-size:17px}}
+
+/* agreement bar + PWA safe areas */
+.rules-agreement{background:var(--bg-2);border-color:var(--lime)}
+.rules-agreement button{border-radius:999px;font-family:var(--display);font-size:18px;letter-spacing:.08em;text-transform:uppercase}
+.rules-agreement button:disabled{background:#506378;color:#d2deea}
+.rules-register{border-radius:999px;font-family:var(--display);font-size:20px;letter-spacing:.08em;text-transform:uppercase}
+header,footer{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+footer{padding-bottom:calc(30px + env(safe-area-inset-bottom))}
+@media(display-mode:standalone){body{overscroll-behavior-y:none}header{padding-top:env(safe-area-inset-top)}}
