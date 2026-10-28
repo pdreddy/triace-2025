@@ -170,4 +170,12 @@ Masking enabled means admin cards hide Ace names by default, with an authenticat
 
 ## Rules homepage and mobile installation
 
-The homepage presents the uploaded match and playoff rules as swipeable cards with a reduced-motion-aware flash transition. Tier ranges come from saved admin settings so the page stays accurate. Visitors must view all nine rules cards and agree on the final card before the Register tab and route become available. The backend also requires the rules-accepted flag. The supplied challenge rule remains marked provisional. The web app includes a manifest and production-only service worker for installation and offline access to the app shell; registration still requires a live connection.
+The homepage embeds the uploaded `triace-rules.html` byte for byte, including its original desktop layout, mobile/PWA card deck, flash effects, and sound control. Visitors must view all nine sections and agree below the document before the Register tab and route become available. The backend also requires the rules-accepted flag. The supplied challenge rule remains marked provisional. The web app includes a manifest and production-only service worker for installation and offline access to the app shell; registration still requires a live connection.
+
+## Deploy the web app to Netlify
+
+Connect this repository to Netlify. `netlify.toml` builds with Node 22, publishes `dist`, supplies the public Firebase web configuration, and rewrites client routes to `index.html`. The exact uploaded `triace-rules.html` is included as a static file and cached for the installed PWA. Netlify serves existing static files before the SPA rewrite.
+
+Netlify hosts only the web app. Before live registration, deploy the Firebase callable functions and reviewed Realtime Database rules described above, enable Anonymous and Email/Password Authentication, add the Netlify hostname to Firebase Authentication authorized domains, and create the admin account with the admin claim. Set `VITE_ADMIN_EMAIL` in Netlify if the admin's actual Authentication email differs from the app default, then rebuild. Netlify environment variables are build-time values. Do not use `npm run demo` as the Netlify build command; demo data stays local.
+
+The supplied HTML shows GOAT 17.50–22.00 and Rising 11.50–17.00 and says teams are always placed in the highest eligible tier. Current saved registration defaults are GOAT 17.00–22.00 and Rising 11.50–16.50, with an option to enter both. The uploaded document is preserved exactly, so these differences must be resolved by the tournament owner before publishing live enrollment. Admin tier changes do not edit the HTML file.

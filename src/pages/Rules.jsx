@@ -1,35 +1,48 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useTournament } from '../hooks/useTournament';
 import { useRulesAccess } from '../hooks/useRulesAccess';
-import { DEFAULT_TIERS, formatUtr } from '../../functions/lib/tournament.js';
 import './rules.css';
-const titles = ['Welcome', 'Team composition', 'UTR & tiers', 'Match format', 'Playoff eligibility', 'Playoff qualification', 'Challenge rule', 'Playoff format', 'Best of five'];
+const CARD_COUNT = 9;
 export default function Rules() {
-  const { data } = useTournament();
   const { accepted, accept } = useRulesAccess();
-  const tiers = data?.tierConfig || DEFAULT_TIERS;
-  const [index, setIndex] = useState(0), [flash, setFlash] = useState(0), [furthest, setFurthest] = useState(0), [checked, setChecked] = useState(false);
-  const touch = useRef(null);
-  function go(next) { if (next < 0 || next >= titles.length || next === index) return; setIndex(next); setFurthest(old => Math.max(old, next)); setFlash(n => n + 1); }
-  const goat = tiers.goat, rising = tiers.rising;
-  const range = tier => tier ? `${formatUtr(tier.minCombinedUtr)}–${formatUtr(tier.maxCombinedUtr)}` : 'Admin configured';
-  return <section className="rules-page" aria-label="Traice tournament rules" onTouchStart={e => { touch.current = e.touches[0]?.clientX; }} onTouchEnd={e => { if (touch.current == null) return; const delta = e.changedTouches[0].clientX - touch.current; if (Math.abs(delta) > 65) go(index + (delta < 0 ? 1 : -1)); touch.current = null; }}>
-    <div className="rules-stage" key={index}>
-      <div className="rules-flash" key={`flash-${flash}`} aria-hidden="true" />
-      {index === 0 && <div className="rules-hero"><div><span className="rules-kicker">● OFFICIAL TOURNAMENT RULES</span><h1>TRIACE <em>2.0</em></h1><p>Three players per team. Three on court each week.</p><div className="rules-stat-row"><span><b>3</b> players per team</span><span><b>2</b> main tiers</span><span><b>40%</b> singles days</span><span><b>Bo5</b> playoffs</span></div></div><img src="/traice-tennis.webp" alt="Triace Tennis, powered by Prosper Open" /></div>}
-      {index === 1 && <><RuleHead number="01" title="Team composition" /><div className="rules-grid three">{['Captain', 'Ace 1', 'Ace 2'].map((name,i)=><div className="rules-panel" key={name}><span className="rules-ball">P{i+1}</span><strong>{name}</strong></div>)}</div><div className="rules-panel"><span className="rules-label">Individual rating</span><p>The higher of each player's singles or doubles UTR counts. Add all three counted ratings for the team total.</p></div></>}
-      {index === 2 && <><RuleHead number="02" title="Team UTR & tiers" /><p className="rules-lead">Combined team UTR = P1 + P2 + P3. Both ends of each configured range count.</p><div className="rules-grid"><div className="rules-panel accent-lime"><img className="rules-tier-art" src="/goat-tier.webp" alt="Majestic mountain goat on a tennis court" /><span className="rules-label">GOAT</span><strong className="rules-large">{range(goat)}</strong><p>Combined UTR {goat?.active ? '· open' : '· inactive'}</p></div><div className="rules-panel accent-blue"><img className="rules-tier-art" src="/rising-tier.webp" alt="Rising tennis ball and arrows" /><span className="rules-label">Rising</span><strong className="rules-large">{range(rising)}</strong><p>Combined UTR {rising?.active ? '· open' : '· inactive'}</p></div></div><div className="rules-panel"><p>A GOAT-qualified team can select GOAT, Rising, or both. A Rising-qualified team cannot enter GOAT. “Interested in a higher UTR tier” selects the highest tier the team qualifies for. Teams outside every active range cannot register.</p><p>Admin tier order resolves overlaps. The displayed ranges reflect saved admin settings.</p></div></>}
-      {index === 3 && <><RuleHead number="03" title="Match format" /><div className="rules-grid"><div className="rules-panel"><span className="rules-label">Singles</span><strong className="rules-large">Any 2 players</strong><p>Choose any two of the three on each match day.</p></div><div className="rules-panel accent-lime"><span className="rules-label">Doubles</span><strong className="rules-large">P3 + partner</strong><p>Allowed: P1 + P3 or P2 + P3. P1 + P2 is not allowed.</p></div></div></>}
-      {index === 4 && <><RuleHead number="04" title="Playoff eligibility" /><div className="rules-grid"><div className="rules-panel accent-lime"><span className="rules-huge">40%</span><p>Every player must play singles on at least 40% of the team's scheduled match days, rounded down.</p><strong>8 days × 40% = 3 singles days</strong></div><div className="rules-panel"><span className="rules-label">Examples</span><p>5–7 days: 2 singles days<br/>8–9 days: 3 singles days<br/>10–12 days: 4 singles days</p><p>Rotate your singles players so everyone qualifies.</p></div></div></>}
-      {index === 5 && <><RuleHead number="05" title="Playoff qualification" /><div className="rules-grid"><div className="rules-panel"><span className="rules-label">More than 7 teams</span><strong className="rules-huge">TOP 4</strong><p>qualify for the playoffs.</p></div><div className="rules-panel"><span className="rules-label">7 or fewer teams</span><strong className="rules-huge">TOP 3</strong><p>qualify for the playoffs.</p></div></div></>}
-      {index === 6 && <><RuleHead number="06" title="Challenge rule" /><p className="rules-lead">Provisional. This rule will be reviewed before team enrolments are finalized.</p><div className="rules-grid"><div className="rules-panel"><span className="rules-label">Who can challenge?</span><p>Only teams in 5th or 6th. They can challenge 2nd, 3rd, or 4th. First place is safe.</p></div><div className="rules-panel"><span className="rules-label">Conditions</span><p>Finish scheduled weeks on time. Challenge before the final three weeks. Each team gets one challenge.</p></div></div><div className="rules-panel"><p>Win: the teams swap table positions. Lose: both keep their positions.</p></div></>}
-      {index === 7 && <><RuleHead number="07" title="Playoff format" /><div className="rules-grid"><div className="rules-panel"><span className="rules-label">Top 4 qualify</span><p>Semifinal 1: 1st vs 3rd<br/>Semifinal 2: 2nd vs 4th<br/>Winners play the final.</p></div><div className="rules-panel"><span className="rules-label">Top 3 qualify</span><p>Eliminator: 2nd vs 3rd<br/>Winner faces 1st in the final.</p></div></div></>}
-      {index === 8 && <><RuleHead number="08" title="Every playoff encounter: best of 5" /><div className="rules-grid three"><div className="rules-panel"><span className="rules-label">Matches 1–2</span><strong>Singles</strong></div><div className="rules-panel"><span className="rules-label">Matches 3–4</span><strong>Doubles</strong></div><div className="rules-panel accent-lime"><span className="rules-label">Match 5</span><strong>10-point super tiebreak</strong></div></div><div className="rules-panel"><strong className="rules-large">First to 3 wins</strong><p>The first team to win three of the five matches advances.</p></div></>}
-    </div>
-    <div className="rules-controls"><button type="button" onClick={() => go(index-1)} disabled={index===0} aria-label="Previous rule card">←</button><span aria-live="polite">{String(index+1).padStart(2,'0')} / {String(titles.length).padStart(2,'0')} · {titles[index]}</span><button type="button" onClick={() => go(index+1)} disabled={index===titles.length-1} aria-label="Next rule card">→</button></div>
-    <div className="rules-dots" aria-label="Rule cards">{titles.map((title,i)=><button type="button" key={title} onClick={() => go(i)} disabled={i > furthest} aria-label={`Show ${title}`} aria-current={i===index ? 'step' : undefined}/>)}</div>
-    <p className="rules-help">Swipe left or right on mobile to explore every rule card.</p>{!accepted && <div className="rules-agreement"><label><input type="checkbox" checked={checked} disabled={index !== titles.length-1} onChange={e => setChecked(e.target.checked)} /> I have viewed every rules card and agree to the tournament rules.</label><button type="button" disabled={index !== titles.length-1 || !checked} onClick={accept}>Agree to rules</button></div>}{accepted ? <Link className="rules-register" to="/register">Register team ↗</Link> : <span className="rules-register locked" aria-disabled="true">Read all cards and agree to register 🔒</span>}
+  const frame = useRef(null), cleanup = useRef(() => {});
+  const [seen, setSeen] = useState([0]), [current, setCurrent] = useState(0), [checked, setChecked] = useState(false), [ready, setReady] = useState(false);
+  const allSeen = seen.length === CARD_COUNT;
+  function record(index) { setSeen(old => old.includes(index) ? old : [...old, index]); }
+  function attach() {
+    cleanup.current();
+    const doc = frame.current?.contentDocument;
+    const root = doc?.querySelector('#triace'), track = root?.querySelector('.track');
+    if (!track) return;
+    const cards = [...track.children].filter(el => el.matches('header,section'));
+    if (cards.length !== CARD_COUNT) return;
+    setReady(true); record(0);
+    const observer = new frame.current.contentWindow.IntersectionObserver(entries => {
+      for (const entry of entries) if (entry.isIntersecting && entry.intersectionRatio >= .35) {
+        const index = cards.indexOf(entry.target);
+        if (index >= 0) { record(index); if (!root.classList.contains('deck')) setCurrent(index); }
+      }
+    }, { root: null, threshold: [.35, .6] });
+    cards.forEach(card => observer.observe(card));
+    const mutation = new frame.current.contentWindow.MutationObserver(() => {
+      if (!root.classList.contains('deck')) return;
+      const index = cards.findIndex(card => card.classList.contains('active'));
+      if (index >= 0) { setCurrent(index); record(index); }
+    });
+    mutation.observe(track, { attributes: true, attributeFilter: ['class'], subtree: true });
+    cleanup.current = () => { observer.disconnect(); mutation.disconnect(); };
+  }
+  function next() {
+    const doc = frame.current?.contentDocument, root = doc?.querySelector('#triace');
+    const cards = [...(root?.querySelector('.track')?.children || [])].filter(el => el.matches('header,section'));
+    if (!root || current >= cards.length - 1) return;
+    if (root.classList.contains('deck')) root.querySelector('.dnav .next')?.click();
+    else cards[current + 1]?.scrollIntoView({ behavior: 'auto', block: 'start' });
+    setCurrent(current + 1);
+  }
+  return <section className="embedded-rules" aria-label="Official Triace tournament rules">
+    <div className="embedded-rules-heading"><div><span className="eyebrow">OFFICIAL TOURNAMENT RULES</span><h1>Read the <em>rules.</em></h1><p>This is the complete rules document supplied for Triace 2.0. Scroll on desktop or swipe the cards on mobile.</p></div><img src="/traice-tennis.webp" alt="Triace Tennis" /></div>
+    <div className="rules-frame-wrap">{current > 0 && <span className="rules-bounce" key={current} aria-hidden="true" />}<iframe ref={frame} src="/triace-rules.html" title="Complete Triace 2.0 tournament rules" onLoad={attach} /></div>
+    <div className="rules-review"><div className="rules-review-top"><strong>{seen.length} of {CARD_COUNT} sections viewed</strong><button type="button" onClick={next} disabled={!ready || current >= CARD_COUNT - 1} aria-label="Next rule card">Next rule →</button></div><div className="rules-progress" role="progressbar" aria-valuemin="0" aria-valuemax={CARD_COUNT} aria-valuenow={seen.length}><span style={{ width: `${seen.length / CARD_COUNT * 100}%` }} /></div><p>Registration uses the tier ranges saved by the admin. Review each section of the document before agreeing.</p>{!accepted && <div className="rules-agreement"><label><input type="checkbox" checked={checked} disabled={!allSeen} onChange={e => setChecked(e.target.checked)} /> I have read all sections and agree to the tournament rules.</label><button type="button" disabled={!allSeen || !checked} onClick={accept}>Agree to rules</button></div>}{accepted ? <Link className="rules-register" to="/register">Register team ↗</Link> : <span className="rules-register locked" aria-disabled="true">Read all sections and agree to register 🔒</span>}</div>
   </section>;
 }
-function RuleHead({number,title}) { return <div className="rules-head"><span>{number}</span><h2>{title}</h2></div>; }
