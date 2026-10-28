@@ -150,7 +150,7 @@ Masking enabled means admin cards hide Ace names by default, with an authenticat
 
 - Exactly three players. Every required UTR must be numeric, positive, and within configured individual bounds (default 0.01–16.50); at most two decimal places.
 - Defaults: GOAT 17.00–22.00, Rising 11.50–16.50, inclusive.
-- Preference options are all active tiers plus “Interested in a higher UTR tier.” Assignment always chooses the highest eligible active tier, even if a lower tier was preferred. The chosen preference is retained separately.
+- Options are all active tiers plus “Interested in a higher UTR tier.” A GOAT-qualified team may enter GOAT, Rising, or both public lists; a Rising-qualified team cannot enter GOAT. The higher-tier option assigns the highest eligible tier. Recalculation preserves the chosen tier when still eligible.
 - For overlaps, lower `sortOrder` is higher priority; each tier must have a unique order. Tier IDs are immutable; names, ranges, order, and active status are editable. Up to 20 tiers are supported.
 - Totals in gaps or outside all active ranges cannot register. Existing teams can become **Unassigned** after a configuration change and recalculation; they stay in private records and disappear from public tier paths.
 - Saving configuration updates new registrations. Use **Recalculate Tiers** to update existing teams. It rebuilds the entire public tier tree from private registrations, removes stale entries, updates private assignments, and returns reviewed/moved/unchanged/unassigned counts. `moved + unchanged = reviewed`; `unassigned` is a subset that may include unchanged unassigned teams.

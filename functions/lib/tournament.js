@@ -40,6 +40,20 @@ export function orderedTiers(config, activeOnly = false) {
 export function assignTier(combinedUtr, config) {
   return orderedTiers(config, true).find(tier => combinedUtr >= tier.minCombinedUtr && combinedUtr <= tier.maxCombinedUtr)?.id ?? null;
 }
+export function assignSelectedTier(combinedUtr, config, selectedTier = 'higher') {
+  const highest = assignTier(combinedUtr, config);
+  if (!highest) return null;
+  if (selectedTier === 'higher') return highest;
+  if (selectedTier === 'both') return highest === 'goat' && config.rising?.active ? 'goat' : null;
+  const active = orderedTiers(config, true);
+  const highestIndex = active.findIndex(tier => tier.id === highest);
+  const selectedIndex = active.findIndex(tier => tier.id === selectedTier);
+  return selectedIndex >= highestIndex ? selectedTier : null;
+}
+export function listedTiers(combinedUtr, config, selectedTier) {
+  const assigned = assignSelectedTier(combinedUtr, config, selectedTier);
+  return assigned ? selectedTier === 'both' ? ['goat', 'rising'] : [assigned] : [];
+}
 function player(value, captain, settings) {
   exact(value, [captain ? 'firstName' : 'fullName', 'singlesUtr', 'doublesUtr'], 'Invalid player fields.');
   const key = captain ? 'firstName' : 'fullName';
@@ -56,11 +70,11 @@ export function validateRegistration(payload, settings, tiers) {
   exact(payload, ['teamId', 'captain', 'ace1', 'ace2', 'selectedTier', 'consent'], 'Invalid registration fields.');
   assert(typeof payload.teamId === 'string' && /^[a-zA-Z0-9_-]{16,80}$/.test(payload.teamId), 'Invalid registration identifier.');
   assert(payload.consent === true, 'Player consent is required.');
-  assert(payload.selectedTier === 'higher' || (typeof payload.selectedTier === 'string' && Object.hasOwn(tiers, payload.selectedTier) && tiers[payload.selectedTier].active), 'Select an active tier or the higher-tier interest option.');
+  assert(payload.selectedTier === 'higher' || payload.selectedTier === 'both' || (typeof payload.selectedTier === 'string' && Object.hasOwn(tiers, payload.selectedTier) && tiers[payload.selectedTier].active), 'Select an active tier or the higher-tier interest option.');
   const captain = player(payload.captain, true, settings), ace1 = player(payload.ace1, false, settings), ace2 = player(payload.ace2, false, settings);
-  const combinedUtr = captain.utr + ace1.utr + ace2.utr, assignedTier = assignTier(combinedUtr, tiers);
-  assert(assignedTier, 'Your combined UTR does not fit an active tier. Please contact the tournament admin.');
-  return { teamId: payload.teamId, captain, ace1, ace2, combinedUtr, selectedTier: payload.selectedTier, assignedTier };
+  const combinedUtr = captain.utr + ace1.utr + ace2.utr, assignedTier = assignSelectedTier(combinedUtr, tiers, payload.selectedTier);
+  assert(assignedTier, 'Your team does not qualify for the selected tier. Choose an eligible tier or contact the tournament admin.');
+  return { teamId: payload.teamId, captain, ace1, ace2, combinedUtr, selectedTier: payload.selectedTier, assignedTier, listedTiers: listedTiers(combinedUtr, tiers, payload.selectedTier) };
 }
 export function publicRecord(team) {
   return { teamId: team.teamId, captainFirstName: team.captain.firstName, captainUtr: team.captain.utr, ace1Utr: team.ace1.utr, ace2Utr: team.ace2.utr, combinedUtr: team.combinedUtr, assignedTier: team.assignedTier, registeredAt: team.registeredAt };
@@ -76,13 +90,13 @@ export function applyRegistration(current, payload, uid, now = Date.now()) {
   if (previous) {
     const { ownerUid, registeredAt, ...saved } = previous;
     assert(ownerUid === uid && canonical(saved) === canonical(team), 'This registration identifier is already in use.');
-    return { state, result: { teamId: previous.teamId, assignedTier: previous.assignedTier, combinedUtr: previous.combinedUtr } };
+    return { state, result: { teamId: previous.teamId, assignedTier: previous.assignedTier, combinedUtr: previous.combinedUtr, listedTiers: previous.listedTiers || [previous.assignedTier] } };
   }
   const record = { ...team, ownerUid: uid, registeredAt: now };
   state.registrations ||= {}; state.registrations[team.teamId] = record;
-  state.tiers ||= {}; state.tiers[team.assignedTier] ||= { teams: {} }; state.tiers[team.assignedTier].teams ||= {};
-  state.tiers[team.assignedTier].teams[team.teamId] = publicRecord(record);
-  return { state, result: { teamId: record.teamId, assignedTier: record.assignedTier, combinedUtr: record.combinedUtr } };
+  state.tiers ||= {};
+  for (const tierId of team.listedTiers) { state.tiers[tierId] ||= { teams: {} }; state.tiers[tierId].teams ||= {}; state.tiers[tierId].teams[team.teamId] = publicRecord(record); }
+  return { state, result: { teamId: record.teamId, assignedTier: record.assignedTier, combinedUtr: record.combinedUtr, listedTiers: record.listedTiers } };
 }
 export function applyConfiguration(current, payload) {
   exact(payload, ['settings', 'tierConfig', 'expectedRevision'], 'Invalid configuration request.');
@@ -90,7 +104,7 @@ export function applyConfiguration(current, payload) {
   assert(payload.expectedRevision === (current?.configRevision || 0), 'Configuration changed in another session. Reload settings before saving.');
   const settings = validateSettings(payload.settings), tiers = validateTierConfig(payload.tierConfig);
   const removed = Object.keys(state.tierConfig || {}).filter(id => !Object.hasOwn(tiers, id));
-  assert(!Object.values(state.registrations || {}).some(team => removed.includes(team.assignedTier)), 'A removed tier still has teams. Deactivate it, save, and recalculate before removing it.');
+  assert(!Object.values(state.registrations || {}).some(team => (team.listedTiers || [team.assignedTier]).some(id => removed.includes(id))), 'A removed tier still has teams. Deactivate it, save, and recalculate before removing it.');
   state.settings = settings; state.tierConfig = tiers; state.configRevision = (current?.configRevision || 0) + 1;
   for (const id of removed) if (state.tiers) delete state.tiers[id];
   return { state, result: { configRevision: state.configRevision } };
@@ -102,11 +116,11 @@ export function applyRecalculation(current) {
   state.tiers = {};
   for (const team of Object.values(state.registrations || {})) {
     const total = team.captain.utr + team.ace1.utr + team.ace2.utr;
-    const assigned = assignTier(total, state.tierConfig);
-    summary.reviewed++; if (assigned === (team.assignedTier ?? null)) summary.unchanged++; else summary.moved++;
+    const assigned = assignSelectedTier(total, state.tierConfig, team.selectedTier);
+    summary.reviewed++; if (assigned === (team.assignedTier ?? null) && JSON.stringify(listedTiers(total, state.tierConfig, team.selectedTier)) === JSON.stringify(team.listedTiers || (team.assignedTier ? [team.assignedTier] : []))) summary.unchanged++; else summary.moved++;
     if (!assigned) summary.unassigned++;
-    team.combinedUtr = total; team.assignedTier = assigned;
-    if (assigned) { state.tiers[assigned] ||= { teams: {} }; state.tiers[assigned].teams[team.teamId] = publicRecord(team); }
+    team.combinedUtr = total; team.assignedTier = assigned; team.listedTiers = listedTiers(total, state.tierConfig, team.selectedTier);
+    for (const tierId of team.listedTiers) { state.tiers[tierId] ||= { teams: {} }; state.tiers[tierId].teams[team.teamId] = publicRecord(team); }
   }
   return { state, result: summary };
 }
