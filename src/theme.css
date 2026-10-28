@@ -178,3 +178,25 @@ footer>span{font-style:normal;font-weight:600}
 .app-rules .rules-frame-wrap iframe{height:100%;min-height:0}
 .app-rules .rules-review{flex:none;margin-top:8px;padding:8px 12px;gap:6px}
 @media(max-width:700px){.app-rules>header{min-height:0}.app-rules .brand{font-size:24px}.app-rules nav a,.app-rules .nav-locked{min-height:36px;padding:4px 10px}}
+
+/* App shell for every page: fixed header, scrolling content, tab bar on phones */
+.app{height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+.app>header{flex:none;min-height:60px;padding:6px 0}
+.app>footer{display:none}
+.app>main{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--line) transparent;padding-bottom:max(24px,env(safe-area-inset-bottom))}
+.app-rules>main{overflow:hidden}
+.page,.intro,.registration-grid{animation:page-in .3s ease both}
+@keyframes page-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.page,.intro,.registration-grid{animation:none}}
+.summary,.settings-card,.recalculate{border-color:#3e6a54}
+.page{padding:20px 0 32px}
+.page>h1{margin:12px 0}
+@media(max-width:620px){
+ .app>header{flex-wrap:nowrap}
+ .app>header nav{position:fixed;left:0;right:0;bottom:0;z-index:20;width:100%;justify-content:space-around;gap:0;padding:6px 8px calc(6px + env(safe-area-inset-bottom));background:#0b1724f2;border-top:1px solid var(--line);backdrop-filter:blur(10px)}
+ .app>header nav a,.app>header nav .nav-locked,.app>header nav .text-button{flex:1;justify-content:center;font-size:14px;padding:6px 4px;min-height:44px;text-align:center}
+ .app>main{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+ .app-rules>main{padding-bottom:calc(66px + env(safe-area-inset-bottom))}
+ .summary{top:0}
+}
+@media(max-width:620px){.brand-banner{display:none}}
