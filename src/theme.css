@@ -200,3 +200,76 @@ footer>span{font-style:normal;font-weight:600}
  .summary{top:0}
 }
 @media(max-width:620px){.brand-banner{display:none}}
+
+/* ===== Phone: every screen fits, no page scrolling (≤700px) ===== */
+.step-nav,.admin-tabs{display:none}
+@media(max-width:700px){
+ .app>header{min-height:52px;padding:4px 0}
+ .app .environment{display:none}
+ .app>main{padding-bottom:calc(64px + env(safe-area-inset-bottom))}
+ .app>main>.message{margin:6px 0;padding:8px 12px;font-size:12px}
+ .brand-banner,.intro,.hero-logo,.login-logo{display:none}
+
+ /* Register: stepper */
+ .app-fit>main{overflow:hidden;display:flex;flex-direction:column}
+ .app-fit .registration-grid{display:flex;flex-direction:column-reverse;flex:1;min-height:0;gap:8px;margin:0}
+ .app-fit .registration-grid>form{flex:1;min-height:0;display:flex;flex-direction:column}
+ .app-fit .registration-grid>form>.section-label,.app-fit .registration-grid>form>h2{display:none}
+ .app-fit form>fieldset{flex:1;min-height:0;display:flex;flex-direction:column}
+ .step-panel{display:none}.step-panel.on{display:block;flex:1;min-height:0;overflow-y:auto}
+ .step-panel.player{border:0;padding:0;margin:0}
+ .step-title,.player-heading h3{font-size:24px;margin:0 0 6px}
+ .player-heading{margin-bottom:10px}
+ .tier-options{grid-template-columns:1fr;gap:8px;margin-bottom:8px}
+ .tier-option{padding:10px 12px}.tier-option:last-child{grid-column:auto}
+ .tier-option-art{display:none}.tier-option strong{font-size:18px}
+ .step-panel .small{font-size:12px;margin-bottom:8px}
+ .field input,select{margin-bottom:12px;padding:11px 12px}
+ .ratings{gap:10px}
+ .step-nav{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:8px;border-top:1px solid var(--line)}
+ .step-nav>span{font-family:var(--display);font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:center;flex:1}
+ .step-nav .button,.step-nav .secondary{width:auto;min-height:44px;padding:8px 18px;font-size:16px}
+ .step-nav-spacer{min-width:72px}
+ .step-panel .button{width:100%}
+ .rules-confirmed{margin:0 0 8px;font-size:12px}
+ .checkbox{margin:8px 0;font-size:12px}
+ .summary{position:static;padding:8px 14px;border-radius:12px}
+ .summary .total output{font-size:34px}
+
+ /* Login */
+ .narrow{min-height:0;margin:0 auto;padding-top:4px}
+ .narrow h1{font-size:34px;margin-bottom:6px}.narrow>p{margin-bottom:12px}
+
+ /* Tier list: swipeable rows */
+ .page{padding:6px 0 12px}
+ .page>h1,.page h1{font-size:32px;margin:4px 0}
+ .page>p{font-size:13px;margin:0 0 8px}
+ .page>.eyebrow{font-size:12px}
+ .filters{flex-wrap:nowrap;overflow-x:auto;margin:6px -2px;padding:2px;scrollbar-width:none}.filters button{white-space:nowrap;flex:none}
+ .lineup-tools{flex-direction:row;gap:8px}.lineup-tools input,.lineup-tools select{padding:8px 12px;min-height:40px}.lineup-tools select{max-width:42%}
+ .tier-group{margin:12px 0}
+ .group-heading h2{font-size:22px}
+ .tier-art{display:none}
+ .team-list{display:flex;grid-template-columns:none;overflow-x:auto;scroll-snap-type:x mandatory;gap:12px;margin:10px -2px 0;padding:2px 2px 8px;scrollbar-width:none}
+ .team-list>.team-card{flex:0 0 82%;scroll-snap-align:start;padding:14px}
+ .skeleton-list{display:flex;overflow:hidden}.skeleton-card{flex:0 0 82%;height:150px}
+
+ /* Admin: tabs */
+ .admin>.eyebrow,.admin>p:not(.message),.admin .group-heading>a{display:none}
+ .admin .group-heading h1{font-size:28px;margin:2px 0}
+ .admin-tabs{display:flex;gap:6px;margin:6px 0}
+ .admin-tabs button{flex:1;min-height:44px;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--muted);font-family:var(--display);font-size:17px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+ .admin-tabs button[aria-selected=true]{background:var(--lime);border-color:var(--lime);color:var(--bg)}
+ .admin[data-tab=settings] .pane:not(.pane-settings),.admin[data-tab=tiers] .pane:not(.pane-tiers),.admin[data-tab=teams] .pane:not(.pane-teams){display:none}
+ .admin-save-bar{margin:6px 0;padding:8px 12px}
+ .admin-tools{grid-template-columns:1fr 1fr;gap:8px}.admin-tools>.field:first-child{grid-column:1/-1}
+}
+@media(max-width:700px){
+ .app-rules>main>.message{display:none}
+ .app-rules .embedded-rules{margin:4px 0 0}
+ .app-rules .rules-review{margin-top:6px;padding:6px 10px;gap:4px}
+ .app-rules .rules-review-top{gap:10px}.app-rules .rules-review-top strong{font-size:18px}
+ .app-rules .rules-review-top button{min-height:38px;padding:4px 14px}
+ .rules-review .rules-agreement label{font-size:12px}.rules-review .rules-agreement button,.rules-register{min-height:38px;padding:5px 16px;font-size:16px}
+ .app-rules>main{padding-bottom:calc(60px + env(safe-area-inset-bottom))}
+}

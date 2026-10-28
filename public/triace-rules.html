@@ -324,6 +324,25 @@
   .triace .seats i{width:18px;height:18px}
 }
 
+/* compact deck chrome so each card gets the most room on phones */
+.triace.deck .dnav{padding:4px 14px calc(6px + env(safe-area-inset-bottom))}
+.triace.deck .dnav button{width:40px;height:40px}
+.triace.deck .track>header,.triace.deck .track>section{padding-top:calc(8px + env(safe-area-inset-top))}
+@media (max-height:760px){.triace .dnav .dots{display:none}}
+@media (max-height:900px){
+.triace.deck .track>*>.wrap{padding:16px 14px 14px;border-radius:20px}
+.triace.deck .card{padding:12px 14px;border-radius:12px}
+.triace.deck .head{margin-bottom:10px;gap:8px}
+.triace.deck .lead{font-size:14px;margin-bottom:10px}
+.triace.deck .grid2,.triace.deck .grid3,.triace.deck .chal,.triace.deck .bracket{gap:8px}
+.triace.deck .big{font-size:24px;margin-top:4px}
+.triace.deck ul.ticks{gap:6px;margin-top:8px}.triace.deck ul.ticks li{font-size:14px}
+.triace.deck .step{padding:12px 10px}.triace.deck .steps{row-gap:16px;gap:8px}
+.triace.deck .player{padding:10px 6px}.triace.deck .player .ball{width:46px;height:46px;font-size:20px}
+.triace.deck .ring{width:130px;height:130px}.triace.deck .ring b{font-size:42px}
+.triace.deck .q .n{font-size:48px}
+.triace.deck .rub{padding:10px}
+}
 /* ---- lighter, tidier type to match the rest of the site ---- */
 .triace .title{font-weight:700;font-style:normal;font-size:clamp(44px,7vw,84px);line-height:.95;margin-top:14px}
 .triace .title span{text-shadow:none}
@@ -717,9 +736,26 @@
 
   /* flash cards on phones and when installed as an app (PWA); normal page elsewhere */
   var mq=window.matchMedia?matchMedia('(max-width: 760px), (display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui)'):null;
+  /* Deck cards always fit the screen: shrink the card content (never below 55%) instead of scrolling */
+  function fit(){
+    var deck=root.classList.contains('deck');
+    cards.forEach(function(c){
+      var w=c.querySelector('.wrap'); if(!w) return;
+      w.style.zoom=''; w.style.minHeight='';
+      if(!deck) return;
+      var cs=getComputedStyle(c), avail=c.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom);
+      w.style.minHeight='0';
+      var z=1, need=w.getBoundingClientRect().height;
+      for(var n=0;n<5&&need>avail+1&&z>.56;n++){ z=Math.max(.56,z*avail/need*.98); w.style.zoom=z; need=w.getBoundingClientRect().height; }
+      w.style.minHeight='';
+    });
+  }
+  window.addEventListener('resize',fit);
+  if(document.fonts&&document.fonts.ready) document.fonts.ready.then(fit);
   function apply(){
     var on=(mq&&mq.matches)||window.navigator.standalone===true;
     root.classList.toggle('deck',on);
+    fit();
     if(on){ setActive(cur,true); track.scrollLeft=cur*track.clientWidth; }
     else { cards.forEach(function(c){ c.classList.remove('active'); }); }
   }
