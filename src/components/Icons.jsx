@@ -15,7 +15,13 @@ const paths = {
   ball: <><circle cx="12" cy="12" r="9" /><path d="M5.5 5.8c3 2.7 3 9.7 0 12.4M18.5 5.8c-3 2.7-3 9.7 0 12.4" /></>,
   logout: <><path d="M15 4h3.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H15" /><path d="M10 8l-4 4 4 4M6 12h10" /></>,
   wifiOff: <><path d="M3 3l18 18" /><path d="M8.5 16.5a5 5 0 0 1 7 0M5 13a10 10 0 0 1 5-2.7M14.5 10.4A10 10 0 0 1 19 13M2 9.5a15 15 0 0 1 4.6-2.9M11 5.1A15 15 0 0 1 22 9.5" /><circle cx="12" cy="20" r="1" /></>,
-  refresh: <><path d="M20 11a8 8 0 1 0-2.3 5.7" /><path d="M20 4v7h-7" /></>
+  refresh: <><path d="M20 11a8 8 0 1 0-2.3 5.7" /><path d="M20 4v7h-7" /></>,
+  chevronLeft: <path d="m15 5-7 7 7 7" />,
+  chevronRight: <path d="m9 5 7 7-7 7" />,
+  user: <><circle cx="12" cy="8" r="4" /><path d="M4 21c1-4 4.2-6 8-6s7 2 8 6" /></>,
+  users: <><circle cx="9" cy="8" r="3.5" /><circle cx="17" cy="9" r="2.8" /><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 14.6c2.8.2 4.8 2 5.5 5.4" /></>,
+  bolt: <path d="M13 2 4 14h7l-1 8 9-12h-7z" />,
+  warn: <><path d="M12 3 2 20h20z" /><path d="M12 9v5M12 17.5v.5" /></>
 };
 export function Icon({ name, size = 20 }) {
   return <svg className="icon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">{paths[name]}</svg>;
