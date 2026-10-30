@@ -336,21 +336,30 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
   scrollbar-width: thin;
 }
 .rule-card-body::before { content: ""; position: absolute; top: 0; left: 28px; right: 28px; height: 4px; border-radius: 0 0 4px 4px; background: var(--lime); }
+/* card flips in while the rally plays */
 .rule-card.active .rule-card-body { border-color: var(--lime); box-shadow: 0 0 0 6px #d9f24b10; animation: card-in .45s cubic-bezier(.2, .8, .2, 1) both; }
 .rule-card-body { justify-content: safe center; }
-.deck-flash {
+.rally { position: absolute; inset: 0 0 56px; z-index: 3; overflow: hidden; pointer-events: none; border-radius: var(--r-lg); }
+.racquet { position: absolute; left: 3%; top: 30%; width: 64px; height: 150px; transform-origin: 50% 95%; animation: racquet-swing 1.6s cubic-bezier(.3, 1.4, .5, 1) both; filter: drop-shadow(0 8px 14px #0009); }
+.racquet-frame { fill: #d9f24b14; stroke: var(--lime); stroke-width: 5; }
+.racquet-strings { fill: none; stroke: #f4f8ffb3; stroke-width: 1.2; }
+.racquet-throat { fill: none; stroke: var(--lime); stroke-width: 5; stroke-linejoin: round; }
+.racquet-grip { fill: var(--clay); }
+.rally-ball {
   position: absolute;
-  z-index: 3;
-  top: 30%;
-  left: 0;
-  width: 34px;
-  height: 34px;
+  left: 7%;
+  top: 40%;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
-  pointer-events: none;
+  opacity: 0;
   background: radial-gradient(circle at 30% 25%, #f8ffbb, var(--lime) 60%, #a7c51c);
-  box-shadow: 0 0 18px var(--lime);
-  animation: ball-flight 1.4s ease-out both;
+  box-shadow: 0 0 16px #d9f24bcc, inset -3px -4px 0 #0002;
+  animation: ball-rally 3s cubic-bezier(.45, 0, .55, 1) both;
 }
+.rally-ball::after { content: ""; position: absolute; inset: 3px 9px; border: 2px solid #ffffffcc; border-block: 0; border-radius: 50%; }
+.rally-ball:nth-of-type(2) { width: 24px; height: 24px; animation-delay: .35s; }
+.rally-ball:nth-of-type(3) { width: 20px; height: 20px; animation-delay: .7s; }
 .deck-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .deck-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
 .deck-dots button { display: grid; place-items: center; width: 22px; height: 28px; padding: 0; border: 0; background: none; }
@@ -630,12 +639,23 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
 /* ---------- 13. Motion ---------- */
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 @keyframes card-in { from { opacity: .4; transform: scale(.97) rotate(-.4deg); } to { opacity: 1; transform: none; } }
-@keyframes ball-flight {
-  0% { transform: translate(-40px, -30px) scale(.6); opacity: 0; }
-  15% { opacity: 1; }
-  45% { transform: translate(45vw, 120px) scale(1.1); }
-  75% { transform: translate(70vw, 10px) scale(.9); }
-  100% { transform: translate(105vw, 90px) scale(.7); opacity: 0; }
+@keyframes racquet-swing {
+  0% { opacity: 0; transform: rotate(-70deg) scale(.7); }
+  30% { opacity: 1; transform: rotate(-70deg) scale(1); }
+  55% { transform: rotate(35deg); }
+  80% { opacity: 1; transform: rotate(20deg); }
+  100% { opacity: 0; transform: rotate(25deg) translateY(10px); }
+}
+@keyframes ball-rally {
+  0% { opacity: 0; left: 7%; top: 40%; transform: scale(.5) rotate(0); }
+  8% { opacity: 1; left: 9%; top: 36%; transform: scale(1); }
+  22% { left: 30%; top: 8%; }
+  36% { left: 46%; top: 78%; transform: scale(1.15, .8) rotate(260deg); }
+  50% { left: 60%; top: 28%; transform: scale(1) rotate(400deg); }
+  64% { left: 72%; top: 80%; transform: scale(1.12, .82) rotate(560deg); }
+  78% { left: 84%; top: 50%; transform: scale(1) rotate(680deg); }
+  88% { left: 92%; top: 82%; transform: scale(1.1, .85) rotate(760deg); opacity: 1; }
+  100% { left: 104%; top: 66%; transform: scale(.9) rotate(860deg); opacity: 0; }
 }
 @keyframes pulse { 0% { box-shadow: 0 0 0 0 #7ee08a99; } 70%, 100% { box-shadow: 0 0 0 8px #7ee08a00; } }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -681,6 +701,8 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
 
   /* rules deck */
   .rules-screen { gap: 8px; }
+  .rally { inset: 0 0 50px; border-radius: var(--r); }
+  .racquet { width: 46px; height: 108px; }
   .deck { gap: 6px; }
   .rule-card-body { gap: 10px; padding: 16px 14px 12px; border-radius: var(--r); }
   .rule-title { font-size: 56px; }

@@ -6,6 +6,21 @@ import { RULE_CARDS } from '../rules/cards';
 
 const COUNT = RULE_CARDS.length;
 
+// Played on every card change: a racquet swings and three balls bounce across the card.
+function Rally() {
+  return (
+    <div className="rally" aria-hidden="true">
+      <svg className="racquet" viewBox="0 0 64 150">
+        <ellipse className="racquet-frame" cx="32" cy="38" rx="27" ry="34" />
+        <path className="racquet-strings" d="M14 18v40M23 8v60M32 5v66M41 8v60M50 18v40M8 26h48M6 38h52M8 50h48M14 62h36" />
+        <path className="racquet-throat" d="M20 68l12 22 12-22" />
+        <rect className="racquet-grip" x="27" y="88" width="10" height="58" rx="4" />
+      </svg>
+      <i className="rally-ball" /><i className="rally-ball" /><i className="rally-ball" />
+    </div>
+  );
+}
+
 export default function Rules() {
   const { accepted, accept } = useRulesAccess();
   const track = useRef(null);
@@ -34,7 +49,7 @@ export default function Rules() {
   return (
     <section className="rules-screen" aria-label="Official Triace tournament rules">
       <div className="deck">
-        {current > 0 && <span className="deck-flash" key={current} aria-hidden="true" />}
+        {current > 0 && <Rally key={current} />}
         <div className="deck-track" ref={track} onScroll={onScroll} onKeyDown={onKeyDown} tabIndex={0} aria-roledescription="carousel" aria-label="Rule cards">
           {RULE_CARDS.map((card, i) => (
             <article key={card.title} className={`rule-card${card.hero ? ' hero' : ''}${i === current ? ' active' : ''}`} aria-roledescription="slide" aria-label={`${i + 1} of ${COUNT}: ${card.title}`} aria-hidden={i !== current}>
