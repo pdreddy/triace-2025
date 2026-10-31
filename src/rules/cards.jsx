@@ -225,12 +225,13 @@ export const RULE_CARDS = [
     body: (
       <>
         <Head num="06" title="Every playoff encounter · best of 5" />
+        <p className="rule-text">Teams share their <strong>lines upfront</strong>, before the encounter starts.</p>
         <ol className="rubbers">
-          <li><Icon name="users" /><strong>Doubles 1</strong><span>Match 1</span></li>
-          <li><Icon name="user" /><strong>Singles</strong><span>Match 2</span></li>
-          <li><Icon name="users" /><strong>Doubles 2</strong><span>Match 3</span></li>
-          <li><Icon name="user" /><strong>Singles</strong><span>Match 4</span></li>
-          <li className="decider"><Icon name="bolt" /><strong>Super tiebreak</strong><span>Match 5 · 10 points</span></li>
+          <li><Icon name="users" /><strong>Doubles 1</strong><span>Match 1</span><span className="chip on">P1 + P2</span></li>
+          <li><Icon name="user" /><strong>Singles 1</strong><span>Match 2</span><span className="chip on">P3</span></li>
+          <li><Icon name="users" /><strong>Doubles 2</strong><span>Match 3 · P3 + P1 or P2</span><span className="chip on">P1 + P3</span></li>
+          <li><Icon name="user" /><strong>Singles 2</strong><span>Match 4 · player left out</span><span className="chip on">P2</span></li>
+          <li className="decider"><Icon name="bolt" /><strong>Super tiebreak</strong><span>Match 5 · 10 points · both singles players</span><span className="chip">P3 + P2</span></li>
         </ol>
         <div className="rule-box first-to">
           <strong className="rule-big">First to 3</strong>
