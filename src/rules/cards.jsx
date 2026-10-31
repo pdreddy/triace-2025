@@ -226,11 +226,11 @@ export const RULE_CARDS = [
       <>
         <Head num="06" title="Every playoff encounter · best of 5" />
         <ol className="rubbers">
-          <li><Icon name="user" /><strong>Singles</strong><span>Match 1</span></li>
+          <li><Icon name="users" /><strong>Doubles 1</strong><span>Match 1</span></li>
           <li><Icon name="user" /><strong>Singles</strong><span>Match 2</span></li>
-          <li><Icon name="users" /><strong>Doubles</strong><span>Match 3</span></li>
-          <li><Icon name="users" /><strong>Doubles</strong><span>Match 4</span></li>
-          <li className="decider"><Icon name="bolt" /><strong>Super tiebreak</strong><span>10 points</span></li>
+          <li><Icon name="users" /><strong>Doubles 2</strong><span>Match 3</span></li>
+          <li><Icon name="user" /><strong>Singles</strong><span>Match 4</span></li>
+          <li className="decider"><Icon name="bolt" /><strong>Super tiebreak</strong><span>Match 5 · 10 points</span></li>
         </ol>
         <div className="rule-box first-to">
           <strong className="rule-big">First to 3</strong>
