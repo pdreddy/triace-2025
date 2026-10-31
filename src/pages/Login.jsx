@@ -13,7 +13,7 @@ export default function Login() {
     event.preventDefault();
     setBusy(true); setError('');
     try { await service.login(username, password); setPassword(''); }
-    catch { setError('Sign-in failed. Check your username/email and password, or Firebase Authentication setup.'); }
+    catch (e) { setError(`Sign-in failed. ${e.message || 'Check your username/email and password.'}`); }
     finally { setBusy(false); }
   }
 
