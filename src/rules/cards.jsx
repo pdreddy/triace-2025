@@ -104,21 +104,14 @@ export const RULE_CARDS = [
     title: 'Match format',
     body: (
       <>
-        <Head num="03" title="Match format" />
-        <div className="rule-grid two">
-          <div className="rule-box">
-            <span className="rule-label">Singles</span>
-            <strong className="rule-big">Any 2 players</strong>
-            <div className="chips"><span className="chip on">P1</span><span className="chip on">P2</span><span className="chip on">P3</span></div>
-            <p className="rule-text">Pick any two of the three on a given match day.</p>
-          </div>
-          <div className="rule-box accent">
-            <span className="rule-label">Doubles</span>
-            <strong className="rule-big">P3 + a partner</strong>
-            <div className="chips"><span className="chip on">P1 + P3</span><span className="chip on">P2 + P3</span><span className="chip off">P1 + P2</span></div>
-            <p className="rule-text">Only these two pairings are allowed.</p>
-          </div>
-        </div>
+        <Head num="03" title="Match format · round robin" />
+        <p className="rule-text">Every round-robin encounter is <strong>three matches: two doubles and one singles</strong>, played in this order.</p>
+        <ol className="rule-steps three">
+          <li><strong>Doubles 1</strong><span>Any two players pair up.</span><span className="chips"><span className="chip on">P1 + P2</span></span></li>
+          <li><strong>Singles</strong><span>The player who sat out Doubles 1 plays singles.</span><span className="chips"><span className="chip on">P3</span></span></li>
+          <li><strong>Doubles 2</strong><span>That player pairs with one of the Doubles 1 players. The Doubles 1 pair can’t play together again.</span><span className="chips"><span className="chip on">P1 + P3</span><span className="chip on">P2 + P3</span><span className="chip off">P1 + P2</span></span></li>
+        </ol>
+        <p className="rule-text">Example: if P1 + P2 play Doubles 1, P3 plays the singles, then P3 teams up with P1 or P2 for Doubles 2.</p>
       </>
     )
   },

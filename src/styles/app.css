@@ -416,6 +416,8 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
 .rule-steps li::before { content: counter(step); display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; font-family: var(--display); font-weight: 700; color: var(--ink); background: var(--lime); }
 .rule-steps strong { font-family: var(--display); font-size: 18px; text-transform: uppercase; }
 .rule-steps span { font-size: 13px; color: var(--soft); }
+.rule-steps.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.rule-steps .chips { margin-top: auto; padding-top: 8px; }
 .ladder { display: grid; gap: 6px; }
 .ladder li { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: var(--r-sm); font-size: 13.5px; color: var(--soft); background: var(--surface); border: 1px solid var(--line); }
 .ladder b { min-width: 34px; font-family: var(--display); font-size: 18px; color: #fff; }
@@ -715,6 +717,12 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
   .rule-steps li::before { width: 22px; height: 22px; font-size: 13px; }
   .rule-steps strong { font-size: 15px; white-space: nowrap; }
   .rule-steps span { font-size: 12px; line-height: 1.35; }
+  .rule-steps.three { grid-template-columns: 1fr; }
+  .rule-steps.three + .rule-text { display: none; }
+  .rule-steps.three li { grid-template-columns: 24px 1fr; row-gap: 4px; }
+  .rule-steps.three li > span { grid-column: 2; }
+  .rule-steps .chips { padding-top: 2px; gap: 6px; }
+  .rule-steps .chip { padding: 3px 10px; font-size: 12.5px; }
   .ladder { gap: 4px; }
   .ladder li { padding: 5px 10px; font-size: 12.5px; }
   .ladder b { font-size: 15px; }
