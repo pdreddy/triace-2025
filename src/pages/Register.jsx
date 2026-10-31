@@ -4,7 +4,7 @@ import { useTournament } from '../hooks/useTournament';
 import { useRulesAccess } from '../hooks/useRulesAccess';
 import { Field, Message, UtrMeter, tierTone } from '../components/UI';
 import { Icon } from '../components/Icons';
-import { assignSelectedTier, assignTier, orderedTiers, parseUtr, formatUtr, validateRegistration } from '../../functions/lib/tournament.js';
+import { assignSelectedTier, assignTier, orderedTiers, parseUtr, formatUtr, validateRegistration, playerUtr, UTR_GAP_LIMIT } from '../../functions/lib/tournament.js';
 
 const PLAYERS = [
   { key: 'captain', title: 'Captain', note: 'First name public', label: 'Captain first name', placeholder: 'First name only', max: 40, autoComplete: 'given-name' },
@@ -13,7 +13,14 @@ const PLAYERS = [
 ];
 const STEPS = ['Tier', 'Captain', 'Ace 1', 'Ace 2', 'Confirm'];
 const emptyPlayers = () => Object.fromEntries(PLAYERS.map(p => [p.key, { name: '', singles: '', doubles: '' }]));
-const rating = player => { try { return Math.max(player.singles ? parseUtr(player.singles) : 0, player.doubles ? parseUtr(player.doubles) : 0); } catch { return 0; } };
+// Counted rating for the live preview, using the same gap rule as the server (playerUtr).
+function rating(player) {
+  try {
+    const singles = player.singles ? parseUtr(player.singles) : 0, doubles = player.doubles ? parseUtr(player.doubles) : null;
+    if (!singles) return { value: doubles || 0, averaged: false };
+    return { value: playerUtr(singles, doubles), averaged: doubles != null && Math.abs(singles - doubles) > UTR_GAP_LIMIT };
+  } catch { return { value: 0, averaged: false }; }
+}
 
 function TierOption({ value, tone, title, detail, art, selected, disabled, onSelect }) {
   return (
@@ -55,7 +62,7 @@ export default function Register() {
 
   let combined = 0, complete = true;
   for (const value of Object.values(players)) {
-    try { if (!value.singles) complete = false; combined += Math.max(value.singles ? parseUtr(value.singles) : 0, value.doubles ? parseUtr(value.doubles) : 0); } catch { complete = false; }
+    try { if (!value.singles) complete = false; combined += playerUtr(value.singles ? parseUtr(value.singles) : 0, value.doubles ? parseUtr(value.doubles) : null); } catch { complete = false; }
   }
   const highest = complete ? assignTier(combined, config) : null;
   const assigned = complete ? assignSelectedTier(combined, config, selectedTier) : null;
@@ -158,10 +165,10 @@ export default function Register() {
           </div>
           <UtrMeter tiers={active} value={combined} />
           <ul className="preview-players">
-            {PLAYERS.map(p => <li key={p.key} className={filled(p.key) ? 'done' : ''}><span>{p.title}</span><b>{players[p.key].name.trim() || '—'}</b><em>{formatUtr(rating(players[p.key]))}</em></li>)}
+            {PLAYERS.map(p => <li key={p.key} className={filled(p.key) ? 'done' : ''}><span>{p.title}</span><b>{players[p.key].name.trim() || '—'}</b><em>{rating(players[p.key]).averaged && <small>avg</small>}{formatUtr(rating(players[p.key]).value)}</em></li>)}
           </ul>
           <div className="preview-notes">
-            <p><strong>Rating rule.</strong> Each player counts at the higher of singles or doubles UTR.</p>
+            <p><strong>Rating rule.</strong> Each player counts at the higher of singles or doubles UTR. If the two are more than 1.75 apart, their average counts instead.</p>
             <p><strong>Privacy.</strong> The captain’s first name and all three UTRs are public. The admin controls whether Ace names are masked.</p>
           </div>
           {settings && !settings.registrationEnabled && <Message>Registration is closed.</Message>}

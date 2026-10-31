@@ -3,7 +3,7 @@ import { UtrMeter } from '../components/UI';
 
 // The official Triace 2.0 rules, one flash card per entry. Ratings are in hundredths of a UTR.
 const RULE_TIERS = [
-  { id: 'rising', name: 'Rising', minCombinedUtr: 1150, maxCombinedUtr: 1700 },
+  { id: 'rising', name: 'Rising', minCombinedUtr: 1150, maxCombinedUtr: 1750 },
   { id: 'goat', name: 'GOAT', minCombinedUtr: 1750, maxCombinedUtr: 2200 }
 ];
 
@@ -76,6 +76,7 @@ export const RULE_CARDS = [
         <div className="rule-box">
           <span className="rule-label">Each player’s UTR</span>
           <p className="formula">= the higher of <span className="chip on">Singles UTR</span> or <span className="chip on">Doubles UTR</span></p>
+          <p className="rule-text">If singles and doubles are more than <strong>1.75 apart</strong>, the <strong>average</strong> of the two counts instead. Example: singles 5.00 and doubles 7.00 → 6.00.</p>
         </div>
       </>
     )
@@ -85,7 +86,7 @@ export const RULE_CARDS = [
     body: (
       <>
         <Head num="02" title="Team UTR & tiers" />
-        <p className="rule-text">Combined team UTR = P1 + P2 + P3, each counted at their highest applicable UTR. Both ends of each range count.</p>
+        <p className="rule-text">Combined team UTR = P1 + P2 + P3, each counted by the rating rule on the previous card. Both ends of each range count; a team at exactly 17.50 qualifies for GOAT.</p>
         <UtrMeter tiers={RULE_TIERS} />
         <div className="rule-box">
           <span className="rule-label">How teams are placed</span>

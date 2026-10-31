@@ -526,6 +526,7 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
 .preview-players b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .preview-players em { font-family: var(--display); font-size: 20px; font-style: normal; font-weight: 700; color: var(--faint); }
 .preview-players li.done em { color: #fff; }
+.preview-players em small { margin-right: 6px; padding: 1px 6px; border-radius: 999px; font-family: var(--body); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; vertical-align: middle; color: var(--ink); background: var(--clay); }
 .preview-notes { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
 .success-screen { display: flex; flex-direction: column; align-items: center; gap: 14px; max-width: 560px; margin: 4vh auto 0; text-align: center; }
 .success-icon { display: grid; place-items: center; width: 84px; height: 84px; border-radius: 50%; color: var(--ink); background: var(--lime); box-shadow: 0 0 0 10px #d9f24b22, 0 0 40px #d9f24b66; animation: pop .5s cubic-bezier(.2, 1.6, .4, 1) both; }

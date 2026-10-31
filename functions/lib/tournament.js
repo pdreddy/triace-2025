@@ -1,10 +1,17 @@
 export const DEFAULT_SETTINGS = { registrationEnabled: true, aceNameMaskingEnabled: true, minPlayerUtr: 1, maxPlayerUtr: 1650 };
 export const DEFAULT_TIERS = {
-  goat: { name: 'GOAT Tier', minCombinedUtr: 1700, maxCombinedUtr: 2200, sortOrder: 1, active: true },
-  rising: { name: 'Rising Tier', minCombinedUtr: 1150, maxCombinedUtr: 1650, sortOrder: 2, active: true }
+  goat: { name: 'GOAT Tier', minCombinedUtr: 1750, maxCombinedUtr: 2200, sortOrder: 1, active: true },
+  rising: { name: 'Rising Tier', minCombinedUtr: 1150, maxCombinedUtr: 1750, sortOrder: 2, active: true }
 };
 export class ValidationError extends Error { constructor(message) { super(message); this.name = 'ValidationError'; } }
 export const formatUtr = value => (value / 100).toFixed(2);
+// A player counts at the higher of singles and doubles, unless the two are more than 1.75 apart:
+// then the average counts (rounded to the nearest hundredth). Ratings are integer hundredths.
+export const UTR_GAP_LIMIT = 175;
+export function playerUtr(singlesUtr, doublesUtr = null) {
+  if (doublesUtr == null) return singlesUtr;
+  return Math.abs(singlesUtr - doublesUtr) > UTR_GAP_LIMIT ? Math.round((singlesUtr + doublesUtr) / 2) : Math.max(singlesUtr, doublesUtr);
+}
 export function parseUtr(value) {
   const text = String(value ?? '').trim();
   if (!/^\d{1,2}(\.\d{1,2})?$/.test(text)) throw new ValidationError('Enter a numeric UTR with up to two decimal places.');
@@ -62,7 +69,7 @@ function player(value, captain, settings) {
   if (captain) assert(!/\s/.test(clean), 'Enter only the captain’s first name, without a surname.');
   assert(integer(value.singlesUtr, settings.minPlayerUtr, settings.maxPlayerUtr), `${label}: UTR must be ${formatUtr(settings.minPlayerUtr)}–${formatUtr(settings.maxPlayerUtr)}.`);
   assert(value.doublesUtr === null || integer(value.doublesUtr, settings.minPlayerUtr, settings.maxPlayerUtr), `${label}: optional doubles UTR must be within the individual limits.`);
-  return { [key]: clean, singlesUtr: value.singlesUtr, doublesUtr: value.doublesUtr, utr: Math.max(value.singlesUtr, value.doublesUtr ?? 0) };
+  return { [key]: clean, singlesUtr: value.singlesUtr, doublesUtr: value.doublesUtr, utr: playerUtr(value.singlesUtr, value.doublesUtr) };
 }
 export function validateRegistration(payload, settings, tiers) {
   validateSettings(settings); validateTierConfig(tiers);
@@ -117,6 +124,7 @@ export function applyRecalculation(current) {
   const state = structuredClone(current), summary = { reviewed: 0, moved: 0, unchanged: 0, unassigned: 0 };
   state.tiers = {};
   for (const team of Object.values(state.registrations || {})) {
+    for (const key of ['captain', 'ace1', 'ace2']) if (Number.isInteger(team[key].singlesUtr)) team[key].utr = playerUtr(team[key].singlesUtr, team[key].doublesUtr ?? null);
     const total = team.captain.utr + team.ace1.utr + team.ace2.utr;
     const assigned = assignSelectedTier(total, state.tierConfig, team.selectedTier);
     summary.reviewed++; if (assigned === (team.assignedTier ?? null) && JSON.stringify(listedTiers(total, state.tierConfig, team.selectedTier)) === JSON.stringify(team.listedTiers || (team.assignedTier ? [team.assignedTier] : []))) summary.unchanged++; else summary.moved++;
