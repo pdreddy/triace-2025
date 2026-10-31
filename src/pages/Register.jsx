@@ -53,7 +53,7 @@ function Success({ result, config, onAgain }) {
 }
 
 export default function Register() {
-  const { data, service, user, connected } = useTournament();
+  const { data, service, user, connected, error: loadError } = useTournament();
   const { accepted } = useRulesAccess();
   const [players, setPlayers] = useState(emptyPlayers), [selectedTier, setSelectedTier] = useState('higher'), [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [success, setSuccess] = useState(null), [step, setStep] = useState(0);
@@ -67,6 +67,15 @@ export default function Register() {
   const highest = complete ? assignTier(combined, config) : null;
   const assigned = complete ? assignSelectedTier(combined, config, selectedTier) : null;
   const assignedLabel = assigned ? (selectedTier === 'both' ? 'GOAT + Rising' : config[assigned].name) : complete ? (highest ? 'Choose an eligible tier' : 'No eligible active tier') : 'Add all three UTR values';
+  // Every reason the Register button is off, in the order a visitor can act on them.
+  const blockers = [
+    !connected && 'Connecting to the tournament server…',
+    connected && !data && (loadError ? `Tournament data could not be loaded: ${loadError}` : 'Loading tournament settings…'),
+    data && !settings && 'An admin must save the initial tournament configuration.',
+    settings && !settings.registrationEnabled && 'Registration is closed.',
+    data && settings && !active.length && 'No tier is open for registration. An admin must activate a tier.',
+    !user?.uid && 'Signing you in… (anonymous sign-in must be enabled in Firebase Authentication)'
+  ].filter(Boolean);
   const filled = key => !!players[key].name.trim() && !!players[key].singles;
   const stepDone = [true, filled('captain'), filled('ace1'), filled('ace2'), consent];
   const utrLimits = { min: (settings?.minPlayerUtr || 1) / 100, max: (settings?.maxPlayerUtr || 1650) / 100 };
@@ -116,6 +125,7 @@ export default function Register() {
           <fieldset disabled={busy}>
             <div className={`step-panel card${step === 0 ? ' on' : ''}`} role="group" aria-label="Choose your tier">
               <div className="card-head stacked"><h2>Choose your tier</h2><p className="small">GOAT-qualified teams may enter GOAT, Rising, or both. Rising-qualified teams may enter Rising only.</p></div>
+              {!active.length && <p className="small note">{data ? 'No tiers are open yet.' : 'Tiers appear here once the tournament settings load.'}</p>}
               <div className="tier-options">
                 {active.map(t => (
                   <TierOption key={t.id} value={t.id} tone={tierTone(t.id)} title={t.name} art={['goat', 'rising'].includes(t.id) ? `/${t.id}-tier.webp` : null}
@@ -171,8 +181,7 @@ export default function Register() {
             <p><strong>Rating rule.</strong> Each player counts at the higher of singles or doubles UTR. If the two are more than 1.75 apart, their average counts instead.</p>
             <p><strong>Privacy.</strong> The captain’s first name and all three UTRs are public. The admin controls whether Ace names are masked.</p>
           </div>
-          {settings && !settings.registrationEnabled && <Message>Registration is closed.</Message>}
-          {data && !settings && <Message>An admin must save the initial tournament configuration.</Message>}
+          {blockers.map(text => <Message key={text}>{text}</Message>)}
         </aside>
       </div>
     </section>
