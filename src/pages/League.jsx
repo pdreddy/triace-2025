@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTournament, useMyTeams } from '../hooks/useTournament';
 import { EmptyState, Message, tierTone } from '../components/UI';
-import { FixtureCard, StandingsTable, teamIndex } from '../components/League';
+import { Bracket, FixtureCard, StandingsTable, teamIndex } from '../components/League';
 import { orderedTiers } from '../../functions/lib/tournament.js';
 import { standings } from '../../functions/lib/league.js';
 
@@ -12,14 +12,15 @@ export default function League() {
   const [picked, setPicked] = useState(null), [view, setView] = useState('standings'), [mineOnly, setMineOnly] = useState(false), [message, setMessage] = useState('');
   const tier = tiers.find(t => t.id === picked) || tiers[0];
   const teams = teamIndex(data), mine = new Set(Object.keys(myTeams));
-  const fixtures = Object.values(data?.fixtures?.[tier?.id] || {}).sort((a, b) => a.round - b.round || a.id.localeCompare(b.id));
+  const all = Object.values(data?.fixtures?.[tier?.id] || {}), playoffs = all.filter(f => f.stage);
+  const fixtures = all.filter(f => !f.stage).sort((a, b) => a.round - b.round || a.id.localeCompare(b.id));
   const shown = mineOnly ? fixtures.filter(f => mine.has(f.home) || mine.has(f.away)) : fixtures;
   const rounds = [...new Set(shown.map(f => f.round))];
   const rows = tier ? standings(Object.values(data?.tiers?.[tier.id]?.teams || {}), data?.fixtures?.[tier.id]) : [];
   const played = fixtures.filter(f => f.status === 'final').length;
 
-  async function submit(fixture, matches) {
-    await service.submitResult({ tierId: tier.id, fixtureId: fixture.id, matches });
+  async function submit(fixture, entry) {
+    await service.submitResult({ tierId: tier.id, fixtureId: fixture.id, ...entry });
     setMessage(user?.admin ? 'Result saved. Standings are updated.' : 'Score submitted. It counts once the admin approves it.');
   }
 
@@ -44,12 +45,17 @@ export default function League() {
               <div className="segmented labelled" role="tablist" aria-label="League view">
                 <button type="button" role="tab" aria-selected={view === 'standings'} onClick={() => setView('standings')}>Standings</button>
                 <button type="button" role="tab" aria-selected={view === 'fixtures'} onClick={() => setView('fixtures')}>Fixtures</button>
+                <button type="button" role="tab" aria-selected={view === 'playoffs'} onClick={() => setView('playoffs')}>Playoffs</button>
               </div>
             </div>
           </div>
           <Message>{message}</Message>
 
           {view === 'standings' && (rows.length ? <StandingsTable rows={rows} highlight={mine} /> : <EmptyState title="No teams in this tier yet." />)}
+
+          {view === 'playoffs' && (playoffs.length
+            ? <Bracket fixtures={playoffs} teams={teams} mine={mine} admin={!!user?.admin} onSubmit={submit} />
+            : <EmptyState icon="trophy" title="Playoffs haven’t started.">The admin creates the bracket from the final standings: top 3 (eliminator, then final) or top 4 when the tier has more than 7 teams (semifinals, then final). Every playoff encounter is best of 5.</EmptyState>)}
 
           {view === 'fixtures' && (
             <>
@@ -60,7 +66,7 @@ export default function League() {
                   <h2 className="round-title">Round {round}</h2>
                   <div className="fixture-list">
                     {shown.filter(f => f.round === round).map(f => (
-                      <FixtureCard key={f.id} fixture={f} teams={teams} mine={mine.has(f.home) || mine.has(f.away)} admin={!!user?.admin} onSubmit={matches => submit(f, matches)} />
+                      <FixtureCard key={f.id} fixture={f} teams={teams} mine={mine.has(f.home) || mine.has(f.away)} admin={!!user?.admin} onSubmit={entry => submit(f, entry)} />
                     ))}
                   </div>
                 </section>

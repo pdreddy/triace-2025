@@ -76,6 +76,13 @@ export default function Admin() {
     if (existing.length && !window.confirm(replace ? `Replace the ${tier.name} schedule? All of its submitted and final results will be deleted.` : `Create a new ${tier.name} schedule? The current fixtures will be replaced.`)) return;
     return action(async () => { const result = await service.generateFixtures({ tierId: tier.id, replace }); setMessage(`${tier.name}: ${result.fixtures} fixtures over ${result.rounds} rounds created.`); });
   }
+  function createPlayoffs(tier) {
+    const fixtures = Object.values(data?.fixtures?.[tier.id] || {}), league = fixtures.filter(f => !f.stage), playoffs = fixtures.filter(f => f.stage);
+    const unfinished = league.filter(f => f.status !== 'final').length;
+    if (unfinished && !window.confirm(`${unfinished} round-robin results are not final. Create the ${tier.name} playoffs from the current standings anyway?`)) return;
+    if (playoffs.some(f => f.result || f.submission) && !window.confirm(`Replace the ${tier.name} playoffs? Their results will be deleted.`)) return;
+    return action(async () => { await service.generatePlayoffs({ tierId: tier.id, force: unfinished > 0 }); setMessage(`${tier.name} playoffs created from the standings.`); });
+  }
   function review(tierId, fixtureId, approve) {
     return action(async () => { await service.reviewResult({ tierId, fixtureId, approve }); setMessage(approve ? 'Result approved. Standings are updated.' : 'Submission rejected. The captains can submit again.'); });
   }
@@ -216,7 +223,13 @@ export default function Admin() {
               const pending = fixtures.filter(f => f.status === 'submitted'), finals = fixtures.filter(f => f.status === 'final').length;
               return (
                 <section className="card" key={tier.id}>
-                  <div className="card-head"><h3>{tier.name}</h3><button className="secondary small" type="button" disabled={busy || teamCount < 2} onClick={() => generateFixtures(tier)}>{fixtures.length ? 'Regenerate fixtures' : 'Generate fixtures'}</button></div>
+                  <div className="card-head">
+                    <h3>{tier.name}</h3>
+                    <div className="card-actions">
+                      <button className="secondary small" type="button" disabled={busy || teamCount < 2} onClick={() => generateFixtures(tier)}>{fixtures.some(f => !f.stage) ? 'Regenerate fixtures' : 'Generate fixtures'}</button>
+                      <button className="secondary small" type="button" disabled={busy || teamCount < 3 || !fixtures.some(f => !f.stage)} onClick={() => createPlayoffs(tier)}>{fixtures.some(f => f.stage) ? 'Recreate playoffs' : 'Create playoffs'}</button>
+                    </div>
+                  </div>
                   <p className="small">{teamCount} teams · {fixtures.length} fixtures · {finals} final · {pending.length} awaiting approval{teamCount < 2 ? ' · needs at least 2 teams' : ''}</p>
                   {pending.length > 0 && <div className="fixture-list">{pending.map(f => <FixtureCard key={f.id} fixture={f} teams={teamIndex(data)} onReview={approve => review(tier.id, f.id, approve)} />)}</div>}
                 </section>

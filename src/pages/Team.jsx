@@ -4,13 +4,15 @@ import { EmptyState, Stat, tierTone } from '../components/UI';
 import { FixtureCard, teamIndex, teamName } from '../components/League';
 import { Icon } from '../components/Icons';
 import { orderedTiers, formatUtr } from '../../functions/lib/tournament.js';
-import { standings } from '../../functions/lib/league.js';
+import { standings, playerId } from '../../functions/lib/league.js';
+import { useRatings } from './Players';
 
 // A team profile: players and ratings, league record, and every fixture, like a player card in the UTR app.
 export default function Team() {
   const { teamId } = useParams();
   const { data, service, user } = useTournament();
   const myTeams = useMyTeams();
+  const { players: rated } = useRatings();
   const team = teamIndex(data).get(teamId), teams = teamIndex(data);
   if (!data) return <div className="page-loading" aria-busy="true"><span className="spinner" /> Loading team…</div>;
   if (!team) return <section className="page"><EmptyState title="Team not found.">This team isn’t in any tier right now. <Link className="secondary" to="/tiers">Back to the lineup</Link></EmptyState></section>;
@@ -19,7 +21,8 @@ export default function Team() {
   const records = tiers.map(t => ({ tier: t, row: standings(Object.values(data.tiers[t.id].teams), data.fixtures?.[t.id]).find(r => r.team.teamId === teamId), fixtures: Object.values(data.fixtures?.[t.id] || {}).filter(f => f.home === teamId || f.away === teamId).sort((a, b) => a.round - b.round) }));
   const total = records.reduce((sum, r) => ({ won: sum.won + (r.row?.won || 0), lost: sum.lost + (r.row?.lost || 0) }), { won: 0, lost: 0 });
   const mine = Object.hasOwn(myTeams, teamId);
-  const players = [['Captain', team.captainFirstName, team.captainUtr], ['Ace 1', team.ace1Name || 'Ace 1 (masked)', team.ace1Utr], ['Ace 2', team.ace2Name || 'Ace 2 (masked)', team.ace2Utr]];
+  const players = [['captain', 'Captain', team.captainFirstName, team.captainUtr], ['ace1', 'Ace 1', team.ace1Name || 'Ace 1 (masked)', team.ace1Utr], ['ace2', 'Ace 2', team.ace2Name || 'Ace 2 (masked)', team.ace2Utr]];
+  const ratingOf = role => rated.find(p => p.id === playerId(teamId, role));
 
   return (
     <section className="page team-screen">
@@ -40,8 +43,11 @@ export default function Team() {
 
       <section className="card team-players">
         <h2>Players</h2>
-        <ul>{players.map(([role, name, utr]) => <li key={role}><span>{role}</span><b>{name}</b><em>{formatUtr(utr)}</em></li>)}</ul>
-        <p className="small">Counted UTRs: the higher of singles and doubles, or their average when they are more than 1.75 apart.</p>
+        <ul>{players.map(([role, label, name, utr]) => {
+          const r = ratingOf(role);
+          return <li key={role}><span>{label}</span><Link to={`/player/${teamId}/${role}`}><b>{name}</b></Link><small>UTR {formatUtr(utr)}</small><em>{r ? r.rating.toFixed(2) : formatUtr(utr)}</em></li>;
+        })}</ul>
+        <p className="small">Right: live Triace rating. Starting point is the counted UTR: the higher of singles and doubles, or their average when they are more than 1.75 apart.</p>
       </section>
 
       {records.map(({ tier, row, fixtures }) => (
@@ -49,7 +55,7 @@ export default function Team() {
           <div className="tier-head"><div><h2>{tier.name} fixtures</h2>{row && <span>Form {row.form.join(' ') || '—'} · {row.matchesWon}–{row.matchesLost} matches</span>}</div></div>
           {!fixtures.length && <EmptyState icon="calendar" title="No fixtures yet." />}
           <div className="fixture-list">
-            {fixtures.map(f => <FixtureCard key={f.id} fixture={f} teams={teams} mine={mine} admin={!!user?.admin} onSubmit={matches => service.submitResult({ tierId: tier.id, fixtureId: f.id, matches })} />)}
+            {fixtures.map(f => <FixtureCard key={f.id} fixture={f} teams={teams} mine={mine} admin={!!user?.admin} onSubmit={entry => service.submitResult({ tierId: tier.id, fixtureId: f.id, ...entry })} />)}
           </div>
         </section>
       ))}

@@ -23,6 +23,7 @@ export function createDemoService() {
     saveConfiguration: payload => request('configuration', payload),
     recalculate: () => request('recalculate', {}),
     generateFixtures: payload => request('generate-fixtures', payload),
+    generatePlayoffs: payload => request('generate-playoffs', payload),
     submitResult: payload => request('submit-result', payload),
     reviewResult: payload => request('review-result', payload)
   };

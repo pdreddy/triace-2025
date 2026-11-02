@@ -61,6 +61,7 @@ export function createFirebaseService() {
     saveConfiguration: withError(async payload => (await httpsCallable(functions, 'saveConfiguration')(payload)).data),
     recalculate: withError(async () => (await httpsCallable(functions, 'recalculateTiers')({})).data),
     generateFixtures: withError(async payload => (await httpsCallable(functions, 'generateFixtures')(payload)).data),
+    generatePlayoffs: withError(async payload => (await httpsCallable(functions, 'generatePlayoffs')(payload)).data),
     submitResult: withError(async payload => (await httpsCallable(functions, 'submitResult')(payload)).data),
     reviewResult: withError(async payload => (await httpsCallable(functions, 'reviewResult')(payload)).data)
   };

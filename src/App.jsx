@@ -13,9 +13,11 @@ const Login = lazy(() => import('./pages/Login'));
 const Admin = lazy(() => import('./pages/Admin'));
 const League = lazy(() => import('./pages/League'));
 const Team = lazy(() => import('./pages/Team'));
+const Players = lazy(() => import('./pages/Players'));
+const Player = lazy(() => import('./pages/Player'));
 
 const FRIENDLY_ERROR = 'We can’t reach the tournament right now. Please check your connection and try again shortly.';
-const SCREENS = { '/': 'rules', '/register': 'register', '/tiers': 'tiers', '/league': 'league', '/admin/login': 'login', '/admin': 'admin' };
+const SCREENS = { '/': 'rules', '/register': 'register', '/tiers': 'tiers', '/league': 'league', '/players': 'players', '/admin/login': 'login', '/admin': 'admin' };
 
 function StatusPill({ mode, connected, online }) {
   const state = !online ? 'offline' : connected ? 'live' : 'connecting';
@@ -38,7 +40,7 @@ function Layout() {
   const { service, connected, error, user } = useTournament();
   const { accepted } = useRulesAccess();
   const { canInstall, install, online, updated } = usePwa();
-  const path = useLocation().pathname, screen = SCREENS[path] || (path.startsWith('/team/') ? 'team' : 'other');
+  const path = useLocation().pathname, screen = SCREENS[path] || (path.startsWith('/team/') ? 'team' : path.startsWith('/player/') ? 'player' : 'other');
   const [logoutError, setLogoutError] = useState(''), [loggingOut, setLoggingOut] = useState(false);
 
   async function logout() {
@@ -59,10 +61,12 @@ function Layout() {
               : <span className="nav-locked" aria-disabled="true" title="Read and agree to all rules first"><Icon name="lock" /><span>Register</span></span>}
             <NavLink to="/tiers"><Icon name="trophy" /><span>Tier list</span></NavLink>
             <NavLink to="/league"><Icon name="calendar" /><span>League</span></NavLink>
-            <NavLink to={user?.admin ? '/admin' : '/admin/login'}><Icon name="shield" /><span>Admin</span></NavLink>
+            <NavLink to="/players"><Icon name="users" /><span>Players</span></NavLink>
+            <NavLink className="admin-tab" to={user?.admin ? '/admin' : '/admin/login'}><Icon name="shield" /><span>Admin</span></NavLink>
           </nav>
           <div className="topbar-actions">
             <StatusPill mode={service.mode} connected={connected} online={online} />
+            <NavLink className="chip-button admin-chip" to={user?.admin ? '/admin' : '/admin/login'} aria-label="Admin"><Icon name="shield" size={16} /></NavLink>
             {canInstall && <button type="button" className="chip-button" onClick={install}><Icon name="download" size={16} /><span>Install app</span></button>}
             {user?.admin && <button type="button" className="chip-button" disabled={loggingOut} onClick={logout}><Icon name="logout" size={16} /><span>{loggingOut ? 'Signing out…' : 'Sign out'}</span></button>}
           </div>
@@ -80,6 +84,8 @@ function Layout() {
             <Route path="/tiers" element={<Tiers />} />
             <Route path="/league" element={<League />} />
             <Route path="/team/:teamId" element={<Team />} />
+            <Route path="/players" element={<Players />} />
+            <Route path="/player/:teamId/:role" element={<Player />} />
             <Route path="/admin/login" element={<Login />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="*" element={<NotFound />} />
