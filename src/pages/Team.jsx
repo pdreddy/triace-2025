@@ -1,0 +1,58 @@
+import { Link, useParams } from 'react-router-dom';
+import { useTournament, useMyTeams } from '../hooks/useTournament';
+import { EmptyState, Stat, tierTone } from '../components/UI';
+import { FixtureCard, teamIndex, teamName } from '../components/League';
+import { Icon } from '../components/Icons';
+import { orderedTiers, formatUtr } from '../../functions/lib/tournament.js';
+import { standings } from '../../functions/lib/league.js';
+
+// A team profile: players and ratings, league record, and every fixture, like a player card in the UTR app.
+export default function Team() {
+  const { teamId } = useParams();
+  const { data, service, user } = useTournament();
+  const myTeams = useMyTeams();
+  const team = teamIndex(data).get(teamId), teams = teamIndex(data);
+  if (!data) return <div className="page-loading" aria-busy="true"><span className="spinner" /> Loading team…</div>;
+  if (!team) return <section className="page"><EmptyState title="Team not found.">This team isn’t in any tier right now. <Link className="secondary" to="/tiers">Back to the lineup</Link></EmptyState></section>;
+
+  const tiers = orderedTiers(data.tierConfig || {}).filter(t => data.tiers?.[t.id]?.teams?.[teamId]);
+  const records = tiers.map(t => ({ tier: t, row: standings(Object.values(data.tiers[t.id].teams), data.fixtures?.[t.id]).find(r => r.team.teamId === teamId), fixtures: Object.values(data.fixtures?.[t.id] || {}).filter(f => f.home === teamId || f.away === teamId).sort((a, b) => a.round - b.round) }));
+  const total = records.reduce((sum, r) => ({ won: sum.won + (r.row?.won || 0), lost: sum.lost + (r.row?.lost || 0) }), { won: 0, lost: 0 });
+  const mine = Object.hasOwn(myTeams, teamId);
+  const players = [['Captain', team.captainFirstName, team.captainUtr], ['Ace 1', team.ace1Name || 'Ace 1 (masked)', team.ace1Utr], ['Ace 2', team.ace2Name || 'Ace 2 (masked)', team.ace2Utr]];
+
+  return (
+    <section className="page team-screen">
+      <header className={`team-hero ${tierTone(tiers[0]?.id)}`}>
+        <div>
+          <p className="eyebrow">{tiers.map(t => t.name).join(' · ')}{mine && ' · Your team'}</p>
+          <h1>{teamName(team)}</h1>
+          <p className="team-hero-utr"><b>{formatUtr(team.combinedUtr)}</b> combined UTR</p>
+        </div>
+        <span className="team-hero-badge" aria-hidden="true"><Icon name="trophy" size={40} /></span>
+      </header>
+
+      <div className="stat-row">
+        <Stat value={`${total.won}–${total.lost}`} label="Win–loss" tone="accent" />
+        {records.map(r => <Stat key={r.tier.id} value={r.row ? `#${r.row.position}` : '—'} label={`${r.tier.name} position`} />)}
+        <Stat value={records.reduce((s, r) => s + (r.row?.points || 0), 0)} label="Points" />
+      </div>
+
+      <section className="card team-players">
+        <h2>Players</h2>
+        <ul>{players.map(([role, name, utr]) => <li key={role}><span>{role}</span><b>{name}</b><em>{formatUtr(utr)}</em></li>)}</ul>
+        <p className="small">Counted UTRs: the higher of singles and doubles, or their average when they are more than 1.75 apart.</p>
+      </section>
+
+      {records.map(({ tier, row, fixtures }) => (
+        <section key={tier.id} className="tier-group">
+          <div className="tier-head"><div><h2>{tier.name} fixtures</h2>{row && <span>Form {row.form.join(' ') || '—'} · {row.matchesWon}–{row.matchesLost} matches</span>}</div></div>
+          {!fixtures.length && <EmptyState icon="calendar" title="No fixtures yet." />}
+          <div className="fixture-list">
+            {fixtures.map(f => <FixtureCard key={f.id} fixture={f} teams={teams} mine={mine} admin={!!user?.admin} onSubmit={matches => service.submitResult({ tierId: tier.id, fixtureId: f.id, matches })} />)}
+          </div>
+        </section>
+      ))}
+    </section>
+  );
+}

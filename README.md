@@ -157,6 +157,15 @@ Masking enabled means admin cards hide Ace names by default, with an authenticat
 - To remove a populated tier safely: deactivate it, save, recalculate, then remove it and save again. Removal is checked on the server, not just disabled in the UI.
 - Config revisions reject stale writes from another admin session. Reload saved settings to resolve a conflict rather than silently overwriting someone else’s changes.
 
+## League: fixtures, results and standings
+
+- **Fixtures.** In Admin → League & results, *Generate fixtures* builds a round-robin schedule for a tier from its current teams (every team plays every other team once; an odd count gets a bye each round). Regenerating a tier that already has submitted or final results asks for confirmation and clears them.
+- **Scores.** Each encounter is Doubles 1, Doubles 2 and Singles; the team winning two of three wins the encounter. The captain is the browser that registered the team (its anonymous Firebase user, stored privately in `traice2_0/teamsByOwner/<uid>`). Either captain can submit a score from the League page; it shows as *Awaiting approval* until the admin approves or rejects it in Admin → League & results. Admin entries and corrections are final immediately. If a captain clears their browser data, the admin enters the score instead.
+- **Standings.** Computed from final results: 2 points per encounter win; ties break on match difference, then matches won, then combined UTR. The playoff line is drawn under 4th place when the tier has more than 7 teams, otherwise under 3rd.
+- **Team profiles.** `/team/<teamId>` shows the players and counted UTRs, record, position and every fixture.
+
+League logic lives in `functions/lib/league.js` (unit-tested in `tests/unit/league.test.js`), with the Cloud Functions `generateFixtures`, `submitResult` and `reviewResult`. After pulling this change, deploy both the functions and the database rules (`firebase deploy --only functions,database`); `fixtures` is publicly readable and `teamsByOwner/<uid>` is readable only by that user. Running *Recalculate Tiers* once rebuilds the captain index for teams registered before this change.
+
 ## Source organization
 
 - `src/pages/`: registration, public tier list, login, dashboard.

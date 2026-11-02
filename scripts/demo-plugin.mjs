@@ -2,6 +2,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
 import path from 'node:path';
 import { initialState, publicState, applyRegistration, applyConfiguration, applyRecalculation, ValidationError } from '../functions/lib/tournament.js';
+import { applyGenerateFixtures, applySubmitResult, applyReviewResult } from '../functions/lib/league.js';
 const digest = value => createHash('sha256').update(value).digest();
 export function demoPlugin(env) {
   const password = env.TRAICE_ADMIN_PASSWORD;
@@ -41,6 +42,7 @@ export function demoPlugin(env) {
         if (req.method === 'GET') {
           if (endpoint === '/session') return send(200, safeUser());
           if (endpoint === '/public') return send(200, publicState(state));
+          if (endpoint === '/my-teams') return send(200, session ? state.teamsByOwner?.[session.uid] || {} : {});
           if (endpoint === '/registrations') return session?.admin ? send(200, state.registrations || {}) : send(403, { error: 'Administrator access is required.' });
           return send(404, { error: 'Unknown endpoint.' });
         }
@@ -60,8 +62,11 @@ export function demoPlugin(env) {
         if (endpoint === '/logout') { session = newSession(); return send(200, safeUser()); }
         if (endpoint === '/register' && !session) return send(401, { error: 'Open the registration page before submitting.' });
         if (endpoint === '/register') return send(200, await mutate(current => applyRegistration(current, payload, session.uid)));
+        if (endpoint === '/submit-result') return session ? send(200, await mutate(current => applySubmitResult(current, payload, session.uid, session.admin === true))) : send(401, { error: 'Sign in before submitting a score.' });
         if (!session?.admin) return send(403, { error: 'Administrator access is required.' });
         if (endpoint === '/configuration') return send(200, await mutate(current => applyConfiguration(current, payload)));
+        if (endpoint === '/generate-fixtures') return send(200, await mutate(current => applyGenerateFixtures(current, payload)));
+        if (endpoint === '/review-result') return send(200, await mutate(current => applyReviewResult(current, payload)));
         if (endpoint === '/recalculate') return send(200, await mutate(current => applyRecalculation(current)));
         return send(404, { error: 'Unknown endpoint.' });
       } catch (error) { send(error instanceof ValidationError ? 400 : 500, { error: error instanceof ValidationError ? error.message : 'Local demo failed. Check its data directory and server output.' }); }

@@ -3,12 +3,14 @@ import { Link, Navigate } from 'react-router-dom';
 import { useTournament, useRegistrations } from '../hooks/useTournament';
 import { Field, Message, TeamCard, Stat } from '../components/UI';
 import { Icon } from '../components/Icons';
+import { FixtureCard, teamIndex } from '../components/League';
 import { DEFAULT_SETTINGS, DEFAULT_TIERS, orderedTiers, parseUtr, validateSettings, validateTierConfig, registrationsCsv } from '../../functions/lib/tournament.js';
 
 const SECTIONS = [
   { id: 'settings', label: 'Registration & privacy', short: 'Settings', icon: 'shield' },
   { id: 'tiers', label: 'Tier configuration', short: 'Tiers', icon: 'trophy' },
-  { id: 'teams', label: 'Private registrations', short: 'Teams', icon: 'register' }
+  { id: 'teams', label: 'Private registrations', short: 'Teams', icon: 'register' },
+  { id: 'league', label: 'League & results', short: 'League', icon: 'calendar' }
 ];
 const draftFrom = data => ({
   settings: { ...(data?.settings || DEFAULT_SETTINGS) },
@@ -67,6 +69,15 @@ export default function Admin() {
     if (Object.values(teams).some(team => (team.listedTiers || [team.assignedTier]).includes(id))) { setError('This tier still has teams. Deactivate it, save, and recalculate before removing it.'); return; }
     setDraft(old => { const tierConfig = { ...old.tierConfig }; delete tierConfig[id]; return { ...old, tierConfig }; });
     setDirty(true);
+  }
+  function generateFixtures(tier) {
+    const existing = Object.values(data?.fixtures?.[tier.id] || {});
+    const replace = existing.some(f => f.status !== 'scheduled');
+    if (existing.length && !window.confirm(replace ? `Replace the ${tier.name} schedule? All of its submitted and final results will be deleted.` : `Create a new ${tier.name} schedule? The current fixtures will be replaced.`)) return;
+    return action(async () => { const result = await service.generateFixtures({ tierId: tier.id, replace }); setMessage(`${tier.name}: ${result.fixtures} fixtures over ${result.rounds} rounds created.`); });
+  }
+  function review(tierId, fixtureId, approve) {
+    return action(async () => { await service.reviewResult({ tierId, fixtureId, approve }); setMessage(approve ? 'Result approved. Standings are updated.' : 'Submission rejected. The captains can submit again.'); });
   }
   function exportCsv() {
     const blob = new Blob(['﻿' + registrationsCsv(teams, data?.tierConfig || {})], { type: 'text/csv;charset=utf-8;' });
@@ -196,6 +207,23 @@ export default function Admin() {
               </section>
             );
           })}
+
+          <SectionTitle id="league" num="04">League &amp; results</SectionTitle>
+          <p className="small note pane pane-league">Create each tier’s round-robin schedule once its teams are final. Captains submit scores from the League page; they count once you approve them. You can also enter or correct any result there.</p>
+          <div className="league-admin pane pane-league">
+            {liveTiers.map(tier => {
+              const fixtures = Object.values(data?.fixtures?.[tier.id] || {}), teamCount = Object.keys(data?.tiers?.[tier.id]?.teams || {}).length;
+              const pending = fixtures.filter(f => f.status === 'submitted'), finals = fixtures.filter(f => f.status === 'final').length;
+              return (
+                <section className="card" key={tier.id}>
+                  <div className="card-head"><h3>{tier.name}</h3><button className="secondary small" type="button" disabled={busy || teamCount < 2} onClick={() => generateFixtures(tier)}>{fixtures.length ? 'Regenerate fixtures' : 'Generate fixtures'}</button></div>
+                  <p className="small">{teamCount} teams · {fixtures.length} fixtures · {finals} final · {pending.length} awaiting approval{teamCount < 2 ? ' · needs at least 2 teams' : ''}</p>
+                  {pending.length > 0 && <div className="fixture-list">{pending.map(f => <FixtureCard key={f.id} fixture={f} teams={teamIndex(data)} onReview={approve => review(tier.id, f.id, approve)} />)}</div>}
+                </section>
+              );
+            })}
+            <Link className="secondary" to="/league">Open the League page ↗</Link>
+          </div>
         </div>
       </div>
     </section>

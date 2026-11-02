@@ -29,7 +29,10 @@ export function createFirebaseService() {
     mode: env.VITE_USE_EMULATORS === 'true' ? 'Firebase Emulators' : 'Firebase',
     subscribePublic(callback, onError) {
       const state = {}, ready = new Set(), keys = ['settings', 'tierConfig', 'configRevision', 'tiers'];
-      const off = keys.map(key => onValue(ref(database, `traice2_0/${key}`), snapshot => { state[key] = snapshot.val() ?? (key === 'configRevision' ? 0 : key === 'settings' ? null : {}); ready.add(key); if (ready.size === keys.length) callback({ ...state }); }, error => onError(new Error(errorMessage(error)))));
+      const emit = () => { if (ready.size === keys.length) callback({ ...state, fixtures: state.fixtures || {} }); };
+      const off = keys.map(key => onValue(ref(database, `traice2_0/${key}`), snapshot => { state[key] = snapshot.val() ?? (key === 'configRevision' ? 0 : key === 'settings' ? null : {}); ready.add(key); emit(); }, error => onError(new Error(errorMessage(error)))));
+      // Fixtures load on their own so a missing database rule for them never blocks the core tournament data.
+      off.push(onValue(ref(database, 'traice2_0/fixtures'), snapshot => { state.fixtures = snapshot.val() || {}; emit(); }, () => { state.fixtures = {}; emit(); }));
       return () => off.forEach(unsubscribe => unsubscribe());
     },
     subscribeConnection(callback) { return onValue(ref(database, '.info/connected'), snapshot => callback(snapshot.val() === true)); },
@@ -46,6 +49,7 @@ export function createFirebaseService() {
       });
       return () => { stopped = true; unsubscribe(); };
     },
+    subscribeMyTeams(uid, callback) { return onValue(ref(database, `traice2_0/teamsByOwner/${uid}`), snapshot => callback(snapshot.val() || {}), () => callback({})); },
     subscribePrivate(callback, onError) { return onValue(ref(database, 'traice2_0/registrations'), snapshot => callback(snapshot.val() || {}), error => onError(new Error(errorMessage(error)))); },
     async login(username, password) {
       const alias = env.VITE_ADMIN_USERNAME || 'reddi2026', email = env.VITE_ADMIN_EMAIL || 'reddi2026@traice.local';
@@ -55,6 +59,9 @@ export function createFirebaseService() {
     logout: withError(() => signOut(auth)),
     register: withError(async payload => (await httpsCallable(functions, 'registerTeam')(payload)).data),
     saveConfiguration: withError(async payload => (await httpsCallable(functions, 'saveConfiguration')(payload)).data),
-    recalculate: withError(async () => (await httpsCallable(functions, 'recalculateTiers')({})).data)
+    recalculate: withError(async () => (await httpsCallable(functions, 'recalculateTiers')({})).data),
+    generateFixtures: withError(async payload => (await httpsCallable(functions, 'generateFixtures')(payload)).data),
+    submitResult: withError(async payload => (await httpsCallable(functions, 'submitResult')(payload)).data),
+    reviewResult: withError(async payload => (await httpsCallable(functions, 'reviewResult')(payload)).data)
   };
 }

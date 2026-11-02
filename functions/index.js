@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase-admin/app';
 import { getDatabase } from 'firebase-admin/database';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { applyRegistration, applyConfiguration, applyRecalculation, ValidationError } from './lib/tournament.js';
+import { applyGenerateFixtures, applySubmitResult, applyReviewResult } from './lib/league.js';
 initializeApp();
 const options = { region: 'us-central1', maxInstances: 10, timeoutSeconds: 60 };
 function requireAuth(request, admin = false) {
@@ -34,3 +35,6 @@ async function mutate(operation) {
 export const registerTeam = onCall(options, async request => { requireAuth(request); return mutate(state => applyRegistration(state, request.data, request.auth.uid)); });
 export const saveConfiguration = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyConfiguration(state, request.data)); });
 export const recalculateTiers = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyRecalculation(state)); });
+export const generateFixtures = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyGenerateFixtures(state, request.data)); });
+export const submitResult = onCall(options, async request => { requireAuth(request); return mutate(state => applySubmitResult(state, request.data, request.auth.uid, request.auth.token.admin === true)); });
+export const reviewResult = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyReviewResult(state, request.data)); });

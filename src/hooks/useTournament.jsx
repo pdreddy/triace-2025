@@ -30,3 +30,14 @@ export function useRegistrations() {
   }, [service, user?.uid, user?.admin]);
   return { teams, error, loading };
 }
+
+// Team IDs this browser's signed-in user registered (their captain teams).
+export function useMyTeams() {
+  const { service, user } = useTournament(), [teams, setTeams] = useState({});
+  useEffect(() => {
+    setTeams({});
+    if (!user?.uid || !service.subscribeMyTeams) return;
+    return service.subscribeMyTeams(user.uid, setTeams);
+  }, [service, user?.uid]);
+  return teams;
+}

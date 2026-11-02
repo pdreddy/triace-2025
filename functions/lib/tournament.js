@@ -88,7 +88,7 @@ export function publicRecord(team, settings = DEFAULT_SETTINGS) {
   return { teamId: team.teamId, captainFirstName: team.captain.firstName, captainUtr: team.captain.utr, ace1Utr: team.ace1.utr, ace2Utr: team.ace2.utr, ...(!settings.aceNameMaskingEnabled && team.rulesAccepted === true ? { ace1Name: team.ace1.fullName, ace2Name: team.ace2.fullName } : {}), combinedUtr: team.combinedUtr, assignedTier: team.assignedTier, registeredAt: team.registeredAt };
 }
 export function initialState() { return { settings: { ...DEFAULT_SETTINGS }, tierConfig: structuredClone(DEFAULT_TIERS), configRevision: 1, registrations: {}, tiers: {} }; }
-export function publicState(state) { return { settings: state.settings, tierConfig: state.tierConfig || {}, configRevision: state.configRevision || 0, tiers: state.tiers || {} }; }
+export function publicState(state) { return { settings: state.settings, tierConfig: state.tierConfig || {}, configRevision: state.configRevision || 0, tiers: state.tiers || {}, fixtures: state.fixtures || {} }; }
 function canonical(value) { return JSON.stringify(value, (_, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).filter(key => item[key] !== null && item[key] !== undefined).sort().map(key => [key, item[key]])) : item); }
 export function applyRegistration(current, payload, uid, now = Date.now()) {
   assert(typeof uid === 'string' && uid.length > 0, 'Sign in before registering.');
@@ -102,6 +102,7 @@ export function applyRegistration(current, payload, uid, now = Date.now()) {
   }
   const record = { ...team, ownerUid: uid, registeredAt: now };
   state.registrations ||= {}; state.registrations[team.teamId] = record;
+  state.teamsByOwner ||= {}; state.teamsByOwner[uid] ||= {}; state.teamsByOwner[uid][team.teamId] = true;
   state.tiers ||= {};
   for (const tierId of team.listedTiers) { state.tiers[tierId] ||= { teams: {} }; state.tiers[tierId].teams ||= {}; state.tiers[tierId].teams[team.teamId] = publicRecord(record, state.settings); }
   return { state, result: { teamId: record.teamId, assignedTier: record.assignedTier, combinedUtr: record.combinedUtr, listedTiers: record.listedTiers } };
@@ -122,8 +123,9 @@ export function applyRecalculation(current) {
   assert(current?.settings, 'Save the initial tournament configuration first.');
   validateTierConfig(current.tierConfig || {});
   const state = structuredClone(current), summary = { reviewed: 0, moved: 0, unchanged: 0, unassigned: 0 };
-  state.tiers = {};
+  state.tiers = {}; state.teamsByOwner = {};
   for (const team of Object.values(state.registrations || {})) {
+    if (team.ownerUid) { state.teamsByOwner[team.ownerUid] ||= {}; state.teamsByOwner[team.ownerUid][team.teamId] = true; }
     for (const key of ['captain', 'ace1', 'ace2']) if (Number.isInteger(team[key].singlesUtr)) team[key].utr = playerUtr(team[key].singlesUtr, team[key].doublesUtr ?? null);
     const total = team.captain.utr + team.ace1.utr + team.ace2.utr;
     const assigned = assignSelectedTier(total, state.tierConfig, team.selectedTier);

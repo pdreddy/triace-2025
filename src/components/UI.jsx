@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { formatUtr } from '../../functions/lib/tournament.js';
 import { Icon } from './Icons';
 
@@ -75,7 +76,7 @@ export function TeamCard({ team, tierName, tierId, rank, privateView = false, ma
         <span className="badge">{tierName || 'Unassigned'}</span>
         {rank && <span className="rank" aria-label={`Rank ${rank}`}>#{rank}</span>}
       </div>
-      <h3>{captain}’s team</h3>
+      <h3>{privateView ? `${captain}’s team` : <Link to={`/team/${team.teamId}`}>{captain}’s team</Link>}</h3>
       <div className="team-name-row" aria-label="Team players">
         <span>{captain}</span><span>{ace1}</span><span>{ace2}</span>
       </div>

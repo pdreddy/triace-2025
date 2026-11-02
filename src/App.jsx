@@ -11,9 +11,11 @@ const Register = lazy(() => import('./pages/Register'));
 const Tiers = lazy(() => import('./pages/Tiers'));
 const Login = lazy(() => import('./pages/Login'));
 const Admin = lazy(() => import('./pages/Admin'));
+const League = lazy(() => import('./pages/League'));
+const Team = lazy(() => import('./pages/Team'));
 
 const FRIENDLY_ERROR = 'We can’t reach the tournament right now. Please check your connection and try again shortly.';
-const SCREENS = { '/': 'rules', '/register': 'register', '/tiers': 'tiers', '/admin/login': 'login', '/admin': 'admin' };
+const SCREENS = { '/': 'rules', '/register': 'register', '/tiers': 'tiers', '/league': 'league', '/admin/login': 'login', '/admin': 'admin' };
 
 function StatusPill({ mode, connected, online }) {
   const state = !online ? 'offline' : connected ? 'live' : 'connecting';
@@ -36,7 +38,7 @@ function Layout() {
   const { service, connected, error, user } = useTournament();
   const { accepted } = useRulesAccess();
   const { canInstall, install, online, updated } = usePwa();
-  const screen = SCREENS[useLocation().pathname] || 'other';
+  const path = useLocation().pathname, screen = SCREENS[path] || (path.startsWith('/team/') ? 'team' : 'other');
   const [logoutError, setLogoutError] = useState(''), [loggingOut, setLoggingOut] = useState(false);
 
   async function logout() {
@@ -56,6 +58,7 @@ function Layout() {
               ? <NavLink to="/register"><Icon name="register" /><span>Register</span></NavLink>
               : <span className="nav-locked" aria-disabled="true" title="Read and agree to all rules first"><Icon name="lock" /><span>Register</span></span>}
             <NavLink to="/tiers"><Icon name="trophy" /><span>Tier list</span></NavLink>
+            <NavLink to="/league"><Icon name="calendar" /><span>League</span></NavLink>
             <NavLink to={user?.admin ? '/admin' : '/admin/login'}><Icon name="shield" /><span>Admin</span></NavLink>
           </nav>
           <div className="topbar-actions">
@@ -75,6 +78,8 @@ function Layout() {
             <Route path="/" element={<Rules />} />
             <Route path="/register" element={accepted ? <Register /> : <Navigate to="/" replace />} />
             <Route path="/tiers" element={<Tiers />} />
+            <Route path="/league" element={<League />} />
+            <Route path="/team/:teamId" element={<Team />} />
             <Route path="/admin/login" element={<Login />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="*" element={<NotFound />} />

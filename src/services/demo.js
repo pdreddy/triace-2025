@@ -16,10 +16,14 @@ export function createDemoService() {
     subscribeConnection(callback) { callback(true); return () => {}; },
     subscribeAuth(callback, error) { authListeners.add(callback); refreshAuth().catch(error); return () => authListeners.delete(callback); },
     subscribePrivate: (callback, error) => poll('registrations', callback, error),
+    subscribeMyTeams: (uid, callback) => poll('my-teams', callback, () => callback({})),
     async login(username, password) { await request('login', { username, password }); await refreshAuth(); },
     async logout() { await request('logout', {}); await refreshAuth(); },
     register: payload => request('register', payload),
     saveConfiguration: payload => request('configuration', payload),
-    recalculate: () => request('recalculate', {})
+    recalculate: () => request('recalculate', {}),
+    generateFixtures: payload => request('generate-fixtures', payload),
+    submitResult: payload => request('submit-result', payload),
+    reviewResult: payload => request('review-result', payload)
   };
 }
