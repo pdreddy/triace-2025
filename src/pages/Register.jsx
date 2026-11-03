@@ -44,8 +44,17 @@ function Success({ result, config, onAgain }) {
         <div><dt>Combined UTR</dt><dd>{formatUtr(result.combinedUtr)}</dd></div>
         <div><dt>Registration ID</dt><dd className="mono">{result.teamId}</dd></div>
       </dl>
+      {result.captainCode && (
+        <div className="captain-code">
+          <p className="eyebrow">Your captain code</p>
+          <output className="mono" aria-label="Captain code">{result.captainCode}</output>
+          <p className="small">Save it now; it isn’t shown again. Use it to manage your team from another phone or browser (team page → “Captain of this team on a new device?”).</p>
+          <button type="button" className="secondary small" onClick={() => navigator.clipboard?.writeText(result.captainCode)}>Copy code</button>
+        </div>
+      )}
       <div className="success-actions">
-        <Link className="button" to="/tiers">View the lineup <Icon name="arrow" size={18} /></Link>
+        <Link className="button" to={`/team/${result.teamId}`}>Open my team <Icon name="arrow" size={18} /></Link>
+        <Link className="secondary" to="/tiers">View the lineup</Link>
         <button type="button" className="secondary" onClick={onAgain}>Register another team</button>
       </div>
     </section>

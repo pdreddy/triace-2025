@@ -15,7 +15,8 @@ export function LeagueRulesCard({ rules = DEFAULT_LEAGUE_RULES, busy, onSave }) 
   async function save(event) {
     event.preventDefault();
     let gap; try { gap = parseUtr(draft.utrGapLimit); } catch { gap = -1; }
-    const ok = await onSave({ utrGapLimit: gap, pointsPerWin: Number(draft.pointsPerWin), playoffThreshold: Number(draft.playoffThreshold), playoffSpotsLarge: Number(draft.playoffSpotsLarge), playoffSpotsSmall: Number(draft.playoffSpotsSmall), singlesMinPercent: Number(draft.singlesMinPercent) });
+    const numbers = ['pointsPerWin', 'playoffThreshold', 'playoffSpotsLarge', 'playoffSpotsSmall', 'singlesMinPercent', 'challengerFrom', 'challengerTo', 'targetFrom', 'targetTo', 'challengeCutoffRounds'];
+    const ok = await onSave({ utrGapLimit: gap, challengeEnabled: !!draft.challengeEnabled, ...Object.fromEntries(numbers.map(k => [k, Number(draft[k])])) });
     if (ok) setDirty(false);
   }
   const spots = key => <select id={key} value={draft[key]} onChange={e => set(key, e.target.value)}>{[2, 3, 4].map(n => <option key={n} value={n}>Top {n}</option>)}</select>;
@@ -30,6 +31,17 @@ export function LeagueRulesCard({ rules = DEFAULT_LEAGUE_RULES, busy, onSave }) 
         <Field id="rule-threshold" label="Larger playoff above this many teams" type="number" min="2" max="64" step="1" required {...number('playoffThreshold')} />
         <div className="field"><label htmlFor="playoffSpotsLarge">Playoff spots above the threshold</label>{spots('playoffSpotsLarge')}</div>
         <div className="field"><label htmlFor="playoffSpotsSmall">Playoff spots at or below it</label>{spots('playoffSpotsSmall')}</div>
+      </fieldset>
+      <fieldset disabled={busy} className="challenge-rules">
+        <legend>Challenge rule</legend>
+        <label className="checkbox"><input type="checkbox" checked={!!draft.challengeEnabled} onChange={e => set('challengeEnabled', e.target.checked)} /><span>Challenge rule on</span></label>
+        <div className="rules-grid">
+        <Field id="rule-ch-from" label="Challengers: from place" type="number" min="1" max="64" required {...number('challengerFrom')} />
+        <Field id="rule-ch-to" label="Challengers: to place" type="number" min="1" max="64" required {...number('challengerTo')} />
+        <Field id="rule-tg-from" label="Can challenge: from place" type="number" min="1" max="64" required {...number('targetFrom')} />
+        <Field id="rule-tg-to" label="Can challenge: to place" type="number" min="1" max="64" required {...number('targetTo')} />
+        <Field id="rule-cutoff" label="Closed for the last N rounds" type="number" min="0" max="52" required {...number('challengeCutoffRounds')} />
+        </div>
       </fieldset>
       <button className="button small" disabled={busy || !dirty}>Save league rules</button>
     </form>
@@ -103,6 +115,19 @@ export function PlayoffPlanner({ tier, data, rules, busy, onCreate }) {
       {warnings.length > 0 && <div className="small warn-text"><strong>Below the singles minimum:</strong><ul>{warnings.map(w => <li key={w}>{w}</li>)}</ul></div>}
       {duplicate && <p className="small warn-text">Choose a different team for every slot.</p>}
       <button type="button" className="button small" disabled={busy || duplicate} onClick={() => onCreate(chosen, existing.some(f => f.result || f.submission))}>{existing.length ? 'Replace playoffs' : 'Create playoffs'}</button>
+    </div>
+  );
+}
+
+// Dates for a tier's round robin: the first round's start date and how many days each round lasts.
+export function ScheduleForm({ tier, schedule, busy, onSave }) {
+  const [start, setStart] = useState(schedule?.start || ''), [interval, setInterval] = useState(schedule?.intervalDays || 7);
+  useEffect(() => { setStart(schedule?.start || ''); setInterval(schedule?.intervalDays || 7); }, [schedule?.start, schedule?.intervalDays]);
+  return (
+    <div className="inline-form schedule-form">
+      <div className="field"><label htmlFor={`${tier.id}-start`}>Round 1 starts</label><input id={`${tier.id}-start`} type="date" value={start} onChange={e => setStart(e.target.value)} /></div>
+      <Field id={`${tier.id}-interval`} label="Days per round" type="number" min="1" max="60" value={interval} onChange={e => setInterval(e.target.value)} />
+      <button type="button" className="secondary small" disabled={busy || !start} onClick={() => onSave({ tierId: tier.id, start, intervalDays: Number(interval) })}>{schedule ? 'Update dates' : 'Set dates'}</button>
     </div>
   );
 }

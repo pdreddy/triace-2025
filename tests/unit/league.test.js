@@ -210,3 +210,100 @@ test('closing a season archives it publicly and privately, then starts a clean s
   assert.equal(publicState(next).seasons[outcome.archived].name, 'Spring 2026');
   assert.equal(publicState(next).archive, undefined, 'the private archive is never public');
 });
+
+// ---------- dates, challenges, team management ----------
+import { applySetSchedule, applyMoveFixture, addDays, deadlineEnd, isOverdue, onTime, challengeStatus, applyIssueChallenge, applyUpdateTeam, applyWithdrawTeam, applyClaimTeam, applyResetCaptainCode } from '../../functions/lib/league.js';
+const day = date => Date.parse(`${date}T12:00:00Z`);
+
+test('a schedule dates every round, deadlines last to the end of the day anywhere, and results record whether they were on time', () => {
+  let state = applySetSchedule(league(4), { tierId: 'goat', start: '2026-01-05', intervalDays: 7 }).state;
+  const fx = Object.values(state.fixtures.goat), r1 = fx.find(f => f.round === 1), r3 = fx.find(f => f.round === 3);
+  assert.deepEqual([r1.startsOn, r1.dueBy, r3.startsOn, r3.dueBy], ['2026-01-05', '2026-01-11', '2026-01-19', '2026-01-25']);
+  assert.equal(addDays('2026-02-27', 2), '2026-03-01');
+  assert.ok(deadlineEnd('2026-01-11') > Date.parse('2026-01-12T11:00:00Z') && deadlineEnd('2026-01-11') < Date.parse('2026-01-12T12:00:00Z'));
+  assert.equal(isOverdue(r1, day('2026-01-13')), true); assert.equal(isOverdue(r1, day('2026-01-10')), false);
+  assert.throws(() => applySetSchedule(state, { tierId: 'goat', start: '5 Jan', intervalDays: 7 }), /must be a date/);
+  assert.throws(() => applySetSchedule(state, { tierId: 'goat', start: '2026-01-05', intervalDays: 0 }), /1–60/);
+  const owner = state.registrations[r1.home].ownerUid;
+  const late = applySubmitResult(state, { tierId: 'goat', fixtureId: r1.id, matches: result('home', 'home', 'home') }, owner, false, day('2026-01-14')).state;
+  const approved = applyReviewResult(late, { tierId: 'goat', fixtureId: r1.id, approve: true }, day('2026-01-15')).state.fixtures.goat[r1.id];
+  assert.equal(onTime(approved), false);
+  const early = applySubmitResult(state, { tierId: 'goat', fixtureId: r1.id, matches: result('home', 'home', 'home') }, owner, false, day('2026-01-09')).state;
+  assert.equal(onTime(applyReviewResult(early, { tierId: 'goat', fixtureId: r1.id, approve: true }, day('2026-01-20')).state.fixtures.goat[r1.id]), true, 'the captain submission time counts, not the approval time');
+  const rejected = applyReviewResult(early, { tierId: 'goat', fixtureId: r1.id, approve: false }).state.fixtures.goat[r1.id];
+  assert.equal(rejected.completedAt, undefined, 'a rejected score does not count as completed');
+  assert.equal(applyMoveFixture(state, { tierId: 'goat', fixtureId: r1.id, dueBy: '2026-01-20' }).state.fixtures.goat[r1.id].dueBy, '2026-01-20');
+  const generated = applyGenerateFixtures(league(4), { tierId: 'goat', replace: true, start: '2026-03-02', intervalDays: 14 }).state;
+  assert.equal(Object.values(generated.fixtures.goat).find(f => f.round === 2).dueBy, '2026-03-29');
+});
+
+function challengeLeague() {
+  // 8 teams over 7 weekly rounds from 5 Jan; after round 2, registration order decides the table.
+  let state = applySetSchedule(league(8), { tierId: 'goat', start: '2026-01-05', intervalDays: 7 }).state;
+  const order = Object.keys(state.registrations);
+  for (const f of Object.values(state.fixtures.goat).filter(f => f.round <= 2)) {
+    const w = order.indexOf(f.home) < order.indexOf(f.away) ? 'home' : 'away';
+    state = applySubmitResult(state, { tierId: 'goat', fixtureId: f.id, matches: result(w, w, w) }, 'admin', true, day(f.dueBy) - 86400000).state;
+  }
+  return { state, order };
+}
+
+test('the challenge rule: who can challenge, when, once only, and a win swaps places', () => {
+  const { state, order } = challengeLeague(), now = day('2026-01-20');
+  const table = standings(Object.values(state.tiers.goat.teams), state.fixtures.goat).map(r => r.team.teamId);
+  const fifth = table[4], third = table[2], second = table[1], seventh = table[6];
+  const owner = id => state.registrations[id].ownerUid;
+  assert.equal(challengeStatus(state, 'goat', fifth, now).allowed, true);
+  assert.match(challengeStatus(state, 'goat', seventh, now).reasons[0], /places 5–6/);
+  assert.match(challengeStatus(state, 'goat', fifth, day('2026-02-02')).reasons.join(' '), /last 3 weeks/);
+  assert.throws(() => applyIssueChallenge(state, { tierId: 'goat', challenger: fifth, target: third }, owner(seventh), false, now), /captain/);
+  assert.throws(() => applyIssueChallenge(state, { tierId: 'goat', challenger: fifth, target: table[0] }, owner(fifth), false, now), /places 2–4/);
+  let next = applyIssueChallenge(state, { tierId: 'goat', challenger: fifth, target: third }, owner(fifth), false, now).state;
+  const ch = Object.values(next.fixtures.goat).find(f => f.challenge);
+  assert.deepEqual([ch.home, ch.away, ch.status, ch.startsOn, ch.dueBy], [fifth, third, 'scheduled', '2026-01-20', '2026-01-26']);
+  assert.match(challengeStatus(next, 'goat', fifth, now).reasons.join(' '), /only once/);
+  next = applySubmitResult(next, { tierId: 'goat', fixtureId: ch.id, matches: result('home', 'home', 'away') }, 'admin', true, now).state;
+  const after = standings(Object.values(next.tiers.goat.teams), next.fixtures.goat);
+  assert.deepEqual([after[2].team.teamId, after[4].team.teamId], [fifth, third], 'the winning challenger takes third place');
+  assert.equal(after.find(r => r.team.teamId === fifth).played, 2, 'a challenge never adds points or games to the table');
+  const lost = applySubmitResult(applyIssueChallenge(state, { tierId: 'goat', challenger: fifth, target: second }, 'x', true, now).state, { tierId: 'goat', fixtureId: `ch${now}`, matches: result('away', 'away', 'away') }, 'admin', true, now).state;
+  assert.equal(standings(Object.values(lost.tiers.goat.teams), lost.fixtures.goat)[4].team.teamId, fifth, 'a losing challenger keeps its place');
+  let late = structuredClone(state); const mine = Object.values(late.fixtures.goat).find(f => f.round === 1 && (f.home === fifth || f.away === fifth)); mine.completedAt = day('2026-01-15');
+  assert.match(challengeStatus(late, 'goat', fifth, now).reasons.join(' '), /on time/);
+  const off = { ...rulesOf(state), challengeEnabled: false };
+  assert.match(challengeStatus({ ...state, leagueRules: off }, 'goat', fifth, now).reasons[0], /turned off/);
+  void order;
+});
+
+test('captains and the admin can edit or withdraw teams within the limits', () => {
+  let state = league(4);
+  const [a, b] = Object.keys(state.registrations), ownerA = state.registrations[a].ownerUid;
+  const edit = (extra = {}) => ({ teamId: a, captain: { firstName: 'Renamed', singlesUtr: 600, doublesUtr: null }, ace1: { fullName: 'New Ace', singlesUtr: 600, doublesUtr: null }, ace2: { fullName: 'Other Ace', singlesUtr: 600, doublesUtr: null }, selectedTier: 'goat', ...extra });
+  const before = applyUpdateTeam(initialStateWith(state), edit(), ownerA).state;
+  assert.equal(before.tiers.goat.teams[a].captainFirstName, 'Renamed');
+  assert.throws(() => applyUpdateTeam(state, edit(), ownerA), /Fixtures are already scheduled/);
+  assert.throws(() => applyUpdateTeam(state, edit(), 'someone-else', false), /captain or the admin/);
+  assert.equal(applyUpdateTeam(state, edit(), 'admin', true).state.registrations[a].ace1.fullName, 'New Ace');
+  assert.throws(() => applyUpdateTeam(state, edit({ captain: { firstName: 'Low', singlesUtr: 400, doublesUtr: null }, selectedTier: 'rising' }), 'admin', true), /moves the team to another tier/);
+  const withdrawn = applyWithdrawTeam(state, { teamId: a }, 'admin', true, 9).state;
+  assert.equal(withdrawn.registrations[a], undefined); assert.equal(withdrawn.withdrawn[a].withdrawnAt, 9);
+  assert.equal(withdrawn.tiers.goat.teams[a], undefined);
+  assert.equal(Object.values(withdrawn.fixtures.goat).filter(f => f.home === a || f.away === a).length, 0);
+  assert.equal(Object.values(withdrawn.fixtures.goat).length, 3);
+  assert.throws(() => applyWithdrawTeam(state, { teamId: b }, ownerA), /captain or the admin/);
+  void b;
+});
+function initialStateWith(state) { const copy = structuredClone(state); delete copy.fixtures; return copy; }
+
+test('a captain code lets a new device claim the team; the admin can issue a new code', () => {
+  let state = initialState();
+  state = applyRegistration(state, team('Claim', 'team_claim00000000000000'), 'phone-1', 1, 'a'.repeat(64)).state;
+  assert.equal(applyRegistration(state, team('Claim', 'team_claim00000000000000'), 'phone-1', 2, 'b'.repeat(64)).result.created, undefined, 'repeating a registration keeps the first code');
+  assert.throws(() => applyClaimTeam(state, { teamId: 'team_claim00000000000000', codeHash: 'b'.repeat(64) }, 'phone-2'), /doesn’t match/);
+  const claimed = applyClaimTeam(state, { teamId: 'team_claim00000000000000', codeHash: 'a'.repeat(64) }, 'phone-2').state;
+  assert.deepEqual(claimed.teamsByOwner['phone-2'], { team_claim00000000000000: true });
+  assert.deepEqual(applyRecalculation(claimed).state.teamsByOwner['phone-2'], { team_claim00000000000000: true }, 'recalculation keeps claimed devices');
+  const reset = applyResetCaptainCode(claimed, { teamId: 'team_claim00000000000000', codeHash: 'c'.repeat(64) }).state;
+  assert.throws(() => applyClaimTeam(reset, { teamId: 'team_claim00000000000000', codeHash: 'a'.repeat(64) }, 'phone-3'), /doesn’t match/);
+  assert.ok(applyClaimTeam(reset, { teamId: 'team_claim00000000000000', codeHash: 'c'.repeat(64) }, 'phone-3'));
+});

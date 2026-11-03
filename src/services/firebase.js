@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInAnonymously, signInWithEmailAndPassword, signOut, getIdTokenResult, connectAuthEmulator } from 'firebase/auth';
-import { getDatabase, ref, onValue, connectDatabaseEmulator } from 'firebase/database';
+import { getDatabase, ref, onValue, get, connectDatabaseEmulator } from 'firebase/database';
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/functions';
 import { rulesOf, DEFAULT_SEASON_NAME } from '../../functions/lib/tournament.js';
 const env = import.meta.env;
@@ -30,10 +30,10 @@ export function createFirebaseService() {
     mode: env.VITE_USE_EMULATORS === 'true' ? 'Firebase Emulators' : 'Firebase',
     subscribePublic(callback, onError) {
       const state = {}, ready = new Set(), keys = ['settings', 'tierConfig', 'configRevision', 'tiers'];
-      const emit = () => { if (ready.size === keys.length) callback({ ...state, fixtures: state.fixtures || {}, leagueRules: rulesOf(state), season: state.season || { name: DEFAULT_SEASON_NAME }, seasons: state.seasons || {} }); };
+      const emit = () => { if (ready.size === keys.length) callback({ ...state, fixtures: state.fixtures || {}, leagueRules: rulesOf(state), season: state.season || { name: DEFAULT_SEASON_NAME }, seasons: state.seasons || {}, schedules: state.schedules || {} }); };
       const off = keys.map(key => onValue(ref(database, `traice2_0/${key}`), snapshot => { state[key] = snapshot.val() ?? (key === 'configRevision' ? 0 : key === 'settings' ? null : {}); ready.add(key); emit(); }, error => onError(new Error(errorMessage(error)))));
       // League data loads on its own so a missing database rule for it never blocks the core tournament data.
-      for (const key of ['fixtures', 'leagueRules', 'season', 'seasons']) off.push(onValue(ref(database, `traice2_0/${key}`), snapshot => { state[key] = snapshot.val() || undefined; emit(); }, () => { state[key] = undefined; emit(); }));
+      for (const key of ['fixtures', 'leagueRules', 'season', 'seasons', 'schedules']) off.push(onValue(ref(database, `traice2_0/${key}`), snapshot => { state[key] = snapshot.val() || undefined; emit(); }, () => { state[key] = undefined; emit(); }));
       return () => off.forEach(unsubscribe => unsubscribe());
     },
     subscribeConnection(callback) { return onValue(ref(database, '.info/connected'), snapshot => callback(snapshot.val() === true)); },
@@ -50,6 +50,7 @@ export function createFirebaseService() {
       });
       return () => { stopped = true; unsubscribe(); };
     },
+    getMyRegistration: withError(async teamId => (await get(ref(database, `traice2_0/registrations/${teamId}`))).val()),
     subscribeMyTeams(uid, callback) { return onValue(ref(database, `traice2_0/teamsByOwner/${uid}`), snapshot => callback(snapshot.val() || {}), () => callback({})); },
     subscribePrivate(callback, onError) { return onValue(ref(database, 'traice2_0/registrations'), snapshot => callback(snapshot.val() || {}), error => onError(new Error(errorMessage(error)))); },
     async login(username, password) {
@@ -64,6 +65,13 @@ export function createFirebaseService() {
     generateFixtures: withError(async payload => (await httpsCallable(functions, 'generateFixtures')(payload)).data),
     generatePlayoffs: withError(async payload => (await httpsCallable(functions, 'generatePlayoffs')(payload)).data),
     saveLeagueRules: withError(async payload => (await httpsCallable(functions, 'saveLeagueRules')(payload)).data),
+    setSchedule: withError(async payload => (await httpsCallable(functions, 'setSchedule')(payload)).data),
+    moveFixture: withError(async payload => (await httpsCallable(functions, 'moveFixture')(payload)).data),
+    issueChallenge: withError(async payload => (await httpsCallable(functions, 'issueChallenge')(payload)).data),
+    updateTeam: withError(async payload => (await httpsCallable(functions, 'updateTeam')(payload)).data),
+    withdrawTeam: withError(async payload => (await httpsCallable(functions, 'withdrawTeam')(payload)).data),
+    claimTeam: withError(async payload => (await httpsCallable(functions, 'claimTeam')(payload)).data),
+    resetCaptainCode: withError(async payload => (await httpsCallable(functions, 'resetCaptainCode')(payload)).data),
     manageSeason: withError(async payload => (await httpsCallable(functions, 'manageSeason')(payload)).data),
     submitResult: withError(async payload => (await httpsCallable(functions, 'submitResult')(payload)).data),
     reviewResult: withError(async payload => (await httpsCallable(functions, 'reviewResult')(payload)).data)

@@ -1,7 +1,7 @@
 // League play: round-robin fixtures, playoffs, captain score submissions with admin approval,
 // standings and player ratings. Like tournament.js, every apply* function takes the whole
 // tournament state and returns { state, result }.
-import { ValidationError, DEFAULT_LEAGUE_RULES, DEFAULT_SEASON_NAME, rulesOf } from './tournament.js';
+import { ValidationError, DEFAULT_LEAGUE_RULES, DEFAULT_SEASON_NAME, rulesOf, isOwner, validateRegistration, publicRecord } from './tournament.js';
 
 export const ROLES = ['captain', 'ace1', 'ace2'];
 export const ROLE_LABELS = { captain: 'Captain', ace1: 'Ace 1', ace2: 'Ace 2' };
@@ -28,7 +28,21 @@ const formatOf = fixture => FORMATS[fixture.format || 'rr'];
 
 function assert(condition, message) { if (!condition) throw new ValidationError(message); }
 const tierTeams = (state, tierId) => Object.values(state.tiers?.[tierId]?.teams || {});
-const isLeague = fixture => !fixture.stage;
+const isLeague = fixture => !fixture.stage && !fixture.challenge;
+
+// ---------- Dates ----------
+// Dates are calendar days (YYYY-MM-DD). A deadline lasts until the end of that day anywhere on
+// earth (UTC−12), so a result entered late in the evening in any time zone still counts as on time.
+const DAY = 86400000, DATE = /^\d{4}-\d{2}-\d{2}$/;
+const toDay = ms => new Date(ms).toISOString().slice(0, 10);
+export const addDays = (date, days) => toDay(Date.parse(`${date}T00:00:00Z`) + days * DAY);
+export const deadlineEnd = date => Date.parse(`${date}T23:59:59Z`) + 12 * 3600000;
+export const isOverdue = (fixture, now = Date.now()) => !!fixture.dueBy && fixture.status !== 'final' && now > deadlineEnd(fixture.dueBy);
+export const onTime = fixture => !fixture.dueBy || (fixture.completedAt != null && fixture.completedAt <= deadlineEnd(fixture.dueBy));
+function validDate(value, label) { assert(typeof value === 'string' && DATE.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`)), `${label} must be a date.`); return value; }
+function dateRounds(fixtures, start, intervalDays) {
+  for (const f of Object.values(fixtures)) if (isLeague(f) && f.round) { f.startsOn = addDays(start, (f.round - 1) * intervalDays); f.dueBy = addDays(f.startsOn, intervalDays - 1); }
+}
 
 export function deriveLineup(choice) {
   const third = ROLES.find(r => !choice.d1.includes(r)), leftOut = choice.d1.find(r => r !== choice.d2Partner);
@@ -78,7 +92,32 @@ export function applyGenerateFixtures(current, payload) {
     const id = `r${String(r + 1).padStart(2, '0')}m${i + 1}`;
     state.fixtures[tierId][id] = { id, tierId, round: r + 1, format: 'rr', home, away, status: 'scheduled' };
   }));
+  const schedule = payload.start ? validSchedule(payload) : state.schedules?.[tierId];
+  if (schedule) { state.schedules ||= {}; state.schedules[tierId] = schedule; dateRounds(state.fixtures[tierId], schedule.start, schedule.intervalDays); }
   return { state, result: { tierId, fixtures: Object.keys(state.fixtures[tierId]).length, rounds: Math.max(0, teams.length - 1 + (teams.length % 2)) } };
+}
+
+function validSchedule(payload) {
+  const intervalDays = Number(payload.intervalDays);
+  assert(Number.isInteger(intervalDays) && intervalDays >= 1 && intervalDays <= 60, 'Days per round must be 1–60.');
+  return { start: validDate(payload.start, 'The start date'), intervalDays };
+}
+// Date every round: round r starts start + (r − 1) × interval and is due interval − 1 days later.
+export function applySetSchedule(current, payload) {
+  const tierId = payload?.tierId;
+  assert(Object.hasOwn(current?.tierConfig || {}, tierId), 'Choose an existing tier.');
+  const schedule = validSchedule(payload), state = structuredClone(current);
+  state.schedules ||= {}; state.schedules[tierId] = schedule;
+  if (state.fixtures?.[tierId]) dateRounds(state.fixtures[tierId], schedule.start, schedule.intervalDays);
+  return { state, result: { tierId, schedule } };
+}
+// Move one fixture's deadline, e.g. for a rained-off week.
+export function applyMoveFixture(current, payload) {
+  const fixture = current?.fixtures?.[payload?.tierId]?.[payload?.fixtureId];
+  assert(fixture, 'That fixture no longer exists.');
+  const dueBy = validDate(payload.dueBy, 'The new deadline'), state = structuredClone(current);
+  state.fixtures[payload.tierId][payload.fixtureId].dueBy = dueBy;
+  return { state, result: { dueBy } };
 }
 
 // Seeds come from the admin's manual mapping, or from the standings when none are given.
@@ -164,13 +203,14 @@ export function applySubmitResult(current, payload, uid, isAdmin = false, now = 
   const fixture = current?.fixtures?.[payload?.tierId]?.[payload?.fixtureId];
   assert(fixture, 'That fixture no longer exists.');
   assert(fixture.home && fixture.away, 'This playoff match is waiting for the earlier rounds.');
-  const owns = id => current.registrations?.[id]?.ownerUid === uid;
+  const owns = id => isOwner(current.registrations?.[id], uid);
   const side = owns(fixture.home) ? 'home' : owns(fixture.away) ? 'away' : null;
   assert(isAdmin || side, 'Only the captains of these two teams can submit this score.');
   assert(isAdmin || fixture.status !== 'final', 'This result is final. Ask the admin to correct it.');
   const matches = validMatches(fixture, payload.matches), lineups = validLineups(payload.lineups);
   const entry = { matches, winner: encounterWinner(matches), ...(lineups ? { lineups } : {}) };
   const state = structuredClone(current), fixtures = state.fixtures[payload.tierId], target = fixtures[payload.fixtureId];
+  target.completedAt ??= now;
   if (isAdmin) {
     target.result = { ...entry, approvedAt: now };
     target.status = 'final';
@@ -194,6 +234,7 @@ export function applyReviewResult(current, payload, now = Date.now()) {
     target.status = 'final';
   } else {
     target.status = target.result ? 'final' : 'scheduled';
+    if (!target.result) delete target.completedAt;
   }
   delete target.submission;
   advancePlayoffs(fixtures);
@@ -215,10 +256,106 @@ export function standings(teams, fixtures, rules = DEFAULT_LEAGUE_RULES) {
       row.form.push(won ? 'W' : 'L');
     }
   }
-  return [...rows.values()]
+  const table = [...rows.values()]
     .map(row => ({ ...row, form: row.form.slice(-5) }))
-    .sort((a, b) => b.points - a.points || (b.matchesWon - b.matchesLost) - (a.matchesWon - a.matchesLost) || b.matchesWon - a.matchesWon || b.team.combinedUtr - a.team.combinedUtr)
-    .map((row, i) => ({ ...row, position: i + 1 }));
+    .sort((a, b) => b.points - a.points || (b.matchesWon - b.matchesLost) - (a.matchesWon - a.matchesLost) || b.matchesWon - a.matchesWon || b.team.combinedUtr - a.team.combinedUtr);
+  return swapChallengers(table, fixtures).map((row, i) => ({ ...row, position: i + 1 }));
+}
+// A challenger who wins takes the challenged team's place and the two swap.
+function swapChallengers(table, fixtures) {
+  const wins = Object.values(fixtures || {}).filter(f => f.challenge && f.status === 'final' && f.result?.winner === 'home').sort((a, b) => a.result.approvedAt - b.result.approvedAt);
+  for (const f of wins) {
+    const c = table.findIndex(r => r.team.teamId === f.home), t = table.findIndex(r => r.team.teamId === f.away);
+    if (c > t && t >= 0) [table[c], table[t]] = [{ ...table[t], swappedBy: f.id }, { ...table[c], swappedBy: f.id }];
+  }
+  return table;
+}
+
+// ---------- Challenge rule ----------
+export function challengeStatus(current, tierId, teamId, now = Date.now()) {
+  const rules = rulesOf(current), fixtures = current?.fixtures?.[tierId] || {}, league = Object.values(fixtures).filter(isLeague);
+  const table = standings(tierTeams(current, tierId), fixtures, rules), row = table.find(r => r.team.teamId === teamId);
+  const reasons = [];
+  if (!rules.challengeEnabled) reasons.push('The challenge rule is turned off.');
+  if (!league.length) reasons.push('The round-robin fixtures haven’t been created.');
+  if (league.some(f => !f.dueBy)) reasons.push('The admin hasn’t set match dates for this tier.');
+  if (!row || row.position < rules.challengerFrom || row.position > rules.challengerTo) reasons.push(`Only teams in places ${rules.challengerFrom}–${rules.challengerTo} can challenge.`);
+  if (Object.values(fixtures).some(f => f.challenge && f.home === teamId)) reasons.push('Each team can use its challenge only once.');
+  if (Object.values(fixtures).some(f => f.challenge && f.status !== 'final' && (f.home === teamId || f.away === teamId))) reasons.push('This team already has a challenge in progress.');
+  const due = league.filter(f => (f.home === teamId || f.away === teamId) && f.dueBy && deadlineEnd(f.dueBy) < now);
+  if (due.some(f => f.status !== 'final' || !onTime(f))) reasons.push('Every scheduled week so far must be completed on time.');
+  const lastRound = Math.max(0, ...league.map(f => f.round || 0)), cutoff = league.find(f => f.round === lastRound - rules.challengeCutoffRounds + 1);
+  if (cutoff?.startsOn && now >= Date.parse(`${cutoff.startsOn}T00:00:00Z`)) reasons.push(`Challenges close before the last ${rules.challengeCutoffRounds} weeks of the season.`);
+  const targets = table.filter(r => r.position >= rules.targetFrom && r.position <= rules.targetTo && !Object.values(fixtures).some(f => f.challenge && f.status !== 'final' && (f.home === r.team.teamId || f.away === r.team.teamId)));
+  return { allowed: reasons.length === 0, reasons, targets: targets.map(r => r.team.teamId), position: row?.position };
+}
+export function applyIssueChallenge(current, payload, uid, isAdmin = false, now = Date.now()) {
+  const { tierId, challenger, target } = payload || {};
+  assert(Object.hasOwn(current?.tierConfig || {}, tierId), 'Choose an existing tier.');
+  assert(isAdmin || isOwner(current.registrations?.[challenger], uid), 'Only the challenging team’s captain can issue a challenge.');
+  const status = challengeStatus(current, tierId, challenger, now);
+  assert(status.allowed, status.reasons[0] || 'This team can’t challenge now.');
+  assert(status.targets.includes(target), `Choose a team in places ${rulesOf(current).targetFrom}–${rulesOf(current).targetTo}.`);
+  const state = structuredClone(current), interval = state.schedules?.[tierId]?.intervalDays || 7, id = `ch${now}`;
+  state.fixtures[tierId][id] = { id, tierId, challenge: true, label: 'Challenge', format: 'rr', home: challenger, away: target, status: 'scheduled', issuedAt: now, startsOn: toDay(now), dueBy: addDays(toDay(now), interval - 1) };
+  return { state, result: { fixtureId: id } };
+}
+
+// ---------- Team management ----------
+const fixturesWith = (state, teamId) => Object.values(state.fixtures || {}).flatMap(t => Object.values(t || {})).filter(f => f.home === teamId || f.away === teamId);
+function placeTeam(state, record) {
+  for (const tier of Object.values(state.tiers || {})) if (tier.teams) delete tier.teams[record.teamId];
+  for (const tierId of record.listedTiers) { state.tiers[tierId] ||= { teams: {} }; state.tiers[tierId].teams ||= {}; state.tiers[tierId].teams[record.teamId] = publicRecord(record, state.settings); }
+}
+// The admin can always edit; a captain only until fixtures exist for the team.
+export function applyUpdateTeam(current, payload, uid, isAdmin = false) {
+  const previous = current?.registrations?.[payload?.teamId];
+  assert(previous, 'That team no longer exists.');
+  assert(isAdmin || isOwner(previous, uid), 'Only this team’s captain or the admin can edit it.');
+  const scheduled = fixturesWith(current, previous.teamId);
+  assert(isAdmin || !scheduled.length, 'Fixtures are already scheduled. Ask the admin to edit the team.');
+  const { teamId, captain, ace1, ace2, selectedTier } = payload;
+  const team = validateRegistration({ teamId, captain, ace1, ace2, selectedTier, consent: true, rulesAccepted: true }, { ...current.settings, registrationEnabled: true }, current.tierConfig || {}, rulesOf(current).utrGapLimit);
+  assert(!scheduled.length || JSON.stringify(team.listedTiers) === JSON.stringify(previous.listedTiers || [previous.assignedTier]), 'This change moves the team to another tier, but it already has fixtures. Withdraw it or regenerate the fixtures first.');
+  const state = structuredClone(current), record = { ...previous, ...team };
+  state.registrations[teamId] = record;
+  placeTeam(state, record);
+  return { state, result: { teamId, listedTiers: record.listedTiers, combinedUtr: record.combinedUtr } };
+}
+// Withdrawing removes the team and its unplayed fixtures; its finished results stop counting.
+export function applyWithdrawTeam(current, payload, uid, isAdmin = false, now = Date.now()) {
+  const previous = current?.registrations?.[payload?.teamId];
+  assert(previous, 'That team no longer exists.');
+  assert(isAdmin || isOwner(previous, uid), 'Only this team’s captain or the admin can withdraw it.');
+  const scheduled = fixturesWith(current, previous.teamId);
+  assert(isAdmin || !scheduled.length, 'Fixtures are already scheduled. Ask the admin to withdraw the team.');
+  assert(!scheduled.some(f => f.stage && f.status !== 'final'), 'This team is in the playoffs. Recreate the playoffs without it first.');
+  const state = structuredClone(current), teamId = previous.teamId;
+  delete state.registrations[teamId];
+  state.withdrawn ||= {}; state.withdrawn[teamId] = { ...previous, withdrawnAt: now };
+  for (const tier of Object.values(state.tiers || {})) if (tier.teams) delete tier.teams[teamId];
+  for (const owned of Object.values(state.teamsByOwner || {})) delete owned[teamId];
+  for (const tier of Object.values(state.fixtures || {})) for (const f of Object.values(tier || {})) if ((f.home === teamId || f.away === teamId) && f.status !== 'final' && !f.stage) delete tier[f.id];
+  return { state, result: { teamId, removedFixtures: scheduled.filter(f => f.status !== 'final' && !f.stage).length } };
+}
+// A captain on a new device proves ownership with the captain code (hashed by the caller).
+export function applyClaimTeam(current, payload, uid) {
+  const record = current?.registrations?.[payload?.teamId];
+  assert(typeof uid === 'string' && uid, 'Sign in before claiming a team.');
+  assert(record && record.recoveryHash && typeof payload.codeHash === 'string' && payload.codeHash === record.recoveryHash, 'That captain code doesn’t match this team.');
+  const state = structuredClone(current), target = state.registrations[record.teamId];
+  target.owners ||= {}; target.owners[uid] = true;
+  state.teamsByOwner ||= {}; state.teamsByOwner[uid] ||= {}; state.teamsByOwner[uid][record.teamId] = true;
+  return { state, result: { teamId: record.teamId } };
+}
+// The admin issues a fresh captain code (the caller generates it and passes its hash).
+export function applyResetCaptainCode(current, payload) {
+  const record = current?.registrations?.[payload?.teamId];
+  assert(record, 'That team no longer exists.');
+  assert(typeof payload.codeHash === 'string' && /^[a-f0-9]{64}$/.test(payload.codeHash), 'Invalid captain code.');
+  const state = structuredClone(current);
+  state.registrations[record.teamId].recoveryHash = payload.codeHash;
+  return { state, result: { teamId: record.teamId } };
 }
 export const playoffSpots = (teamCount, rules = DEFAULT_LEAGUE_RULES) => Math.min(teamCount, teamCount > rules.playoffThreshold ? rules.playoffSpotsLarge : rules.playoffSpotsSmall);
 

@@ -715,6 +715,31 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
 .champion-banner span { font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
 .champion-banner b { font-family: var(--display); font-size: 24px; text-transform: uppercase; color: var(--ink); }
 .champion-banner em { margin-left: auto; font-size: 13px; font-style: normal; }
+.due { margin-left: auto; font-size: 11.5px; font-weight: 600; color: var(--muted); }
+.due.overdue { color: var(--danger); }
+.fixture-card.overdue { border-color: #ff8a6b88; }
+.fixture-top .status { margin-left: 10px; }
+.move-due summary, .claim summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--lime); }
+.move-due .inline-form { margin-top: 8px; }
+.move-due input[type=date], .schedule-form input[type=date] { width: 100%; min-height: 40px; padding: 6px 10px; border-radius: var(--r-sm); color: #fff; background: #091827; border: 1px solid #3d6283; color-scheme: dark; }
+.round-title span { font-family: var(--body); font-size: 13px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--muted); }
+.challenge-panel { margin-bottom: 14px; border-color: #ff8a4c66; }
+.reasons { display: grid; gap: 4px; padding-left: 18px; list-style: disc; font-size: 13px; color: var(--warn); }
+.challenge-rules { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.challenge-rules legend { margin-bottom: 4px; font-family: var(--display); font-size: 17px; font-weight: 700; text-transform: uppercase; }
+.challenge-rules .checkbox { margin: 0 0 12px; }
+.swap { color: var(--clay); font-weight: 700; }
+.schedule-form { margin-top: 12px; }
+.captain-code { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; padding: 16px; border-radius: var(--r); background: #d9f24b14; border: 1px dashed var(--lime); }
+.captain-code output { font-size: 30px; font-weight: 700; letter-spacing: .12em; color: var(--lime); }
+.team-edit { padding: 16px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--lime); }
+.team-edit-row { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 0 10px; }
+.team-edit .actions { margin: 4px 0 0; }
+.team-admin { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.manage-team { margin-bottom: 18px; }
+.manage-team h2 { font-size: 22px; }
+.claim { margin-bottom: 18px; }
+.claim .inline-form { margin-top: 10px; }
 .card-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .league-admin { display: grid; gap: 12px; justify-items: start; }
 .league-admin > .card { width: 100%; margin: 0; }
@@ -971,7 +996,8 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
   .admin-chip { display: inline-flex; }
   .tabs a, .nav-locked { font-size: 11px; letter-spacing: .02em; }
   .lineups { grid-template-columns: 1fr; }
-  .singles-check ul, .rules-grid, .slot-grid, .season-list { grid-template-columns: 1fr; }
+  .singles-check ul, .rules-grid, .slot-grid, .season-list, .team-edit-row { grid-template-columns: 1fr; }
+  .fixture-top { flex-wrap: wrap; }
   .champion-banner em { margin-left: 0; }
   .inline-form { flex-direction: column; align-items: stretch; }
   .bracket-view { grid-template-columns: 1fr; }

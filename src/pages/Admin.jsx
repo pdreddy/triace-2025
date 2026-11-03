@@ -4,7 +4,8 @@ import { useTournament, useRegistrations } from '../hooks/useTournament';
 import { Field, Message, TeamCard, Stat } from '../components/UI';
 import { Icon } from '../components/Icons';
 import { FixtureCard, teamIndex } from '../components/League';
-import { LeagueRulesCard, PlayoffPlanner, SeasonCard } from '../components/AdminLeague';
+import { LeagueRulesCard, PlayoffPlanner, ScheduleForm, SeasonCard } from '../components/AdminLeague';
+import { TeamEditForm } from '../components/TeamTools';
 import { DEFAULT_SETTINGS, DEFAULT_TIERS, orderedTiers, parseUtr, validateSettings, validateTierConfig, registrationsCsv } from '../../functions/lib/tournament.js';
 
 const SECTIONS = [
@@ -30,7 +31,7 @@ export default function Admin() {
   const { teams, loading, error: readError } = useRegistrations();
   const [draft, setDraft] = useState(() => draftFrom(data)), [dirty, setDirty] = useState(false), [busy, setBusy] = useState(false);
   const [error, setError] = useState(''), [message, setMessage] = useState(''), [summary, setSummary] = useState(null);
-  const [query, setQuery] = useState(''), [filter, setFilter] = useState('all'), [reveal, setReveal] = useState(false), [newId, setNewId] = useState(''), [tab, setTab] = useState('settings');
+  const [query, setQuery] = useState(''), [filter, setFilter] = useState('all'), [reveal, setReveal] = useState(false), [newId, setNewId] = useState(''), [tab, setTab] = useState('settings'), [editing, setEditing] = useState(null);
 
   useEffect(() => {
     if (data && !dirty && (data.configRevision || 0) >= draft.expectedRevision) setDraft(draftFrom(data));
@@ -70,6 +71,16 @@ export default function Admin() {
     if (Object.values(teams).some(team => (team.listedTiers || [team.assignedTier]).includes(id))) { setError('This tier still has teams. Deactivate it, save, and recalculate before removing it.'); return; }
     setDraft(old => { const tierConfig = { ...old.tierConfig }; delete tierConfig[id]; return { ...old, tierConfig }; });
     setDirty(true);
+  }
+  const saveSchedule = schedule => attempt(async () => { await service.setSchedule(schedule); setMessage('Match dates saved. Every round now has a deadline.'); });
+  const saveTeam = async payload => { await service.updateTeam(payload); setEditing(null); setMessage('Team updated.'); };
+  function withdraw(team) {
+    if (!window.confirm(`Withdraw ${team.captain.firstName}’s team? Its unplayed fixtures are removed and its results stop counting.`)) return;
+    return action(async () => { const r = await service.withdrawTeam({ teamId: team.teamId }); setMessage(`${team.captain.firstName}’s team withdrawn${r.removedFixtures ? `; ${r.removedFixtures} unplayed fixtures removed` : ''}.`); });
+  }
+  function newCaptainCode(team) {
+    if (!window.confirm(`Issue a new captain code for ${team.captain.firstName}’s team? The old code stops working; devices already linked keep access.`)) return;
+    return action(async () => { const r = await service.resetCaptainCode({ teamId: team.teamId }); setMessage(`New captain code for ${team.captain.firstName}’s team: ${r.captainCode}. Send it to the captain; it isn’t shown again.`); });
   }
   function generateFixtures(tier) {
     const existing = Object.values(data?.fixtures?.[tier.id] || {});
@@ -213,7 +224,18 @@ export default function Admin() {
             return (
               <section className="tier-group pane pane-teams" key={group.id}>
                 <div className="tier-head"><div><h2>{group.name}</h2><span>{list.length} {list.length === 1 ? 'team' : 'teams'}</span></div></div>
-                <div className="team-list">{list.map(team => <TeamCard key={team.teamId} team={team} tierName={group.name} tierId={group.id} privateView masked={masked} />)}</div>
+                <div className="team-list">{list.map(team => editing === team.teamId
+                  ? <TeamEditForm key={team.teamId} registration={team} tierConfig={data?.tierConfig} onSave={saveTeam} onCancel={() => setEditing(null)} />
+                  : (
+                    <div className="team-admin" key={team.teamId}>
+                      <TeamCard team={team} tierName={group.name} tierId={group.id} privateView masked={masked} />
+                      <div className="card-actions">
+                        <button type="button" className="secondary small" disabled={busy} onClick={() => setEditing(team.teamId)}>Edit</button>
+                        <button type="button" className="secondary small" disabled={busy} onClick={() => newCaptainCode(team)}>New captain code</button>
+                        <button type="button" className="danger" disabled={busy} onClick={() => withdraw(team)}>Withdraw</button>
+                      </div>
+                    </div>
+                  ))}</div>
               </section>
             );
           })}
@@ -236,6 +258,7 @@ export default function Admin() {
                   </div>
                   <p className="small">{teamCount} teams · {fixtures.length} fixtures · {finals} final · {pending.length} awaiting approval{teamCount < 2 ? ' · needs at least 2 teams' : ''}</p>
                   {pending.length > 0 && <div className="fixture-list">{pending.map(f => <FixtureCard key={f.id} fixture={f} teams={teamIndex(data)} onReview={approve => review(tier.id, f.id, approve)} />)}</div>}
+                  {teamCount >= 2 && <ScheduleForm tier={tier} schedule={data?.schedules?.[tier.id]} busy={busy} onSave={saveSchedule} />}
                   <PlayoffPlanner tier={tier} data={data} rules={data?.leagueRules} busy={busy} onCreate={(seeds, hasResults) => createPlayoffs(tier, seeds, hasResults)} />
                 </section>
               );

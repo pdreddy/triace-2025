@@ -1,6 +1,8 @@
-import { Link, useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useTournament, useMyTeams } from '../hooks/useTournament';
-import { EmptyState, Stat, tierTone } from '../components/UI';
+import { EmptyState, Message, Stat, tierTone } from '../components/UI';
+import { CaptainClaim, TeamEditForm } from '../components/TeamTools';
 import { FixtureCard, teamIndex, teamName, playerName } from '../components/League';
 import { Icon } from '../components/Icons';
 import { orderedTiers, formatUtr } from '../../functions/lib/tournament.js';
@@ -13,6 +15,16 @@ export default function Team() {
   const { data, service, user } = useTournament();
   const myTeams = useMyTeams();
   const { players: rated } = useRatings();
+  const navigate = useNavigate(), [editing, setEditing] = useState(null), [note, setNote] = useState('');
+  const owned = Object.hasOwn(myTeams, teamId);
+  const scheduled = Object.values(data?.fixtures || {}).some(t => Object.values(t || {}).some(f => f.home === teamId || f.away === teamId));
+  useEffect(() => { setEditing(null); }, [teamId]);
+  async function startEdit() { try { setEditing(await service.getMyRegistration(teamId)); } catch (e) { setNote(e.message); } }
+  async function saveTeam(payload) { await service.updateTeam(payload); setEditing(null); setNote('Team updated.'); }
+  async function withdraw() {
+    if (!window.confirm('Withdraw your team from this season? This can’t be undone from the app.')) return;
+    try { await service.withdrawTeam({ teamId }); navigate('/tiers'); } catch (e) { setNote(e.message); }
+  }
   const team = teamIndex(data).get(teamId), teams = teamIndex(data);
   if (!data) return <div className="page-loading" aria-busy="true"><span className="spinner" /> Loading team…</div>;
   if (!team) return <section className="page"><EmptyState title="Team not found.">This team isn’t in any tier right now. <Link className="secondary" to="/tiers">Back to the lineup</Link></EmptyState></section>;
@@ -20,7 +32,7 @@ export default function Team() {
   const tiers = orderedTiers(data.tierConfig || {}).filter(t => data.tiers?.[t.id]?.teams?.[teamId]);
   const records = tiers.map(t => ({ tier: t, row: standings(Object.values(data.tiers[t.id].teams), data.fixtures?.[t.id], data.leagueRules).find(r => r.team.teamId === teamId), fixtures: Object.values(data.fixtures?.[t.id] || {}).filter(f => f.home === teamId || f.away === teamId).sort((a, b) => a.round - b.round) }));
   const total = records.reduce((sum, r) => ({ won: sum.won + (r.row?.won || 0), lost: sum.lost + (r.row?.lost || 0) }), { won: 0, lost: 0 });
-  const mine = Object.hasOwn(myTeams, teamId);
+  const mine = owned;
   const players = [['captain', 'Captain', team.captainFirstName, team.captainUtr], ['ace1', 'Ace 1', team.ace1Name || 'Ace 1 (masked)', team.ace1Utr], ['ace2', 'Ace 2', team.ace2Name || 'Ace 2 (masked)', team.ace2Utr]];
   const ratingOf = role => rated.find(p => p.id === playerId(teamId, role));
 
@@ -35,6 +47,18 @@ export default function Team() {
         <span className="team-hero-badge" aria-hidden="true"><Icon name="trophy" size={40} /></span>
       </header>
 
+      <Message>{note}</Message>
+      {owned && !user?.admin && (
+        <section className="card manage-team">
+          <div className="card-head"><h2>Manage your team</h2>{scheduled && <span className="pill">Fixtures scheduled</span>}</div>
+          {scheduled
+            ? <p className="small">Fixtures are scheduled, so changes now go through the admin.</p>
+            : editing
+              ? <TeamEditForm registration={editing} tierConfig={data.tierConfig} onSave={saveTeam} onCancel={() => setEditing(null)} />
+              : <div className="card-actions"><button type="button" className="secondary small" onClick={startEdit}>Edit players</button><button type="button" className="danger" onClick={withdraw}>Withdraw team</button></div>}
+        </section>
+      )}
+      {!owned && !user?.admin && <CaptainClaim teamId={teamId} service={service} onClaimed={() => setNote('This device is now linked to your team. You can submit scores and manage the team here.')} />}
       <div className="stat-row">
         <Stat value={`${total.won}–${total.lost}`} label="Win–loss" tone="accent" />
         {records.map(r => <Stat key={r.tier.id} value={r.row ? `#${r.row.position}` : '—'} label={`${r.tier.name} position`} />)}

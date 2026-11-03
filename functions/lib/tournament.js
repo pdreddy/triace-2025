@@ -13,7 +13,14 @@ export function playerUtr(singlesUtr, doublesUtr = null, gapLimit = UTR_GAP_LIMI
   return Math.abs(singlesUtr - doublesUtr) > gapLimit ? Math.round((singlesUtr + doublesUtr) / 2) : Math.max(singlesUtr, doublesUtr);
 }
 // League rules the admin can change. Missing values (older saved data) fall back to these defaults.
-export const DEFAULT_LEAGUE_RULES = { utrGapLimit: 175, pointsPerWin: 2, playoffThreshold: 7, playoffSpotsLarge: 4, playoffSpotsSmall: 3, singlesMinPercent: 40 };
+export const DEFAULT_LEAGUE_RULES = {
+  utrGapLimit: 175, pointsPerWin: 2, playoffThreshold: 7, playoffSpotsLarge: 4, playoffSpotsSmall: 3, singlesMinPercent: 40,
+  // Challenge rule (provisional): a team in challengerFrom–challengerTo may challenge one in targetFrom–targetTo once,
+  // before the last challengeCutoffRounds rounds; a challenger win swaps the two places in the table.
+  challengeEnabled: true, challengerFrom: 5, challengerTo: 6, targetFrom: 2, targetTo: 4, challengeCutoffRounds: 3
+};
+// A registration belongs to the browser that created it and to any device that claimed it with the captain code.
+export const isOwner = (registration, uid) => !!registration && !!uid && (registration.ownerUid === uid || registration.owners?.[uid] === true);
 export const rulesOf = state => ({ ...DEFAULT_LEAGUE_RULES, ...(state?.leagueRules || {}) });
 export const DEFAULT_SEASON_NAME = `${new Date().getFullYear()} season`;
 export function parseUtr(value) {
@@ -92,24 +99,24 @@ export function publicRecord(team, settings = DEFAULT_SETTINGS) {
   return { teamId: team.teamId, captainFirstName: team.captain.firstName, captainUtr: team.captain.utr, ace1Utr: team.ace1.utr, ace2Utr: team.ace2.utr, ...(!settings.aceNameMaskingEnabled && team.rulesAccepted === true ? { ace1Name: team.ace1.fullName, ace2Name: team.ace2.fullName } : {}), combinedUtr: team.combinedUtr, assignedTier: team.assignedTier, registeredAt: team.registeredAt };
 }
 export function initialState() { return { settings: { ...DEFAULT_SETTINGS }, tierConfig: structuredClone(DEFAULT_TIERS), configRevision: 1, registrations: {}, tiers: {} }; }
-export function publicState(state) { return { settings: state.settings, tierConfig: state.tierConfig || {}, configRevision: state.configRevision || 0, tiers: state.tiers || {}, fixtures: state.fixtures || {}, leagueRules: rulesOf(state), season: state.season || { name: DEFAULT_SEASON_NAME }, seasons: state.seasons || {} }; }
+export function publicState(state) { return { settings: state.settings, tierConfig: state.tierConfig || {}, configRevision: state.configRevision || 0, tiers: state.tiers || {}, fixtures: state.fixtures || {}, leagueRules: rulesOf(state), season: state.season || { name: DEFAULT_SEASON_NAME }, seasons: state.seasons || {}, schedules: state.schedules || {} }; }
 function canonical(value) { return JSON.stringify(value, (_, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).filter(key => item[key] !== null && item[key] !== undefined).sort().map(key => [key, item[key]])) : item); }
-export function applyRegistration(current, payload, uid, now = Date.now()) {
+export function applyRegistration(current, payload, uid, now = Date.now(), recoveryHash = null) {
   assert(typeof uid === 'string' && uid.length > 0, 'Sign in before registering.');
   assert(current?.settings, 'The admin must initialize tournament settings first.');
   const team = validateRegistration(payload, current.settings, current.tierConfig || {}, rulesOf(current).utrGapLimit);
   const state = structuredClone(current), previous = state.registrations?.[team.teamId];
   if (previous) {
-    const { ownerUid, registeredAt, ...saved } = previous;
+    const { ownerUid, registeredAt, recoveryHash: savedHash, owners, ...saved } = previous;
     assert(ownerUid === uid && canonical(saved) === canonical(team), 'This registration identifier is already in use.');
     return { state, result: { teamId: previous.teamId, assignedTier: previous.assignedTier, combinedUtr: previous.combinedUtr, listedTiers: previous.listedTiers || [previous.assignedTier] } };
   }
-  const record = { ...team, ownerUid: uid, registeredAt: now };
+  const record = { ...team, ownerUid: uid, registeredAt: now, ...(recoveryHash ? { recoveryHash } : {}) };
   state.registrations ||= {}; state.registrations[team.teamId] = record;
   state.teamsByOwner ||= {}; state.teamsByOwner[uid] ||= {}; state.teamsByOwner[uid][team.teamId] = true;
   state.tiers ||= {};
   for (const tierId of team.listedTiers) { state.tiers[tierId] ||= { teams: {} }; state.tiers[tierId].teams ||= {}; state.tiers[tierId].teams[team.teamId] = publicRecord(record, state.settings); }
-  return { state, result: { teamId: record.teamId, assignedTier: record.assignedTier, combinedUtr: record.combinedUtr, listedTiers: record.listedTiers } };
+  return { state, result: { teamId: record.teamId, assignedTier: record.assignedTier, combinedUtr: record.combinedUtr, listedTiers: record.listedTiers, created: true } };
 }
 export function applyConfiguration(current, payload) {
   exact(payload, ['settings', 'tierConfig', 'expectedRevision'], 'Invalid configuration request.');
@@ -129,7 +136,7 @@ export function applyRecalculation(current) {
   const state = structuredClone(current), summary = { reviewed: 0, moved: 0, unchanged: 0, unassigned: 0 };
   state.tiers = {}; state.teamsByOwner = {};
   for (const team of Object.values(state.registrations || {})) {
-    if (team.ownerUid) { state.teamsByOwner[team.ownerUid] ||= {}; state.teamsByOwner[team.ownerUid][team.teamId] = true; }
+    for (const uid of [team.ownerUid, ...Object.keys(team.owners || {})].filter(Boolean)) { state.teamsByOwner[uid] ||= {}; state.teamsByOwner[uid][team.teamId] = true; }
     for (const key of ['captain', 'ace1', 'ace2']) if (Number.isInteger(team[key].singlesUtr)) team[key].utr = playerUtr(team[key].singlesUtr, team[key].doublesUtr ?? null, rulesOf(state).utrGapLimit);
     const total = team.captain.utr + team.ace1.utr + team.ace2.utr;
     const assigned = assignSelectedTier(total, state.tierConfig, team.selectedTier);
@@ -154,6 +161,10 @@ export function validateLeagueRules(value) {
   assert(integer(value.playoffThreshold, 2, 64), 'The playoff team threshold must be 2–64.');
   assert(integer(value.playoffSpotsSmall, 2, 4) && integer(value.playoffSpotsLarge, 2, 4), 'Playoff spots must be 2, 3 or 4.');
   assert(integer(value.singlesMinPercent, 0, 100), 'The singles minimum must be 0–100%.');
+  assert(typeof value.challengeEnabled === 'boolean', 'Turn the challenge rule on or off.');
+  for (const key of ['challengerFrom', 'challengerTo', 'targetFrom', 'targetTo']) assert(integer(value[key], 1, 64), 'Challenge positions must be 1–64.');
+  assert(value.challengerFrom <= value.challengerTo && value.targetFrom <= value.targetTo && value.targetTo < value.challengerFrom, 'Challengers must sit below the teams they can challenge.');
+  assert(integer(value.challengeCutoffRounds, 0, 52), 'The challenge cutoff must be 0–52 rounds.');
   return { ...value };
 }
 export function applyLeagueRules(current, payload) {

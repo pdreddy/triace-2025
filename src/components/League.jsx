@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Message } from './UI';
 import { Icon } from './Icons';
 import { formatUtr } from '../../functions/lib/tournament.js';
-import { FORMATS, ROLE_LABELS, deriveLineup, encounterWinner, matchPlayers, playoffSpots } from '../../functions/lib/league.js';
+import { FORMATS, ROLE_LABELS, deriveLineup, encounterWinner, matchPlayers, playoffSpots, isOverdue, onTime } from '../../functions/lib/league.js';
 
 export const teamName = team => (team ? `${team.captainFirstName}’s team` : 'To be decided');
 // Every public team across all tiers, by ID (a team listed in two tiers appears once).
@@ -13,6 +13,8 @@ export function playerName(team, role) {
   if (role === 'captain') return team.captainFirstName;
   return team[`${role}Name`] || `${ROLE_LABELS[role]} (masked)`;
 }
+// Calendar dates (YYYY-MM-DD) shown in the viewer's language, e.g. "Sat 11 Jan".
+export const shortDate = date => (date ? new Date(`${date}T12:00:00Z`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }) : '');
 const tally = matches => [matches.filter(m => m.winner === 'home').length, matches.filter(m => m.winner === 'away').length];
 const PAIRS = [['captain', 'ace1'], ['captain', 'ace2'], ['ace1', 'ace2']];
 
@@ -100,8 +102,9 @@ function ScoreForm({ fixture, teams, admin, onSubmit }) {
 
 const STATUS = { scheduled: 'Scheduled', submitted: 'Awaiting approval', final: 'Final', pending: 'Waiting for opponents' };
 
-export function FixtureCard({ fixture, teams, mine = false, admin = false, onSubmit, onReview, archived = false }) {
-  const [open, setOpen] = useState(false);
+export function FixtureCard({ fixture, teams, mine = false, admin = false, onSubmit, onReview, onMove, archived = false }) {
+  const [open, setOpen] = useState(false), [due, setDue] = useState(fixture.dueBy || '');
+  const overdue = !archived && isOverdue(fixture), late = fixture.status === 'final' && fixture.dueBy && !onTime(fixture);
   const shown = fixture.result || fixture.submission, [h, a] = shown ? tally(shown.matches) : [null, null];
   const format = FORMATS[fixture.format || 'rr'];
   const players = { home: matchPlayers(fixture, 'home'), away: matchPlayers(fixture, 'away') };
@@ -109,8 +112,12 @@ export function FixtureCard({ fixture, teams, mine = false, admin = false, onSub
   const sideName = side => teamName(teams.get(fixture[side]));
   const who = (side, key) => (players[side] ? players[side][key].map(r => playerName(teams.get(fixture[side]), r)).join(' + ') : sideName(side));
   return (
-    <article className={`fixture-card ${fixture.status}${mine ? ' mine' : ''}${fixture.stage === 'final' ? ' grand' : ''}`}>
-      <div className="fixture-top"><span className="pill">{fixture.label || `Round ${fixture.round}`}</span><span className={`status ${fixture.status}`}>{STATUS[fixture.status]}</span></div>
+    <article className={`fixture-card ${fixture.status}${mine ? ' mine' : ''}${fixture.stage === 'final' ? ' grand' : ''}${overdue ? ' overdue' : ''}`}>
+      <div className="fixture-top">
+        <span className={`pill${fixture.challenge ? ' warn' : ''}`}>{fixture.label || `Round ${fixture.round}`}</span>
+        {fixture.dueBy && <span className={`due${overdue ? ' overdue' : ''}`}>{overdue ? 'Overdue · ' : 'Due '}{shortDate(fixture.dueBy)}</span>}
+        <span className={`status ${fixture.status}`}>{STATUS[fixture.status]}{late ? ' · late' : ''}</span>
+      </div>
       <div className="fixture-main">
         <TeamLink team={teams.get(fixture.home)} winner={fixture.result?.winner === 'home'} archived={archived} />
         <span className="fixture-score">{shown ? <><b>{h}</b>–<b>{a}</b></> : 'v'}</span>
@@ -134,6 +141,15 @@ export function FixtureCard({ fixture, teams, mine = false, admin = false, onSub
           <button type="button" className="button small" onClick={() => onReview(true)}>Approve</button>
           <button type="button" className="danger" onClick={() => onReview(false)}>Reject</button>
         </div>
+      )}
+      {admin && onMove && !archived && fixture.status !== 'final' && (
+        <details className="move-due">
+          <summary>Change deadline</summary>
+          <div className="inline-form">
+            <div className="field"><label htmlFor={`due-${fixture.tierId}-${fixture.id}`}>New deadline</label><input id={`due-${fixture.tierId}-${fixture.id}`} type="date" value={due} onChange={e => setDue(e.target.value)} /></div>
+            <button type="button" className="secondary small" disabled={!due || due === fixture.dueBy} onClick={() => onMove(due)}>Save</button>
+          </div>
+        </details>
       )}
       {canEnter && onSubmit && (
         <>
@@ -169,7 +185,7 @@ export function StandingsTable({ rows, highlight = new Set(), rules, archived = 
           {rows.map(row => (
             <tr key={row.team.teamId} className={`${row.position <= spots ? 'qualify' : ''}${row.position === spots ? ' cutoff' : ''}${highlight.has(row.team.teamId) ? ' mine' : ''}`}>
               <td className="rank-cell">{row.position}</td>
-              <td>{archived ? <b>{teamName(row.team)}</b> : <Link to={`/team/${row.team.teamId}`}><b>{teamName(row.team)}</b></Link>}<span className="muted team-utr"> · {formatUtr(row.team.combinedUtr)}</span></td>
+              <td>{row.swappedBy && <span className="swap" title="Place changed by a challenge" aria-label="Place changed by a challenge">⇅ </span>}{archived ? <b>{teamName(row.team)}</b> : <Link to={`/team/${row.team.teamId}`}><b>{teamName(row.team)}</b></Link>}<span className="muted team-utr"> · {formatUtr(row.team.combinedUtr)}</span></td>
               <td className="num">{row.played}</td>
               <td className="num">{row.won}</td>
               <td className="num">{row.lost}</td>
@@ -180,7 +196,7 @@ export function StandingsTable({ rows, highlight = new Set(), rules, archived = 
           ))}
         </tbody>
       </table>
-      <p className="table-note">Top {spots} qualify for the playoffs · {rules?.pointsPerWin ?? 2} points per encounter win · ties: match difference, then matches won.</p>
+      <p className="table-note">Top {spots} qualify for the playoffs · {rules?.pointsPerWin ?? 2} points per encounter win · ties: match difference, then matches won · ⇅ place changed by a challenge.</p>
     </div>
   );
 }

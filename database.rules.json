@@ -17,7 +17,10 @@
         ".read": true
       },
       "registrations": {
-        ".read": "auth != null && auth.token.admin === true"
+        ".read": "auth != null && auth.token.admin === true",
+        "$teamId": {
+          ".read": "auth != null && (data.child('ownerUid').val() === auth.uid || data.child('owners').child(auth.uid).val() === true)"
+        }
       },
       "fixtures": {
         ".read": true
@@ -34,6 +37,9 @@
         ".read": true
       },
       "seasons": {
+        ".read": true
+      },
+      "schedules": {
         ".read": true
       }
     }
