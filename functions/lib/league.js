@@ -1,7 +1,7 @@
 // League play: round-robin fixtures, playoffs, captain score submissions with admin approval,
 // standings and player ratings. Like tournament.js, every apply* function takes the whole
 // tournament state and returns { state, result }.
-import { ValidationError } from './tournament.js';
+import { ValidationError, DEFAULT_LEAGUE_RULES, DEFAULT_SEASON_NAME, rulesOf } from './tournament.js';
 
 export const ROLES = ['captain', 'ace1', 'ace2'];
 export const ROLE_LABELS = { captain: 'Captain', ace1: 'Ace 1', ace2: 'Ace 2' };
@@ -22,7 +22,7 @@ export const FORMATS = {
   ]
 };
 export const MATCHES = FORMATS.rr;
-export const POINTS_PER_WIN = 2;
+export const POINTS_PER_WIN = DEFAULT_LEAGUE_RULES.pointsPerWin;
 const SCORE_PATTERN = /^[0-9 ()\-–/,]{0,40}$/;
 const formatOf = fixture => FORMATS[fixture.format || 'rr'];
 
@@ -81,25 +81,39 @@ export function applyGenerateFixtures(current, payload) {
   return { state, result: { tierId, fixtures: Object.keys(state.fixtures[tierId]).length, rounds: Math.max(0, teams.length - 1 + (teams.length % 2)) } };
 }
 
-// Top 4: SF1 1st v 3rd, SF2 2nd v 4th, then the final. Top 3: Eliminator 2nd v 3rd, then 1st v its winner.
+// Seeds come from the admin's manual mapping, or from the standings when none are given.
+// 4 seeds: SF1 1 v 3, SF2 2 v 4, then the final. 3 seeds: Eliminator 2 v 3, then 1 v its winner.
+// 2 seeds: a single final.
 export function applyGeneratePlayoffs(current, payload) {
-  const tierId = payload?.tierId, tierFixtures = current?.fixtures?.[tierId] || {};
+  const tierId = payload?.tierId, tierFixtures = current?.fixtures?.[tierId] || {}, rules = rulesOf(current);
   const league = Object.values(tierFixtures).filter(isLeague);
-  assert(league.length, 'Generate and play the round-robin fixtures first.');
-  assert(payload.force === true || league.every(f => f.status === 'final'), 'Some round-robin results are not final yet. Confirm to create the playoffs from the current standings.');
-  const table = standings(tierTeams(current, tierId), tierFixtures);
-  assert(table.length >= 3, 'Playoffs need at least three teams.');
-  const seeds = table.slice(0, playoffSpots(table.length)).map(r => r.team.teamId);
-  const state = structuredClone(current), target = state.fixtures[tierId];
+  const tierTeamIds = new Set(tierTeams(current, tierId).map(t => t.teamId));
+  let seeds;
+  if (Array.isArray(payload?.seeds)) {
+    seeds = payload.seeds;
+    assert([2, 3, 4].includes(seeds.length), 'Choose 2, 3 or 4 playoff teams.');
+    assert(seeds.every(id => tierTeamIds.has(id)) && new Set(seeds).size === seeds.length, 'Each playoff slot needs a different team from this tier.');
+  } else {
+    assert(league.length, 'Generate and play the round-robin fixtures first.');
+    assert(payload?.force === true || league.every(f => f.status === 'final'), 'Some round-robin results are not final yet. Confirm to create the playoffs from the current standings.');
+    const table = standings(tierTeams(current, tierId), tierFixtures, rules);
+    assert(table.length >= 2, 'Playoffs need at least two teams.');
+    seeds = table.slice(0, playoffSpots(table.length, rules)).map(r => r.team.teamId);
+  }
+  const state = structuredClone(current);
+  state.fixtures ||= {}; state.fixtures[tierId] ||= {};
+  const target = state.fixtures[tierId];
   for (const f of Object.values(target)) if (f.stage) delete target[f.id];
   const add = (id, stage, label, home, away, order) => { target[id] = { id, tierId, stage, label, order, format: 'po', home, away, status: home && away ? 'scheduled' : 'pending' }; };
   if (seeds.length === 4) {
     add('po-sf1', 'sf1', 'Semifinal 1', seeds[0], seeds[2], 1);
     add('po-sf2', 'sf2', 'Semifinal 2', seeds[1], seeds[3], 2);
     add('po-final', 'final', 'Final', null, null, 3);
-  } else {
+  } else if (seeds.length === 3) {
     add('po-elim', 'elim', 'Eliminator', seeds[1], seeds[2], 1);
     add('po-final', 'final', 'Final', seeds[0], null, 2);
+  } else {
+    add('po-final', 'final', 'Final', seeds[0], seeds[1], 1);
   }
   return { state, result: { tierId, seeds } };
 }
@@ -109,6 +123,7 @@ function advancePlayoffs(fixtures) {
   const final = fixtures['po-final'];
   if (!final) return;
   const winnerOf = id => (fixtures[id]?.status === 'final' ? fixtures[id][fixtures[id].result.winner] : null);
+  if (!fixtures['po-sf1'] && !fixtures['po-elim']) return;
   const slots = fixtures['po-sf1'] ? [winnerOf('po-sf1'), winnerOf('po-sf2')] : [final.home, winnerOf('po-elim')];
   if (slots[0] !== final.home || slots[1] !== final.away) {
     final.home = slots[0]; final.away = slots[1];
@@ -185,9 +200,9 @@ export function applyReviewResult(current, payload, now = Date.now()) {
   return { state, result: { status: target.status } };
 }
 
-// Standings from final round-robin results: 2 points per encounter win; ties break on match
-// difference, then matches won, then combined UTR.
-export function standings(teams, fixtures) {
+// Standings from final round-robin results: points per encounter win (admin setting, default 2);
+// ties break on match difference, then matches won, then combined UTR.
+export function standings(teams, fixtures, rules = DEFAULT_LEAGUE_RULES) {
   const rows = new Map(teams.map(t => [t.teamId, { team: t, played: 0, won: 0, lost: 0, matchesWon: 0, matchesLost: 0, points: 0, form: [] }]));
   const finals = Object.values(fixtures || {}).filter(f => isLeague(f) && f.status === 'final' && f.result).sort((a, b) => a.round - b.round || a.result.approvedAt - b.result.approvedAt);
   for (const f of finals) {
@@ -196,7 +211,7 @@ export function standings(teams, fixtures) {
     const homeMatches = f.result.matches.filter(m => m.winner === 'home').length, awayMatches = f.result.matches.filter(m => m.winner === 'away').length;
     for (const [row, won, mine, theirs] of [[home, f.result.winner === 'home', homeMatches, awayMatches], [away, f.result.winner === 'away', awayMatches, homeMatches]]) {
       row.played++; row.matchesWon += mine; row.matchesLost += theirs;
-      if (won) { row.won++; row.points += POINTS_PER_WIN; } else row.lost++;
+      if (won) { row.won++; row.points += rules.pointsPerWin; } else row.lost++;
       row.form.push(won ? 'W' : 'L');
     }
   }
@@ -205,7 +220,7 @@ export function standings(teams, fixtures) {
     .sort((a, b) => b.points - a.points || (b.matchesWon - b.matchesLost) - (a.matchesWon - a.matchesLost) || b.matchesWon - a.matchesWon || b.team.combinedUtr - a.team.combinedUtr)
     .map((row, i) => ({ ...row, position: i + 1 }));
 }
-export const playoffSpots = teamCount => (teamCount > 7 ? 4 : 3);
+export const playoffSpots = (teamCount, rules = DEFAULT_LEAGUE_RULES) => Math.min(teamCount, teamCount > rules.playoffThreshold ? rules.playoffSpotsLarge : rules.playoffSpotsSmall);
 
 // ---------- Player ratings ----------
 // A Triace rating starts at the player's counted UTR and moves after every final match that has a
@@ -259,4 +274,53 @@ export function playerRatings(teams, fixturesByTier) {
     });
   }
   return players;
+}
+
+// ---------- Singles minimum ----------
+// Every player must play singles on at least the configured share of the team's scheduled
+// round-robin match days, rounded down. Counted from final results that include a lineup.
+export function singlesEligibility(teamId, tierFixtures, rules = DEFAULT_LEAGUE_RULES) {
+  const mine = Object.values(tierFixtures || {}).filter(f => isLeague(f) && (f.home === teamId || f.away === teamId));
+  const required = Math.floor((mine.length * rules.singlesMinPercent) / 100);
+  const days = Object.fromEntries(ROLES.map(r => [r, 0]));
+  let recorded = 0;
+  for (const f of mine.filter(f => f.status === 'final')) {
+    const players = matchPlayers(f, f.home === teamId ? 'home' : 'away');
+    if (!players) continue;
+    recorded++;
+    for (const role of players.s || []) days[role]++;
+  }
+  const left = mine.length - mine.filter(f => f.status === 'final').length;
+  return {
+    matchDays: mine.length, required, recorded, left,
+    players: Object.fromEntries(ROLES.map(r => [r, { days: days[r], met: days[r] >= required, possible: days[r] + left >= required }]))
+  };
+}
+
+// ---------- Seasons ----------
+// Closing a season stores a public snapshot (teams, fixtures, standings inputs, champions) and a
+// private copy of the registrations, then clears the season so registration can start again.
+export function applyManageSeason(current, payload, now = Date.now()) {
+  assert(current?.settings, 'Save the initial tournament configuration first.');
+  const name = typeof payload?.name === 'string' ? payload.name.trim() : '';
+  assert(name.length > 0 && name.length <= 60, 'Season names need 1–60 characters.');
+  const state = structuredClone(current), season = state.season || { name: DEFAULT_SEASON_NAME, startedAt: null };
+  if (payload.action === 'rename') {
+    state.season = { ...season, name };
+    return { state, result: { season: state.season } };
+  }
+  assert(payload.action === 'archive', 'Unknown season action.');
+  assert(payload.confirm === season.name, `Type the current season name, “${season.name}”, to confirm.`);
+  const id = `s${now}`, champions = {};
+  for (const [tierId, fixtures] of Object.entries(state.fixtures || {})) {
+    const final = fixtures['po-final'];
+    if (final?.status === 'final') champions[tierId] = { winner: final[final.result.winner], runnerUp: final[final.result.winner === 'home' ? 'away' : 'home'] };
+  }
+  state.seasons ||= {};
+  state.seasons[id] = { id, name: season.name, startedAt: season.startedAt || null, archivedAt: now, tierConfig: state.tierConfig || {}, leagueRules: rulesOf(state), tiers: state.tiers || {}, fixtures: state.fixtures || {}, champions };
+  state.archive ||= {};
+  state.archive[id] = { registrations: state.registrations || {} };
+  state.registrations = {}; state.tiers = {}; state.fixtures = {}; state.teamsByOwner = {};
+  state.season = { name, startedAt: now };
+  return { state, result: { archived: id, season: state.season } };
 }

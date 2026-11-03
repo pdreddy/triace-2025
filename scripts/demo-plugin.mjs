@@ -1,8 +1,8 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
 import path from 'node:path';
-import { initialState, publicState, applyRegistration, applyConfiguration, applyRecalculation, ValidationError } from '../functions/lib/tournament.js';
-import { applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult } from '../functions/lib/league.js';
+import { initialState, publicState, applyRegistration, applyConfiguration, applyRecalculation, applyLeagueRules, ValidationError } from '../functions/lib/tournament.js';
+import { applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult, applyManageSeason } from '../functions/lib/league.js';
 const digest = value => createHash('sha256').update(value).digest();
 export function demoPlugin(env) {
   const password = env.TRAICE_ADMIN_PASSWORD;
@@ -67,6 +67,8 @@ export function demoPlugin(env) {
         if (endpoint === '/configuration') return send(200, await mutate(current => applyConfiguration(current, payload)));
         if (endpoint === '/generate-fixtures') return send(200, await mutate(current => applyGenerateFixtures(current, payload)));
         if (endpoint === '/generate-playoffs') return send(200, await mutate(current => applyGeneratePlayoffs(current, payload)));
+        if (endpoint === '/league-rules') return send(200, await mutate(current => applyLeagueRules(current, payload)));
+        if (endpoint === '/season') return send(200, await mutate(current => applyManageSeason(current, payload)));
         if (endpoint === '/review-result') return send(200, await mutate(current => applyReviewResult(current, payload)));
         if (endpoint === '/recalculate') return send(200, await mutate(current => applyRecalculation(current)));
         return send(404, { error: 'Unknown endpoint.' });

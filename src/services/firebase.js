@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInAnonymously, signInWithEmailAndPassword, signOut, getIdTokenResult, connectAuthEmulator } from 'firebase/auth';
 import { getDatabase, ref, onValue, connectDatabaseEmulator } from 'firebase/database';
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/functions';
+import { rulesOf, DEFAULT_SEASON_NAME } from '../../functions/lib/tournament.js';
 const env = import.meta.env;
 function errorMessage(error) { return error?.message?.replace(/^Firebase:\s*/, '').replace(/\s*\(auth\/[^)]+\)\.?$/, '') || 'The operation failed. Please retry.'; }
 // Sign-in failures worth telling the admin apart (Firebase reports wrong password and unknown user the same way).
@@ -29,10 +30,10 @@ export function createFirebaseService() {
     mode: env.VITE_USE_EMULATORS === 'true' ? 'Firebase Emulators' : 'Firebase',
     subscribePublic(callback, onError) {
       const state = {}, ready = new Set(), keys = ['settings', 'tierConfig', 'configRevision', 'tiers'];
-      const emit = () => { if (ready.size === keys.length) callback({ ...state, fixtures: state.fixtures || {} }); };
+      const emit = () => { if (ready.size === keys.length) callback({ ...state, fixtures: state.fixtures || {}, leagueRules: rulesOf(state), season: state.season || { name: DEFAULT_SEASON_NAME }, seasons: state.seasons || {} }); };
       const off = keys.map(key => onValue(ref(database, `traice2_0/${key}`), snapshot => { state[key] = snapshot.val() ?? (key === 'configRevision' ? 0 : key === 'settings' ? null : {}); ready.add(key); emit(); }, error => onError(new Error(errorMessage(error)))));
-      // Fixtures load on their own so a missing database rule for them never blocks the core tournament data.
-      off.push(onValue(ref(database, 'traice2_0/fixtures'), snapshot => { state.fixtures = snapshot.val() || {}; emit(); }, () => { state.fixtures = {}; emit(); }));
+      // League data loads on its own so a missing database rule for it never blocks the core tournament data.
+      for (const key of ['fixtures', 'leagueRules', 'season', 'seasons']) off.push(onValue(ref(database, `traice2_0/${key}`), snapshot => { state[key] = snapshot.val() || undefined; emit(); }, () => { state[key] = undefined; emit(); }));
       return () => off.forEach(unsubscribe => unsubscribe());
     },
     subscribeConnection(callback) { return onValue(ref(database, '.info/connected'), snapshot => callback(snapshot.val() === true)); },
@@ -62,6 +63,8 @@ export function createFirebaseService() {
     recalculate: withError(async () => (await httpsCallable(functions, 'recalculateTiers')({})).data),
     generateFixtures: withError(async payload => (await httpsCallable(functions, 'generateFixtures')(payload)).data),
     generatePlayoffs: withError(async payload => (await httpsCallable(functions, 'generatePlayoffs')(payload)).data),
+    saveLeagueRules: withError(async payload => (await httpsCallable(functions, 'saveLeagueRules')(payload)).data),
+    manageSeason: withError(async payload => (await httpsCallable(functions, 'manageSeason')(payload)).data),
     submitResult: withError(async payload => (await httpsCallable(functions, 'submitResult')(payload)).data),
     reviewResult: withError(async payload => (await httpsCallable(functions, 'reviewResult')(payload)).data)
   };

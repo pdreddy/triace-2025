@@ -4,6 +4,7 @@ import { useTournament, useRegistrations } from '../hooks/useTournament';
 import { Field, Message, TeamCard, Stat } from '../components/UI';
 import { Icon } from '../components/Icons';
 import { FixtureCard, teamIndex } from '../components/League';
+import { LeagueRulesCard, PlayoffPlanner, SeasonCard } from '../components/AdminLeague';
 import { DEFAULT_SETTINGS, DEFAULT_TIERS, orderedTiers, parseUtr, validateSettings, validateTierConfig, registrationsCsv } from '../../functions/lib/tournament.js';
 
 const SECTIONS = [
@@ -76,13 +77,15 @@ export default function Admin() {
     if (existing.length && !window.confirm(replace ? `Replace the ${tier.name} schedule? All of its submitted and final results will be deleted.` : `Create a new ${tier.name} schedule? The current fixtures will be replaced.`)) return;
     return action(async () => { const result = await service.generateFixtures({ tierId: tier.id, replace }); setMessage(`${tier.name}: ${result.fixtures} fixtures over ${result.rounds} rounds created.`); });
   }
-  function createPlayoffs(tier) {
-    const fixtures = Object.values(data?.fixtures?.[tier.id] || {}), league = fixtures.filter(f => !f.stage), playoffs = fixtures.filter(f => f.stage);
-    const unfinished = league.filter(f => f.status !== 'final').length;
-    if (unfinished && !window.confirm(`${unfinished} round-robin results are not final. Create the ${tier.name} playoffs from the current standings anyway?`)) return;
-    if (playoffs.some(f => f.result || f.submission) && !window.confirm(`Replace the ${tier.name} playoffs? Their results will be deleted.`)) return;
-    return action(async () => { await service.generatePlayoffs({ tierId: tier.id, force: unfinished > 0 }); setMessage(`${tier.name} playoffs created from the standings.`); });
+  // Like action(), but reports whether it succeeded so a form can keep or clear its draft.
+  async function attempt(fn) { let ok = false; await action(async () => { await fn(); ok = true; }); return ok; }
+  function createPlayoffs(tier, seeds, hasResults) {
+    if (hasResults && !window.confirm(`Replace the ${tier.name} playoffs? Their results will be deleted.`)) return;
+    return attempt(async () => { await service.generatePlayoffs({ tierId: tier.id, seeds }); setMessage(`${tier.name} playoffs created.`); });
   }
+  const saveRules = rules => attempt(async () => { await service.saveLeagueRules(rules); setMessage('League rules saved. Rules cards, standings and playoffs now use them.'); });
+  const renameSeason = name => attempt(async () => { await service.manageSeason({ action: 'rename', name }); setMessage('Season renamed.'); });
+  const archiveSeason = (name, confirm) => attempt(async () => { await service.manageSeason({ action: 'archive', name, confirm }); setMessage(`Season saved to the history. ${name} has started; registration is open to new teams.`); });
   function review(tierId, fixtureId, approve) {
     return action(async () => { await service.reviewResult({ tierId, fixtureId, approve }); setMessage(approve ? 'Result approved. Standings are updated.' : 'Submission rejected. The captains can submit again.'); });
   }
@@ -216,8 +219,10 @@ export default function Admin() {
           })}
 
           <SectionTitle id="league" num="04">League &amp; results</SectionTitle>
-          <p className="small note pane pane-league">Create each tier’s round-robin schedule once its teams are final. Captains submit scores from the League page; they count once you approve them. You can also enter or correct any result there.</p>
+          <p className="small note pane pane-league">Every league rule is set here. Create each tier’s round-robin schedule once its teams are final, then map the playoffs. Captains submit scores from the League page; they count once you approve them. You can also enter or correct any result there.</p>
           <div className="league-admin pane pane-league">
+            <LeagueRulesCard rules={data?.leagueRules} busy={busy || !connected || !data?.settings} onSave={saveRules} />
+            {data?.season && <SeasonCard season={data.season} seasons={data.seasons} busy={busy || !connected || !data?.settings} onRename={renameSeason} onArchive={archiveSeason} />}
             {liveTiers.map(tier => {
               const fixtures = Object.values(data?.fixtures?.[tier.id] || {}), teamCount = Object.keys(data?.tiers?.[tier.id]?.teams || {}).length;
               const pending = fixtures.filter(f => f.status === 'submitted'), finals = fixtures.filter(f => f.status === 'final').length;
@@ -227,11 +232,11 @@ export default function Admin() {
                     <h3>{tier.name}</h3>
                     <div className="card-actions">
                       <button className="secondary small" type="button" disabled={busy || teamCount < 2} onClick={() => generateFixtures(tier)}>{fixtures.some(f => !f.stage) ? 'Regenerate fixtures' : 'Generate fixtures'}</button>
-                      <button className="secondary small" type="button" disabled={busy || teamCount < 3 || !fixtures.some(f => !f.stage)} onClick={() => createPlayoffs(tier)}>{fixtures.some(f => f.stage) ? 'Recreate playoffs' : 'Create playoffs'}</button>
                     </div>
                   </div>
                   <p className="small">{teamCount} teams · {fixtures.length} fixtures · {finals} final · {pending.length} awaiting approval{teamCount < 2 ? ' · needs at least 2 teams' : ''}</p>
                   {pending.length > 0 && <div className="fixture-list">{pending.map(f => <FixtureCard key={f.id} fixture={f} teams={teamIndex(data)} onReview={approve => review(tier.id, f.id, approve)} />)}</div>}
+                  <PlayoffPlanner tier={tier} data={data} rules={data?.leagueRules} busy={busy} onCreate={(seeds, hasResults) => createPlayoffs(tier, seeds, hasResults)} />
                 </section>
               );
             })}

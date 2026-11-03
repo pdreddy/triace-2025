@@ -16,8 +16,9 @@ export function playerName(team, role) {
 const tally = matches => [matches.filter(m => m.winner === 'home').length, matches.filter(m => m.winner === 'away').length];
 const PAIRS = [['captain', 'ace1'], ['captain', 'ace2'], ['ace1', 'ace2']];
 
-function TeamLink({ team, winner }) {
+function TeamLink({ team, winner, archived }) {
   if (!team) return <span className="fixture-team tbd">To be decided</span>;
+  if (archived) return <span className={`fixture-team${winner ? ' winner' : ''}`}>{teamName(team)}</span>;
   return <Link className={`fixture-team${winner ? ' winner' : ''}`} to={`/team/${team.teamId}`}>{teamName(team)}</Link>;
 }
 
@@ -99,7 +100,7 @@ function ScoreForm({ fixture, teams, admin, onSubmit }) {
 
 const STATUS = { scheduled: 'Scheduled', submitted: 'Awaiting approval', final: 'Final', pending: 'Waiting for opponents' };
 
-export function FixtureCard({ fixture, teams, mine = false, admin = false, onSubmit, onReview }) {
+export function FixtureCard({ fixture, teams, mine = false, admin = false, onSubmit, onReview, archived = false }) {
   const [open, setOpen] = useState(false);
   const shown = fixture.result || fixture.submission, [h, a] = shown ? tally(shown.matches) : [null, null];
   const format = FORMATS[fixture.format || 'rr'];
@@ -111,9 +112,9 @@ export function FixtureCard({ fixture, teams, mine = false, admin = false, onSub
     <article className={`fixture-card ${fixture.status}${mine ? ' mine' : ''}${fixture.stage === 'final' ? ' grand' : ''}`}>
       <div className="fixture-top"><span className="pill">{fixture.label || `Round ${fixture.round}`}</span><span className={`status ${fixture.status}`}>{STATUS[fixture.status]}</span></div>
       <div className="fixture-main">
-        <TeamLink team={teams.get(fixture.home)} winner={fixture.result?.winner === 'home'} />
+        <TeamLink team={teams.get(fixture.home)} winner={fixture.result?.winner === 'home'} archived={archived} />
         <span className="fixture-score">{shown ? <><b>{h}</b>–<b>{a}</b></> : 'v'}</span>
-        <TeamLink team={teams.get(fixture.away)} winner={fixture.result?.winner === 'away'} />
+        <TeamLink team={teams.get(fixture.away)} winner={fixture.result?.winner === 'away'} archived={archived} />
       </div>
       {shown && (
         <ul className="fixture-matches">
@@ -146,20 +147,20 @@ export function FixtureCard({ fixture, teams, mine = false, admin = false, onSub
   );
 }
 
-export function Bracket({ fixtures, teams, mine, admin, onSubmit }) {
+export function Bracket({ fixtures, teams, mine = new Set(), admin = false, onSubmit, archived = false }) {
   const stages = fixtures.filter(f => f.stage).sort((a, b) => a.order - b.order);
   const early = stages.filter(f => f.stage !== 'final'), final = stages.find(f => f.stage === 'final');
   return (
     <div className="bracket-view">
-      <div className="bracket-col">{early.map(f => <FixtureCard key={f.id} fixture={f} teams={teams} mine={mine.has(f.home) || mine.has(f.away)} admin={admin} onSubmit={entry => onSubmit(f, entry)} />)}</div>
+      <div className="bracket-col">{early.map(f => <FixtureCard key={f.id} fixture={f} teams={teams} mine={mine.has(f.home) || mine.has(f.away)} admin={admin} archived={archived} onSubmit={onSubmit && (entry => onSubmit(f, entry))} />)}</div>
       <span className="bracket-arrow" aria-hidden="true"><Icon name="arrow" size={28} /></span>
-      <div className="bracket-col">{final && <FixtureCard fixture={final} teams={teams} mine={mine.has(final.home) || mine.has(final.away)} admin={admin} onSubmit={entry => onSubmit(final, entry)} />}</div>
+      <div className="bracket-col">{final && <FixtureCard fixture={final} teams={teams} mine={mine.has(final.home) || mine.has(final.away)} admin={admin} archived={archived} onSubmit={onSubmit && (entry => onSubmit(final, entry))} />}</div>
     </div>
   );
 }
 
-export function StandingsTable({ rows, highlight = new Set() }) {
-  const spots = playoffSpots(rows.length);
+export function StandingsTable({ rows, highlight = new Set(), rules, archived = false }) {
+  const spots = playoffSpots(rows.length, rules);
   return (
     <div className="table-wrap">
       <table className="standings league-table">
@@ -168,7 +169,7 @@ export function StandingsTable({ rows, highlight = new Set() }) {
           {rows.map(row => (
             <tr key={row.team.teamId} className={`${row.position <= spots ? 'qualify' : ''}${row.position === spots ? ' cutoff' : ''}${highlight.has(row.team.teamId) ? ' mine' : ''}`}>
               <td className="rank-cell">{row.position}</td>
-              <td><Link to={`/team/${row.team.teamId}`}><b>{teamName(row.team)}</b></Link><span className="muted team-utr"> · {formatUtr(row.team.combinedUtr)}</span></td>
+              <td>{archived ? <b>{teamName(row.team)}</b> : <Link to={`/team/${row.team.teamId}`}><b>{teamName(row.team)}</b></Link>}<span className="muted team-utr"> · {formatUtr(row.team.combinedUtr)}</span></td>
               <td className="num">{row.played}</td>
               <td className="num">{row.won}</td>
               <td className="num">{row.lost}</td>
@@ -179,7 +180,7 @@ export function StandingsTable({ rows, highlight = new Set() }) {
           ))}
         </tbody>
       </table>
-      <p className="table-note">Top {spots} qualify for the playoffs · 2 points per encounter win · ties: match difference, then matches won.</p>
+      <p className="table-note">Top {spots} qualify for the playoffs · {rules?.pointsPerWin ?? 2} points per encounter win · ties: match difference, then matches won.</p>
     </div>
   );
 }

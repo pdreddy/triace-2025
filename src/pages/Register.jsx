@@ -14,11 +14,11 @@ const PLAYERS = [
 const STEPS = ['Tier', 'Captain', 'Ace 1', 'Ace 2', 'Confirm'];
 const emptyPlayers = () => Object.fromEntries(PLAYERS.map(p => [p.key, { name: '', singles: '', doubles: '' }]));
 // Counted rating for the live preview, using the same gap rule as the server (playerUtr).
-function rating(player) {
+function rating(player, gap = UTR_GAP_LIMIT) {
   try {
     const singles = player.singles ? parseUtr(player.singles) : 0, doubles = player.doubles ? parseUtr(player.doubles) : null;
     if (!singles) return { value: doubles || 0, averaged: false };
-    return { value: playerUtr(singles, doubles), averaged: doubles != null && Math.abs(singles - doubles) > UTR_GAP_LIMIT };
+    return { value: playerUtr(singles, doubles, gap), averaged: doubles != null && Math.abs(singles - doubles) > gap };
   } catch { return { value: 0, averaged: false }; }
 }
 
@@ -58,11 +58,11 @@ export default function Register() {
   const [players, setPlayers] = useState(emptyPlayers), [selectedTier, setSelectedTier] = useState('higher'), [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [success, setSuccess] = useState(null), [step, setStep] = useState(0);
   const id = useRef(crypto.randomUUID()), form = useRef(null);
-  const config = data?.tierConfig || {}, active = orderedTiers(config, true), settings = data?.settings;
+  const config = data?.tierConfig || {}, active = orderedTiers(config, true), settings = data?.settings, gap = data?.leagueRules?.utrGapLimit ?? UTR_GAP_LIMIT;
 
   let combined = 0, complete = true;
   for (const value of Object.values(players)) {
-    try { if (!value.singles) complete = false; combined += playerUtr(value.singles ? parseUtr(value.singles) : 0, value.doubles ? parseUtr(value.doubles) : null); } catch { complete = false; }
+    try { if (!value.singles) complete = false; combined += playerUtr(value.singles ? parseUtr(value.singles) : 0, value.doubles ? parseUtr(value.doubles) : null, gap); } catch { complete = false; }
   }
   const highest = complete ? assignTier(combined, config) : null;
   const assigned = complete ? assignSelectedTier(combined, config, selectedTier) : null;
@@ -95,7 +95,7 @@ export default function Register() {
     try {
       const payload = { teamId: id.current, selectedTier, consent, rulesAccepted: accepted };
       for (const [key, value] of Object.entries(players)) payload[key] = { [key === 'captain' ? 'firstName' : 'fullName']: value.name.trim(), singlesUtr: parseUtr(value.singles), doublesUtr: value.doubles.trim() ? parseUtr(value.doubles) : null };
-      validateRegistration(payload, settings, config);
+      validateRegistration(payload, settings, config, gap);
       setBusy(true);
       setSuccess(await service.register(payload));
       setPlayers(emptyPlayers()); setConsent(false); setStep(0); id.current = crypto.randomUUID();
@@ -175,10 +175,10 @@ export default function Register() {
           </div>
           <UtrMeter tiers={active} value={combined} />
           <ul className="preview-players">
-            {PLAYERS.map(p => <li key={p.key} className={filled(p.key) ? 'done' : ''}><span>{p.title}</span><b>{players[p.key].name.trim() || '—'}</b><em>{rating(players[p.key]).averaged && <small>avg</small>}{formatUtr(rating(players[p.key]).value)}</em></li>)}
+            {PLAYERS.map(p => <li key={p.key} className={filled(p.key) ? 'done' : ''}><span>{p.title}</span><b>{players[p.key].name.trim() || '—'}</b><em>{rating(players[p.key], gap).averaged && <small>avg</small>}{formatUtr(rating(players[p.key], gap).value)}</em></li>)}
           </ul>
           <div className="preview-notes">
-            <p><strong>Rating rule.</strong> Each player counts at the higher of singles or doubles UTR. If the two are more than 1.75 apart, their average counts instead.</p>
+            <p><strong>Rating rule.</strong> Each player counts at the higher of singles or doubles UTR. If the two are more than {formatUtr(gap)} apart, their average counts instead.</p>
             <p><strong>Privacy.</strong> The captain’s first name and all three UTRs are public. The admin controls whether Ace names are masked.</p>
           </div>
           {blockers.map(text => <Message key={text}>{text}</Message>)}

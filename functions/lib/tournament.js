@@ -8,10 +8,14 @@ export const formatUtr = value => (value / 100).toFixed(2);
 // A player counts at the higher of singles and doubles, unless the two are more than 1.75 apart:
 // then the average counts (rounded to the nearest hundredth). Ratings are integer hundredths.
 export const UTR_GAP_LIMIT = 175;
-export function playerUtr(singlesUtr, doublesUtr = null) {
+export function playerUtr(singlesUtr, doublesUtr = null, gapLimit = UTR_GAP_LIMIT) {
   if (doublesUtr == null) return singlesUtr;
-  return Math.abs(singlesUtr - doublesUtr) > UTR_GAP_LIMIT ? Math.round((singlesUtr + doublesUtr) / 2) : Math.max(singlesUtr, doublesUtr);
+  return Math.abs(singlesUtr - doublesUtr) > gapLimit ? Math.round((singlesUtr + doublesUtr) / 2) : Math.max(singlesUtr, doublesUtr);
 }
+// League rules the admin can change. Missing values (older saved data) fall back to these defaults.
+export const DEFAULT_LEAGUE_RULES = { utrGapLimit: 175, pointsPerWin: 2, playoffThreshold: 7, playoffSpotsLarge: 4, playoffSpotsSmall: 3, singlesMinPercent: 40 };
+export const rulesOf = state => ({ ...DEFAULT_LEAGUE_RULES, ...(state?.leagueRules || {}) });
+export const DEFAULT_SEASON_NAME = `${new Date().getFullYear()} season`;
 export function parseUtr(value) {
   const text = String(value ?? '').trim();
   if (!/^\d{1,2}(\.\d{1,2})?$/.test(text)) throw new ValidationError('Enter a numeric UTR with up to two decimal places.');
@@ -61,7 +65,7 @@ export function listedTiers(combinedUtr, config, selectedTier) {
   const assigned = assignSelectedTier(combinedUtr, config, selectedTier);
   return assigned ? selectedTier === 'both' ? ['goat', 'rising'] : [assigned] : [];
 }
-function player(value, captain, settings) {
+function player(value, captain, settings, gapLimit) {
   exact(value, [captain ? 'firstName' : 'fullName', 'singlesUtr', 'doublesUtr'], 'Invalid player fields.');
   const key = captain ? 'firstName' : 'fullName';
   const label = captain ? 'Captain first name' : 'Ace full name';
@@ -69,9 +73,9 @@ function player(value, captain, settings) {
   if (captain) assert(!/\s/.test(clean), 'Enter only the captain’s first name, without a surname.');
   assert(integer(value.singlesUtr, settings.minPlayerUtr, settings.maxPlayerUtr), `${label}: UTR must be ${formatUtr(settings.minPlayerUtr)}–${formatUtr(settings.maxPlayerUtr)}.`);
   assert(value.doublesUtr === null || integer(value.doublesUtr, settings.minPlayerUtr, settings.maxPlayerUtr), `${label}: optional doubles UTR must be within the individual limits.`);
-  return { [key]: clean, singlesUtr: value.singlesUtr, doublesUtr: value.doublesUtr, utr: playerUtr(value.singlesUtr, value.doublesUtr) };
+  return { [key]: clean, singlesUtr: value.singlesUtr, doublesUtr: value.doublesUtr, utr: playerUtr(value.singlesUtr, value.doublesUtr, gapLimit) };
 }
-export function validateRegistration(payload, settings, tiers) {
+export function validateRegistration(payload, settings, tiers, gapLimit = UTR_GAP_LIMIT) {
   validateSettings(settings); validateTierConfig(tiers);
   assert(settings.registrationEnabled, 'Registration is currently closed.');
   exact(payload, ['teamId', 'captain', 'ace1', 'ace2', 'selectedTier', 'consent', 'rulesAccepted'], 'Invalid registration fields.');
@@ -79,7 +83,7 @@ export function validateRegistration(payload, settings, tiers) {
   assert(payload.consent === true, 'Player consent is required.');
   assert(payload.rulesAccepted === true, 'Read and accept the tournament rules before registering.');
   assert(payload.selectedTier === 'higher' || payload.selectedTier === 'both' || (typeof payload.selectedTier === 'string' && Object.hasOwn(tiers, payload.selectedTier) && tiers[payload.selectedTier].active), 'Select an active tier or the higher-tier interest option.');
-  const captain = player(payload.captain, true, settings), ace1 = player(payload.ace1, false, settings), ace2 = player(payload.ace2, false, settings);
+  const captain = player(payload.captain, true, settings, gapLimit), ace1 = player(payload.ace1, false, settings, gapLimit), ace2 = player(payload.ace2, false, settings, gapLimit);
   const combinedUtr = captain.utr + ace1.utr + ace2.utr, assignedTier = assignSelectedTier(combinedUtr, tiers, payload.selectedTier);
   assert(assignedTier, 'Your team does not qualify for the selected tier. Choose an eligible tier or contact the tournament admin.');
   return { teamId: payload.teamId, captain, ace1, ace2, combinedUtr, selectedTier: payload.selectedTier, assignedTier, listedTiers: listedTiers(combinedUtr, tiers, payload.selectedTier), rulesAccepted: true };
@@ -88,12 +92,12 @@ export function publicRecord(team, settings = DEFAULT_SETTINGS) {
   return { teamId: team.teamId, captainFirstName: team.captain.firstName, captainUtr: team.captain.utr, ace1Utr: team.ace1.utr, ace2Utr: team.ace2.utr, ...(!settings.aceNameMaskingEnabled && team.rulesAccepted === true ? { ace1Name: team.ace1.fullName, ace2Name: team.ace2.fullName } : {}), combinedUtr: team.combinedUtr, assignedTier: team.assignedTier, registeredAt: team.registeredAt };
 }
 export function initialState() { return { settings: { ...DEFAULT_SETTINGS }, tierConfig: structuredClone(DEFAULT_TIERS), configRevision: 1, registrations: {}, tiers: {} }; }
-export function publicState(state) { return { settings: state.settings, tierConfig: state.tierConfig || {}, configRevision: state.configRevision || 0, tiers: state.tiers || {}, fixtures: state.fixtures || {} }; }
+export function publicState(state) { return { settings: state.settings, tierConfig: state.tierConfig || {}, configRevision: state.configRevision || 0, tiers: state.tiers || {}, fixtures: state.fixtures || {}, leagueRules: rulesOf(state), season: state.season || { name: DEFAULT_SEASON_NAME }, seasons: state.seasons || {} }; }
 function canonical(value) { return JSON.stringify(value, (_, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).filter(key => item[key] !== null && item[key] !== undefined).sort().map(key => [key, item[key]])) : item); }
 export function applyRegistration(current, payload, uid, now = Date.now()) {
   assert(typeof uid === 'string' && uid.length > 0, 'Sign in before registering.');
   assert(current?.settings, 'The admin must initialize tournament settings first.');
-  const team = validateRegistration(payload, current.settings, current.tierConfig || {});
+  const team = validateRegistration(payload, current.settings, current.tierConfig || {}, rulesOf(current).utrGapLimit);
   const state = structuredClone(current), previous = state.registrations?.[team.teamId];
   if (previous) {
     const { ownerUid, registeredAt, ...saved } = previous;
@@ -126,7 +130,7 @@ export function applyRecalculation(current) {
   state.tiers = {}; state.teamsByOwner = {};
   for (const team of Object.values(state.registrations || {})) {
     if (team.ownerUid) { state.teamsByOwner[team.ownerUid] ||= {}; state.teamsByOwner[team.ownerUid][team.teamId] = true; }
-    for (const key of ['captain', 'ace1', 'ace2']) if (Number.isInteger(team[key].singlesUtr)) team[key].utr = playerUtr(team[key].singlesUtr, team[key].doublesUtr ?? null);
+    for (const key of ['captain', 'ace1', 'ace2']) if (Number.isInteger(team[key].singlesUtr)) team[key].utr = playerUtr(team[key].singlesUtr, team[key].doublesUtr ?? null, rulesOf(state).utrGapLimit);
     const total = team.captain.utr + team.ace1.utr + team.ace2.utr;
     const assigned = assignSelectedTier(total, state.tierConfig, team.selectedTier);
     summary.reviewed++; if (assigned === (team.assignedTier ?? null) && JSON.stringify(listedTiers(total, state.tierConfig, team.selectedTier)) === JSON.stringify(team.listedTiers || (team.assignedTier ? [team.assignedTier] : []))) summary.unchanged++; else summary.moved++;
@@ -141,4 +145,20 @@ export function registrationsCsv(teams, tiers) {
   const cell = value => { let text = String(value ?? ''); if (/^[\s]*[=+@-]/.test(text)) text = "'" + text; return '"' + text.replaceAll('"', '""') + '"'; };
   const rows = Object.values(teams || {}).map(t => [t.teamId, t.captain.firstName, formatUtr(t.captain.utr), t.ace1.fullName, formatUtr(t.ace1.utr), t.ace2.fullName, formatUtr(t.ace2.utr), formatUtr(t.combinedUtr), tiers[t.selectedTier]?.name || t.selectedTier, tiers[t.assignedTier]?.name || 'Unassigned', new Date(t.registeredAt).toISOString()]);
   return [columns, ...rows].map(row => row.map(cell).join(',')).join('\r\n');
+}
+
+export function validateLeagueRules(value) {
+  exact(value, Object.keys(DEFAULT_LEAGUE_RULES), 'Invalid league rules.');
+  assert(integer(value.utrGapLimit, 0, 1650), 'The singles/doubles gap must be between 0.00 and 16.50.');
+  assert(integer(value.pointsPerWin, 1, 10), 'Points per encounter win must be 1–10.');
+  assert(integer(value.playoffThreshold, 2, 64), 'The playoff team threshold must be 2–64.');
+  assert(integer(value.playoffSpotsSmall, 2, 4) && integer(value.playoffSpotsLarge, 2, 4), 'Playoff spots must be 2, 3 or 4.');
+  assert(integer(value.singlesMinPercent, 0, 100), 'The singles minimum must be 0–100%.');
+  return { ...value };
+}
+export function applyLeagueRules(current, payload) {
+  assert(current?.settings, 'Save the initial tournament configuration first.');
+  const state = structuredClone(current);
+  state.leagueRules = validateLeagueRules(payload);
+  return { state, result: { leagueRules: state.leagueRules } };
 }

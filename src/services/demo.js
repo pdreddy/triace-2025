@@ -24,6 +24,8 @@ export function createDemoService() {
     recalculate: () => request('recalculate', {}),
     generateFixtures: payload => request('generate-fixtures', payload),
     generatePlayoffs: payload => request('generate-playoffs', payload),
+    saveLeagueRules: payload => request('league-rules', payload),
+    manageSeason: payload => request('season', payload),
     submitResult: payload => request('submit-result', payload),
     reviewResult: payload => request('review-result', payload)
   };

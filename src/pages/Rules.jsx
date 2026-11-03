@@ -1,10 +1,9 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useRulesAccess } from '../hooks/useRulesAccess';
 import { Icon } from '../components/Icons';
-import { RULE_CARDS } from '../rules/cards';
-
-const COUNT = RULE_CARDS.length;
+import { ruleCards } from '../rules/cards';
+import { useTournament } from '../hooks/useTournament';
 
 // Played on every card change: a racquet swings and three balls bounce across the card.
 function Rally() {
@@ -23,6 +22,9 @@ function Rally() {
 
 export default function Rules() {
   const { accepted, accept } = useRulesAccess();
+  const { data } = useTournament();
+  const RULE_CARDS = useMemo(() => ruleCards(data?.tierConfig, data?.leagueRules), [data?.tierConfig, data?.leagueRules]);
+  const COUNT = RULE_CARDS.length;
   const track = useRef(null);
   const [current, setCurrent] = useState(0), [seen, setSeen] = useState([0]), [checked, setChecked] = useState(false);
   const allSeen = seen.length === COUNT, last = current === COUNT - 1;

@@ -15,6 +15,7 @@ const League = lazy(() => import('./pages/League'));
 const Team = lazy(() => import('./pages/Team'));
 const Players = lazy(() => import('./pages/Players'));
 const Player = lazy(() => import('./pages/Player'));
+const History = lazy(() => import('./pages/History'));
 
 const FRIENDLY_ERROR = 'We can’t reach the tournament right now. Please check your connection and try again shortly.';
 const SCREENS = { '/': 'rules', '/register': 'register', '/tiers': 'tiers', '/league': 'league', '/players': 'players', '/admin/login': 'login', '/admin': 'admin' };
@@ -40,7 +41,7 @@ function Layout() {
   const { service, connected, error, user } = useTournament();
   const { accepted } = useRulesAccess();
   const { canInstall, install, online, updated } = usePwa();
-  const path = useLocation().pathname, screen = SCREENS[path] || (path.startsWith('/team/') ? 'team' : path.startsWith('/player/') ? 'player' : 'other');
+  const path = useLocation().pathname, screen = SCREENS[path] || (path.startsWith('/team/') ? 'team' : path.startsWith('/player/') ? 'player' : path.startsWith('/history') ? 'history' : 'other');
   const [logoutError, setLogoutError] = useState(''), [loggingOut, setLoggingOut] = useState(false);
 
   async function logout() {
@@ -86,6 +87,8 @@ function Layout() {
             <Route path="/team/:teamId" element={<Team />} />
             <Route path="/players" element={<Players />} />
             <Route path="/player/:teamId/:role" element={<Player />} />
+            <Route path="/history" element={<History />} />
+            <Route path="/history/:seasonId" element={<History />} />
             <Route path="/admin/login" element={<Login />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="*" element={<NotFound />} />

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useTournament, useMyTeams } from '../hooks/useTournament';
 import { EmptyState, Message, tierTone } from '../components/UI';
 import { Bracket, FixtureCard, StandingsTable, teamIndex } from '../components/League';
@@ -16,7 +17,7 @@ export default function League() {
   const fixtures = all.filter(f => !f.stage).sort((a, b) => a.round - b.round || a.id.localeCompare(b.id));
   const shown = mineOnly ? fixtures.filter(f => mine.has(f.home) || mine.has(f.away)) : fixtures;
   const rounds = [...new Set(shown.map(f => f.round))];
-  const rows = tier ? standings(Object.values(data?.tiers?.[tier.id]?.teams || {}), data?.fixtures?.[tier.id]) : [];
+  const rows = tier ? standings(Object.values(data?.tiers?.[tier.id]?.teams || {}), data?.fixtures?.[tier.id], data?.leagueRules) : [];
   const played = fixtures.filter(f => f.status === 'final').length;
 
   async function submit(fixture, entry) {
@@ -27,9 +28,9 @@ export default function League() {
   return (
     <section className="page league-screen">
       <header className="page-head">
-        <p className="eyebrow">Round robin · {played} of {fixtures.length} encounters played</p>
+        <p className="eyebrow">{data?.season?.name || 'This season'} · {played} of {fixtures.length} encounters played</p>
         <h1>The <em>league.</em></h1>
-        <p>Live standings and every fixture. Captains submit their scores here; the admin approves them.</p>
+        <p>Live standings and every fixture. Captains submit their scores here; the admin approves them. <Link className="text-link" to="/history">Past seasons →</Link></p>
       </header>
 
       {!data && <div className="skeleton-list" aria-busy="true" aria-label="Loading the league">{[0, 1, 2].map(i => <div key={i} className="skeleton-card" />)}</div>}
@@ -51,7 +52,7 @@ export default function League() {
           </div>
           <Message>{message}</Message>
 
-          {view === 'standings' && (rows.length ? <StandingsTable rows={rows} highlight={mine} /> : <EmptyState title="No teams in this tier yet." />)}
+          {view === 'standings' && (rows.length ? <StandingsTable rows={rows} highlight={mine} rules={data?.leagueRules} /> : <EmptyState title="No teams in this tier yet." />)}
 
           {view === 'playoffs' && (playoffs.length
             ? <Bracket fixtures={playoffs} teams={teams} mine={mine} admin={!!user?.admin} onSubmit={submit} />

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { initialState, applyRegistration, applyRecalculation } from '../../functions/lib/tournament.js';
-import { roundRobin, applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult, standings, playoffSpots, encounterWinner, deriveLineup, matchPlayers, playerRatings, playerId, gameShare } from '../../functions/lib/league.js';
+import { initialState, applyRegistration, applyRecalculation, applyLeagueRules, publicState, rulesOf, DEFAULT_LEAGUE_RULES } from '../../functions/lib/tournament.js';
+import { roundRobin, applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult, standings, playoffSpots, encounterWinner, deriveLineup, matchPlayers, playerRatings, playerId, gameShare, singlesEligibility, applyManageSeason } from '../../functions/lib/league.js';
 
 const team = (captain, id, values = [600, 600, 600]) => ({ teamId: id, captain: { firstName: captain, singlesUtr: values[0], doublesUtr: null }, ace1: { fullName: `${captain} Ace One`, singlesUtr: values[1], doublesUtr: null }, ace2: { fullName: `${captain} Ace Two`, singlesUtr: values[2], doublesUtr: null }, selectedTier: 'goat', consent: true, rulesAccepted: true });
 const result = (...winners) => [{ key: 'd1', winner: winners[0], score: '6-4 6-4' }, { key: 'd2', winner: winners[1], score: '3-6 6-3 10-8' }, { key: 's', winner: winners[2], score: '6-2 6-1' }];
@@ -146,4 +146,67 @@ test('ratings move with game share against expectation and track each player his
   assert.equal(homeCaptain.history.length, 2); assert.equal(homeCaptain.wins + homeCaptain.losses, 2);
   assert.deepEqual([homeCaptain.doubles.wins, homeCaptain.singles.losses], [1, 1]);
   assert.equal(ratings.get(playerId(f.home, 'ace2')).history[0].match, 'Doubles 2');
+});
+
+test('league rules are validated, saved and change ratings, points and playoff spots', () => {
+  const base = initialState();
+  for (const bad of [{ ...DEFAULT_LEAGUE_RULES, pointsPerWin: 0 }, { ...DEFAULT_LEAGUE_RULES, playoffSpotsLarge: 5 }, { ...DEFAULT_LEAGUE_RULES, singlesMinPercent: 101 }, { ...DEFAULT_LEAGUE_RULES, extra: 1 }])
+    assert.throws(() => applyLeagueRules(base, bad));
+  const rules = { ...DEFAULT_LEAGUE_RULES, utrGapLimit: 250, pointsPerWin: 3, playoffThreshold: 3, playoffSpotsLarge: 2 };
+  const state = applyLeagueRules(base, rules).state;
+  assert.deepEqual(publicState(state).leagueRules, rules);
+  assert.deepEqual(publicState(initialState()).leagueRules, DEFAULT_LEAGUE_RULES, 'older data falls back to defaults');
+  const p = team('Gap', 'team_gap0000000000000000', [500, 600, 600]); p.captain.doublesUtr = 700;
+  assert.equal(applyRegistration(state, p, 'u').state.registrations.team_gap0000000000000000.captain.utr, 700, 'a 2.00 gap no longer averages when the limit is 2.50');
+  let s = league(4); s = applyLeagueRules(s, rules).state;
+  const f = Object.values(s.fixtures.goat)[0];
+  s = applySubmitResult(s, { tierId: 'goat', fixtureId: f.id, matches: result('home', 'home', 'home') }, 'admin', true).state;
+  assert.equal(standings(Object.values(s.tiers.goat.teams), s.fixtures.goat, rulesOf(s))[0].points, 3);
+  assert.equal(playoffSpots(4, rulesOf(s)), 2);
+});
+
+test('the admin can map playoff seeds manually, including a two-team final', () => {
+  const state = league(5), ids = Object.keys(state.registrations);
+  const four = applyGeneratePlayoffs(state, { tierId: 'goat', seeds: [ids[4], ids[3], ids[2], ids[1]] }).state.fixtures.goat;
+  assert.deepEqual([four['po-sf1'].home, four['po-sf1'].away, four['po-sf2'].home, four['po-sf2'].away], [ids[4], ids[2], ids[3], ids[1]]);
+  const two = applyGeneratePlayoffs(state, { tierId: 'goat', seeds: [ids[0], ids[1]] }).state.fixtures.goat;
+  assert.deepEqual([two['po-final'].home, two['po-final'].away, two['po-final'].status], [ids[0], ids[1], 'scheduled']);
+  assert.equal(Object.values(two).filter(f => !f.stage).length, 10, 'league fixtures are kept');
+  assert.throws(() => applyGeneratePlayoffs(state, { tierId: 'goat', seeds: [ids[0], ids[0], ids[1]] }), /different team/);
+  assert.throws(() => applyGeneratePlayoffs(state, { tierId: 'goat', seeds: [ids[0], 'team_not_in_this_tier00'] }), /different team/);
+  assert.throws(() => applyGeneratePlayoffs(state, { tierId: 'goat', seeds: [ids[0]] }), /2, 3 or 4/);
+  let done = applySubmitResult(applyGeneratePlayoffs(state, { tierId: 'goat', seeds: [ids[0], ids[1]] }).state, { tierId: 'goat', fixtureId: 'po-final', matches: po('away', 'away', 'away') }, 'admin', true).state;
+  assert.equal(done.fixtures.goat['po-final'].result.winner, 'away');
+});
+
+test('singles minimum counts singles days against the share of scheduled match days', () => {
+  let state = league(6);
+  const teamId = Object.keys(state.registrations)[0], mine = Object.values(state.fixtures.goat).filter(f => f.home === teamId || f.away === teamId);
+  assert.equal(mine.length, 5);
+  for (const f of mine.slice(0, 3)) state = applySubmitResult(state, { tierId: 'goat', fixtureId: f.id, matches: result('home', 'home', 'home'), lineups: { home: { d1: ['ace1', 'ace2'], d2Partner: 'ace2' }, away: { d1: ['ace1', 'ace2'], d2Partner: 'ace2' } } }, 'admin', true).state;
+  const check = singlesEligibility(teamId, state.fixtures.goat);
+  assert.deepEqual([check.matchDays, check.required, check.left], [5, 2, 2]);
+  assert.deepEqual(check.players.ace1, { days: 3, met: true, possible: true }, 'ace1 is left out of Doubles 2 and plays every singles');
+  assert.deepEqual(check.players.captain, { days: 0, met: false, possible: true });
+  assert.equal(singlesEligibility(teamId, state.fixtures.goat, { ...DEFAULT_LEAGUE_RULES, singlesMinPercent: 100 }).players.captain.possible, false);
+});
+
+test('closing a season archives it publicly and privately, then starts a clean season', () => {
+  let state = finishLeague(league(3), 3);
+  const ids = Object.keys(state.registrations);
+  state = applyGeneratePlayoffs(state, { tierId: 'goat' }).state;
+  state = applySubmitResult(state, { tierId: 'goat', fixtureId: 'po-elim', matches: po('home', 'home', 'home') }, 'admin', true).state;
+  state = applySubmitResult(state, { tierId: 'goat', fixtureId: 'po-final', matches: po('away', 'away', 'away') }, 'admin', true).state;
+  state = applyManageSeason(state, { action: 'rename', name: 'Spring 2026' }).state;
+  assert.throws(() => applyManageSeason(state, { action: 'archive', name: 'Autumn 2026', confirm: 'wrong' }), /Type the current season name/);
+  const { state: next, result: outcome } = applyManageSeason(state, { action: 'archive', name: 'Autumn 2026', confirm: 'Spring 2026' }, 5000);
+  const season = next.seasons[outcome.archived];
+  assert.equal(season.name, 'Spring 2026');
+  assert.deepEqual(season.champions.goat, { winner: ids[1], runnerUp: ids[0] });
+  assert.equal(Object.keys(season.tiers.goat.teams).length, 3);
+  assert.equal(Object.keys(next.archive[outcome.archived].registrations).length, 3, 'private registrations are kept for the admin');
+  assert.deepEqual([Object.keys(next.registrations).length, Object.keys(next.fixtures).length, Object.keys(next.tiers).length], [0, 0, 0]);
+  assert.deepEqual(next.season, { name: 'Autumn 2026', startedAt: 5000 });
+  assert.equal(publicState(next).seasons[outcome.archived].name, 'Spring 2026');
+  assert.equal(publicState(next).archive, undefined, 'the private archive is never public');
 });

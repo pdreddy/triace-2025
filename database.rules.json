@@ -26,6 +26,15 @@
         "$uid": {
           ".read": "auth != null && auth.uid === $uid"
         }
+      },
+      "leagueRules": {
+        ".read": true
+      },
+      "season": {
+        ".read": true
+      },
+      "seasons": {
+        ".read": true
       }
     }
   }

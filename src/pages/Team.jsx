@@ -1,10 +1,10 @@
 import { Link, useParams } from 'react-router-dom';
 import { useTournament, useMyTeams } from '../hooks/useTournament';
 import { EmptyState, Stat, tierTone } from '../components/UI';
-import { FixtureCard, teamIndex, teamName } from '../components/League';
+import { FixtureCard, teamIndex, teamName, playerName } from '../components/League';
 import { Icon } from '../components/Icons';
 import { orderedTiers, formatUtr } from '../../functions/lib/tournament.js';
-import { standings, playerId } from '../../functions/lib/league.js';
+import { standings, playerId, singlesEligibility, ROLES } from '../../functions/lib/league.js';
 import { useRatings } from './Players';
 
 // A team profile: players and ratings, league record, and every fixture, like a player card in the UTR app.
@@ -18,7 +18,7 @@ export default function Team() {
   if (!team) return <section className="page"><EmptyState title="Team not found.">This team isn’t in any tier right now. <Link className="secondary" to="/tiers">Back to the lineup</Link></EmptyState></section>;
 
   const tiers = orderedTiers(data.tierConfig || {}).filter(t => data.tiers?.[t.id]?.teams?.[teamId]);
-  const records = tiers.map(t => ({ tier: t, row: standings(Object.values(data.tiers[t.id].teams), data.fixtures?.[t.id]).find(r => r.team.teamId === teamId), fixtures: Object.values(data.fixtures?.[t.id] || {}).filter(f => f.home === teamId || f.away === teamId).sort((a, b) => a.round - b.round) }));
+  const records = tiers.map(t => ({ tier: t, row: standings(Object.values(data.tiers[t.id].teams), data.fixtures?.[t.id], data.leagueRules).find(r => r.team.teamId === teamId), fixtures: Object.values(data.fixtures?.[t.id] || {}).filter(f => f.home === teamId || f.away === teamId).sort((a, b) => a.round - b.round) }));
   const total = records.reduce((sum, r) => ({ won: sum.won + (r.row?.won || 0), lost: sum.lost + (r.row?.lost || 0) }), { won: 0, lost: 0 });
   const mine = Object.hasOwn(myTeams, teamId);
   const players = [['captain', 'Captain', team.captainFirstName, team.captainUtr], ['ace1', 'Ace 1', team.ace1Name || 'Ace 1 (masked)', team.ace1Utr], ['ace2', 'Ace 2', team.ace2Name || 'Ace 2 (masked)', team.ace2Utr]];
@@ -47,13 +47,22 @@ export default function Team() {
           const r = ratingOf(role);
           return <li key={role}><span>{label}</span><Link to={`/player/${teamId}/${role}`}><b>{name}</b></Link><small>UTR {formatUtr(utr)}</small><em>{r ? r.rating.toFixed(2) : formatUtr(utr)}</em></li>;
         })}</ul>
-        <p className="small">Right: live Triace rating. Starting point is the counted UTR: the higher of singles and doubles, or their average when they are more than 1.75 apart.</p>
+        <p className="small">Right: live Triace rating. Starting point is the counted UTR: the higher of singles and doubles, or their average when they are more than {formatUtr(data.leagueRules?.utrGapLimit ?? 175)} apart.</p>
       </section>
 
       {records.map(({ tier, row, fixtures }) => (
         <section key={tier.id} className="tier-group">
           <div className="tier-head"><div><h2>{tier.name} fixtures</h2>{row && <span>Form {row.form.join(' ') || '—'} · {row.matchesWon}–{row.matchesLost} matches</span>}</div></div>
           {!fixtures.length && <EmptyState icon="calendar" title="No fixtures yet." />}
+          {fixtures.length > 0 && (() => {
+            const check = singlesEligibility(teamId, data.fixtures?.[tier.id], data.leagueRules), pct = data.leagueRules?.singlesMinPercent ?? 40;
+            return (
+              <div className="singles-check">
+                <p className="small">Singles minimum: {pct}% of {check.matchDays} match days = <strong>{check.required}</strong> singles days each{check.left ? ` · ${check.left} match days left` : ''}.</p>
+                <ul>{ROLES.map(r => { const p = check.players[r], state = p.met ? 'met' : p.possible ? 'open' : 'missed'; return <li key={r} className={state}><b>{playerName(team, r)}</b><span>{p.days}/{check.required}</span><em>{state === 'met' ? 'Eligible' : state === 'open' ? `Needs ${check.required - p.days} more` : 'Can’t reach the minimum'}</em></li>; })}</ul>
+              </div>
+            );
+          })()}
           <div className="fixture-list">
             {fixtures.map(f => <FixtureCard key={f.id} fixture={f} teams={teams} mine={mine} admin={!!user?.admin} onSubmit={entry => service.submitResult({ tierId: tier.id, fixtureId: f.id, ...entry })} />)}
           </div>
