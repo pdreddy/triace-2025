@@ -398,6 +398,7 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
 @media (prefers-reduced-motion: reduce) { .hero-tier-meter .meter-band, .hero-tier-tile { animation: none; } }
 .rule-grid { display: grid; gap: 14px; }
 .rule-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.playoff-direct { grid-column: 1 / -1; }
 .rule-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .rule-box { display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: var(--r); background: #0b172499; border: 1px solid var(--line); }
 .rule-box.center { align-items: center; text-align: center; }

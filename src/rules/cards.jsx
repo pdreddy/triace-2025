@@ -56,7 +56,7 @@ function Match({ title, seeds, final = false }) {
 export function ruleCards(tierConfig = DEFAULT_TIERS, rules = DEFAULT_LEAGUE_RULES) {
   const tiers = orderedTiers(tierConfig, true).sort((a, b) => a.minCombinedUtr - b.minCombinedUtr);
   const configuredShowcase = orderedTiers(tierConfig, false).filter(t => t.id === 'rising' || t.id === 'goat');
-  const showcase = configuredShowcase.length ? configuredShowcase : orderedTiers(DEFAULT_TIERS, false);
+  const showcase = (configuredShowcase.length ? configuredShowcase : orderedTiers(DEFAULT_TIERS, false)).sort((a, b) => a.minCombinedUtr - b.minCombinedUtr);
   const sampleRanges = !configuredShowcase.length;
   const rising = showcase.find(t => t.id === 'rising'), goat = showcase.find(t => t.id === 'goat');
   const sharedBoundary = rising && goat && rising.maxCombinedUtr === goat.minCombinedUtr && (sampleRanges || (rising.active && goat.active));
@@ -84,7 +84,7 @@ export function ruleCards(tierConfig = DEFAULT_TIERS, rules = DEFAULT_LEAGUE_RUL
             {showcase.map(t => <div key={t.id} className={`hero-tier-tile ${t.id}${t.active && !sampleRanges ? '' : ' inactive'}`}><strong>{t.name}</strong><span>{formatUtr(t.minCombinedUtr)}–{formatUtr(t.maxCombinedUtr)} combined UTR</span>{(sampleRanges || !t.active) && <small>{sampleRanges ? 'Example range · awaiting admin setup' : 'Currently closed'}</small>}</div>)}
           </div>
           <UtrMeter tiers={tiers.length ? tiers : showcase} />
-          {sharedBoundary && <p className="rule-text">{sampleRanges ? 'Example: ' : ''}Rising covers up to {formatUtr(rising.maxCombinedUtr)}. At exactly {formatUtr(goat.minCombinedUtr)}, GOAT has priority; above it, GOAT continues through {formatUtr(goat.maxCombinedUtr)}.</p>}
+          {sharedBoundary && <p className="rule-text">{sampleRanges ? 'Example automatic placement: ' : 'Automatic placement: '}Rising {formatUtr(rising.minCombinedUtr)}–{formatUtr(rising.maxCombinedUtr - 1)}; GOAT {formatUtr(goat.minCombinedUtr)}–{formatUtr(goat.maxCombinedUtr)}. At exactly {formatUtr(goat.minCombinedUtr)}, GOAT takes priority. A GOAT-qualified team may still choose Rising.</p>}
           {!sharedBoundary && <p className="rule-text">Your three players’ combined UTR determines which active tier you qualify for. Where ranges overlap, the higher-priority tier wins.</p>}
         </div>
         <p className="rule-hint">Swipe or tap Next to flip through every rule <Icon name="arrow" size={16} /></p>
@@ -132,13 +132,13 @@ export function ruleCards(tierConfig = DEFAULT_TIERS, rules = DEFAULT_LEAGUE_RUL
     body: (
       <>
         <Head num="03" title="Match format · round robin" />
-        <p className="rule-text">Every round-robin encounter is <strong>three matches: two doubles, then one singles</strong>, played in this order.</p>
+        <p className="rule-text">In round robin, <strong>each team meets every other team once</strong>; an odd number of teams means one bye per round. An encounter has <strong>three matches: Doubles 1, Doubles 2, then Singles</strong>. Win two of the three to win the encounter.</p>
         <ol className="rule-steps three">
           <li><strong>Doubles 1</strong><span>Any two players pair up.</span><span className="chips"><span className="chip on">P1 + P2</span></span></li>
           <li><strong>Doubles 2</strong><span>The third player pairs with one of the Doubles 1 players. The Doubles 1 pair can’t play together again.</span><span className="chips"><span className="chip on">P1 + P3</span><span className="chip on">P2 + P3</span><span className="chip off">P1 + P2</span></span></li>
           <li><strong>Singles</strong><span>The player who sat out Doubles 2 plays the singles.</span><span className="chips"><span className="chip on">P2</span></span></li>
         </ol>
-        <p className="rule-text">Example: P1 + P2 play Doubles 1, P1 + P3 play Doubles 2, and P2 plays the singles. Every player plays exactly two matches.</p>
+        <p className="rule-text">Example: P1 + P2 play Doubles 1, P1 + P3 play Doubles 2, and P2 plays Singles. P1 and P2 each play twice; P3 plays once.</p>
       </>
     )
   },
@@ -225,6 +225,7 @@ export function ruleCards(tierConfig = DEFAULT_TIERS, rules = DEFAULT_LEAGUE_RUL
     body: (
       <>
         <Head num="06" title="Playoff format" />
+        <p className="rule-text">After round robin, the qualifying teams enter a knockout bracket. Each playoff encounter is best of five; the first team to win three matches advances.</p>
         <div className="rule-grid two">
           <div className="rule-box">
             <span className="rule-label">If the top 4 qualify</span>
@@ -241,6 +242,7 @@ export function ruleCards(tierConfig = DEFAULT_TIERS, rules = DEFAULT_LEAGUE_RUL
               <Match title="Final" final seeds={[['1', '1st place'], ['', 'Winner Eliminator']]} />
             </div>
           </div>
+          <div className="rule-box playoff-direct"><span className="rule-label">If the top 2 qualify</span><p className="rule-text">1st place meets 2nd place directly in the final.</p></div>
         </div>
       </>
     )
@@ -250,7 +252,7 @@ export function ruleCards(tierConfig = DEFAULT_TIERS, rules = DEFAULT_LEAGUE_RUL
     body: (
       <>
         <Head num="06" title="Every playoff encounter · best of 5" />
-        <p className="rule-text">Teams share their <strong>lines upfront</strong>, before the encounter starts.</p>
+        <p className="rule-text">Teams share their <strong>lineups upfront</strong>, before the encounter starts. Play in the order below. Stop when one team wins three matches; play the fifth-match super tiebreak only if the score is 2–2.</p>
         <ol className="rubbers">
           <li><Icon name="users" /><strong>Doubles 1</strong><span>Match 1</span><span className="chip on">P1 + P2</span></li>
           <li><Icon name="user" /><strong>Singles 1</strong><span>Match 2</span><span className="chip on">P3</span></li>
