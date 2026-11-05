@@ -1,8 +1,8 @@
 {
  "name": "Triace 2.0 Tournament",
  "short_name": "Triace",
- "description": "Tournament rules, team registration, and tier lists",
- "start_url": "/",
+ "description": "Traice tennis league: rules, team registration, tier lists, standings, fixtures, champions and past seasons",
+ "start_url": "/?source=pwa",
  "scope": "/",
  "display": "standalone",
  "background_color": "#0b1724",
@@ -21,13 +21,13 @@
    "purpose": "any"
   },
   {
-   "src": "/icon-192.png",
+   "src": "/icon-maskable-192.png",
    "sizes": "192x192",
    "type": "image/png",
    "purpose": "maskable"
   },
   {
-   "src": "/icon-512.png",
+   "src": "/icon-maskable-512.png",
    "sizes": "512x512",
    "type": "image/png",
    "purpose": "maskable"
@@ -35,7 +35,7 @@
  ],
  "id": "/",
  "lang": "en",
- "orientation": "portrait-primary",
+ "orientation": "any",
  "categories": [
   "sports",
   "games"
@@ -56,6 +56,19 @@
   {
    "name": "Tier list",
    "url": "/tiers"
+  },
+  {
+   "name": "League",
+   "url": "/league"
+  },
+  {
+   "name": "Champions",
+   "url": "/champions"
+  },
+  {
+   "name": "Past seasons",
+   "url": "/history"
   }
- ]
+ ],
+ "prefer_related_applications": false
 }

@@ -99,7 +99,7 @@ function SeasonList({ data }) {
   return (
     <section className="page history-screen">
       <header className="page-head">
-        <p className="eyebrow">Now playing · {data.season?.name}</p>
+        <p className="eyebrow">{data?.season?.name ? `Now playing · ${data.season.name}` : 'Season history'}</p>
         <h1>Past <em>seasons.</em></h1>
         <p>Every closed season keeps its final standings, playoffs and champions.</p>
       </header>
@@ -173,7 +173,6 @@ function SeasonDetail({ season }) {
 export default function History() {
   const { seasonId } = useParams();
   const { data } = useTournament();
-  if (!data) return <div className="page-loading" aria-busy="true"><span className="spinner" /> Loading history…</div>;
   if (!seasonId) return <SeasonList data={data} />;
   const season = seasonsOf(data)[seasonId];
   return season ? <SeasonDetail season={season} /> : <section className="page"><EmptyState title="Season not found."><Link className="secondary" to="/history">All seasons</Link></EmptyState></section>;

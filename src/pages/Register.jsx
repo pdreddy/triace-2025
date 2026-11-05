@@ -4,6 +4,7 @@ import { useTournament } from '../hooks/useTournament';
 import { useRulesAccess } from '../hooks/useRulesAccess';
 import { Field, Message, UtrMeter, tierTone } from '../components/UI';
 import { Icon } from '../components/Icons';
+import { earlyBirdStatus } from '../config/earlyBird.js';
 import { assignSelectedTier, assignTier, orderedTiers, parseUtr, formatUtr, validateRegistration, playerUtr, UTR_GAP_LIMIT, DEFAULT_TIERS } from '../../functions/lib/tournament.js';
 
 const PLAYERS = [
@@ -125,13 +126,15 @@ export default function Register() {
 
   const tierLocked = t => complete && !assignSelectedTier(combined, config, t.id);
   const goatFallback = selectedTier === 'goat_fallback_rising';
-  const fallbackAvailable = !!config.goat?.active && !!config.rising?.active && (!complete || ['goat', 'rising'].includes(highest));
+  const bird = earlyBirdStatus();
+  const fallbackAvailable =!!config.goat?.active && !!config.rising?.active && (!complete || ['goat', 'rising'].includes(highest));
   return (
     <section className="register-screen">
       <header className="page-head">
         <p className="eyebrow">Three players. One team.</p>
         <h1>Build your <em>trio.</em></h1>
         <p>Pick your tier, add your three players, and see where your team lands as you type.</p>
+        <p className={`early-bird ${bird.phase}`}><span className="pill">{bird.label}</span><span><strong>{bird.headline}.</strong> {bird.detail}</span></p>
       </header>
 
       <ol className="step-rail" aria-label="Registration steps">

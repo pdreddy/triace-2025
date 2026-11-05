@@ -39,7 +39,7 @@ function NotFound() {
 }
 
 function Layout() {
-  const { service, connected, error, user } = useTournament();
+  const { service, connected, error, user, savedAt } = useTournament();
   const { accepted } = useRulesAccess();
   const { canInstall, install, online, updated } = usePwa();
   const path = useLocation().pathname, screen = SCREENS[path] || (path.startsWith('/team/') ? 'team' : path.startsWith('/player/') ? 'player' : path.startsWith('/history') ? 'history' : 'other');
@@ -78,6 +78,7 @@ function Layout() {
 
       <main>
         {!online && <p className="banner offline" role="status"><Icon name="wifiOff" size={16} /> You’re offline. Saved pages still work; reconnect before registering.</p>}
+        {savedAt && <p className="banner offline" role="status"><Icon name="wifiOff" size={16} /> Showing data saved {new Date(savedAt).toLocaleString()}. It refreshes as soon as a connection is available.</p>}
         {updated && <p className="banner update" role="status"><Icon name="refresh" size={16} /> A new version is ready. <button type="button" onClick={() => location.reload()}>Reload</button></p>}
         <Message error>{shownError}</Message>
         <Suspense fallback={<div className="page-loading" aria-busy="true"><span className="spinner" /> Loading…</div>}>

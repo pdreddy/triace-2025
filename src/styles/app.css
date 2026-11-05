@@ -1164,3 +1164,14 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
 .schedule-list li i { font-size: 11px; font-style: normal; font-weight: 700; text-transform: uppercase; color: var(--muted); }
 .schedule-list li b:nth-of-type(2) { text-align: right; }
 @media (max-width: 700px) { .schedule-list li { grid-template-columns: 1fr auto 1fr; } .schedule-list li .pill { grid-column: 1 / -1; justify-self: start; } }
+
+/* Season format + early bird (rules opening card, registration page) */
+.hero-format { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0; }
+.hero-format > div { display: grid; gap: 2px; padding: 9px 14px; border-radius: var(--r); border: 1px solid var(--line); background: #ffffff08; font-size: 13.5px; color: var(--muted); }
+.hero-format strong { color: var(--lime); }
+.early-bird { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 0; padding: 8px 14px; border-radius: var(--r); border: 1px solid #f6c93b66; background: #f6c93b14; font-size: 14px; }
+.early-bird .pill { flex: none; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--ink); background: #f6c93b; }
+.early-bird.late { border-color: #ff8a6b66; background: #ff8a6b14; }
+.early-bird.late .pill { background: #ff8a6b; }
+.early-bird strong { color: #fff; }
+@media (max-width: 700px) { .hero-format { grid-template-columns: 1fr; gap: 6px; } .hero-format > div { padding: 7px 12px; font-size: 12.5px; } .early-bird { padding: 7px 12px; font-size: 12.5px; } .early-bird .pill { font-size: 11px; padding: 3px 10px; } }

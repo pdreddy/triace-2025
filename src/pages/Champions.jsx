@@ -13,7 +13,6 @@ const squad = team => (team?.superSixFullMembers || team?.fullMembers || team?.s
 
 export default function Champions() {
   const { data } = useTournament();
-  if (!data) return <div className="page-loading" aria-busy="true"><span className="spinner" /> Loading champions…</div>;
   const seasons = seasonList(data);
   return (
     <section className="page champions-screen">

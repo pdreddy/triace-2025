@@ -1,6 +1,7 @@
 import { Icon } from '../components/Icons';
 import { UtrMeter } from '../components/UI';
 import { formatUtr, orderedTiers, DEFAULT_TIERS, DEFAULT_LEAGUE_RULES } from '../../functions/lib/tournament.js';
+import { earlyBirdStatus } from '../config/earlyBird.js';
 
 // Minimum singles days for a few season lengths, grouped where the answer is the same.
 function singlesTable(percent) {
@@ -63,6 +64,7 @@ export function ruleCards(tierConfig = DEFAULT_TIERS, rules = DEFAULT_LEAGUE_RUL
   const gap = formatUtr(rules.utrGapLimit), pct = rules.singlesMinPercent;
   const exampleDoubles = 500 + rules.utrGapLimit + 25, exampleAverage = Math.round((500 + exampleDoubles) / 2);
   const exampleNeed = Math.floor((8 * pct) / 100);
+  const bird = earlyBirdStatus();
   return [
   {
     title: 'Triace 2.0',
@@ -78,6 +80,11 @@ export function ruleCards(tierConfig = DEFAULT_TIERS, rules = DEFAULT_LEAGUE_RUL
           <div><b>{pct}%</b><span>singles days per player</span></div>
           <div><b>Bo5</b><span>Best of 5 playoff matches. First to win 3 advances.</span></div>
         </div>
+        <div className="hero-format" aria-label="Season format">
+          <div><strong className="rule-label">Round-robin league</strong><span>Every team plays every other team in its tier once. Win 2 of 3 matches.</span></div>
+          <div><strong className="rule-label">Playoffs</strong><span>Top {rules.playoffSpotsSmall}–{rules.playoffSpotsLarge} teams per tier advance. Best of 5; first to 3 wins.</span></div>
+        </div>
+        <p className={`early-bird ${bird.phase}`}><span className="pill">{bird.label}</span><span>{bird.short}</span></p>
         <div className="hero-tier-meter">
           <strong className="rule-label">Find your team’s tier</strong>
           <div className="hero-tier-tiles">

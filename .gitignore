@@ -10,3 +10,4 @@ firebase-config.json
 .local-demo/
 test-results/
 playwright-report/
+dist-pwa/
