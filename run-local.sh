@@ -21,7 +21,8 @@ if [ "$NODE_MAJOR" -lt 22 ]; then echo "Node $(node -v) is too old; this app nee
 if [ ! -d node_modules ]; then echo "Installing dependencies…"; npm ci --no-audit --no-fund; fi
 
 # Use the caller's password if it is long enough, otherwise a fixed local one (the demo only listens on 127.0.0.1).
-if [ "${#TRAICE_ADMIN_PASSWORD:-}" -lt 8 ]; then export TRAICE_ADMIN_PASSWORD="demo-admin-1234"; fi
+PW="${TRAICE_ADMIN_PASSWORD:-}"
+if [ "${#PW}" -lt 8 ]; then export TRAICE_ADMIN_PASSWORD="demo-admin-1234"; fi
 
 if [ "$RUN_TESTS" = 1 ]; then npm test; fi
 
