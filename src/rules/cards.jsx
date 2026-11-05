@@ -55,8 +55,11 @@ function Match({ title, seeds, final = false }) {
 // league settings. Ratings are in hundredths of a UTR.
 export function ruleCards(tierConfig = DEFAULT_TIERS, rules = DEFAULT_LEAGUE_RULES) {
   const tiers = orderedTiers(tierConfig, true).sort((a, b) => a.minCombinedUtr - b.minCombinedUtr);
-  const rising = tiers.find(t => t.id === 'rising'), goat = tiers.find(t => t.id === 'goat');
-  const sharedBoundary = rising && goat && rising.maxCombinedUtr === goat.minCombinedUtr;
+  const configuredShowcase = orderedTiers(tierConfig, false).filter(t => t.id === 'rising' || t.id === 'goat');
+  const showcase = configuredShowcase.length ? configuredShowcase : orderedTiers(DEFAULT_TIERS, false);
+  const sampleRanges = !configuredShowcase.length;
+  const rising = showcase.find(t => t.id === 'rising'), goat = showcase.find(t => t.id === 'goat');
+  const sharedBoundary = rising && goat && rising.maxCombinedUtr === goat.minCombinedUtr && (sampleRanges || (rising.active && goat.active));
   const gap = formatUtr(rules.utrGapLimit), pct = rules.singlesMinPercent;
   const exampleDoubles = 500 + rules.utrGapLimit + 25, exampleAverage = Math.round((500 + exampleDoubles) / 2);
   const exampleNeed = Math.floor((8 * pct) / 100);
@@ -77,8 +80,11 @@ export function ruleCards(tierConfig = DEFAULT_TIERS, rules = DEFAULT_LEAGUE_RUL
         </div>
         <div className="hero-tier-meter">
           <strong className="rule-label">Find your team’s tier</strong>
-          <UtrMeter tiers={tiers} />
-          {sharedBoundary && <p className="rule-text">Rising covers up to {formatUtr(rising.maxCombinedUtr)}. At exactly {formatUtr(goat.minCombinedUtr)}, GOAT has priority; above it, GOAT continues through {formatUtr(goat.maxCombinedUtr)}.</p>}
+          <div className="hero-tier-tiles">
+            {showcase.map(t => <div key={t.id} className={`hero-tier-tile ${t.id}${t.active && !sampleRanges ? '' : ' inactive'}`}><strong>{t.name}</strong><span>{formatUtr(t.minCombinedUtr)}–{formatUtr(t.maxCombinedUtr)} combined UTR</span>{(sampleRanges || !t.active) && <small>{sampleRanges ? 'Example range · awaiting admin setup' : 'Currently closed'}</small>}</div>)}
+          </div>
+          <UtrMeter tiers={tiers.length ? tiers : showcase} />
+          {sharedBoundary && <p className="rule-text">{sampleRanges ? 'Example: ' : ''}Rising covers up to {formatUtr(rising.maxCombinedUtr)}. At exactly {formatUtr(goat.minCombinedUtr)}, GOAT has priority; above it, GOAT continues through {formatUtr(goat.maxCombinedUtr)}.</p>}
           {!sharedBoundary && <p className="rule-text">Your three players’ combined UTR determines which active tier you qualify for. Where ranges overlap, the higher-priority tier wins.</p>}
         </div>
         <p className="rule-hint">Swipe or tap Next to flip through every rule <Icon name="arrow" size={16} /></p>
@@ -111,8 +117,9 @@ export function ruleCards(tierConfig = DEFAULT_TIERS, rules = DEFAULT_LEAGUE_RUL
         <div className="rule-box">
           <span className="rule-label">How teams are placed</span>
           <ul className="ticks">
-            <li>When registering, a team can state a tier preference or choose <strong>“Interested in a higher UTR tier.”</strong></li>
-            <li>A team is placed in the <strong>highest active tier</strong> whose range includes its combined UTR, even if it preferred a lower tier.</li>
+            <li>Choose <strong>GOAT only</strong>, <strong>Rising only</strong>, <strong>both</strong>, or automatic placement in the highest eligible tier.</li>
+            <li>If you choose GOAT, check <strong>“Rising is okay”</strong> to use Rising only when your team does not qualify for GOAT. This enters one tier, not both.</li>
+            <li>GOAT-qualified teams may choose Rising; Rising-qualified teams cannot enter GOAT.</li>
             <li>If tier ranges overlap, the admin’s tier order decides placement.</li>
             <li>A team whose combined UTR is outside every active tier can’t register.</li>
           </ul>

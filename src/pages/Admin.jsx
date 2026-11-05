@@ -62,7 +62,7 @@ export default function Admin() {
   function addTier() {
     setError('');
     const id = newId.trim().toLowerCase();
-    if (!/^[a-z][a-z0-9_-]{0,39}$/.test(id) || ['higher', 'constructor', 'prototype'].includes(id) || Object.hasOwn(draft.tierConfig, id)) { setError('Choose a unique lowercase tier ID, starting with a letter.'); return; }
+    if (!/^[a-z][a-z0-9_-]{0,39}$/.test(id) || ['higher', 'both', 'goat_fallback_rising', 'constructor', 'prototype'].includes(id) || Object.hasOwn(draft.tierConfig, id)) { setError('Choose a unique lowercase tier ID, starting with a letter.'); return; }
     const sortOrder = Math.max(0, ...Object.values(draft.tierConfig).map(t => t.sortOrder)) + 1;
     setDraft(old => ({ ...old, tierConfig: { ...old.tierConfig, [id]: { name: 'New Tier', minCombinedUtr: 1, maxCombinedUtr: 4950, sortOrder, active: false } } }));
     setDirty(true); setNewId('');

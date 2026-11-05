@@ -75,7 +75,7 @@ export default function Register() {
   }
   const highest = complete ? assignTier(combined, config) : null;
   const assigned = complete ? assignSelectedTier(combined, config, selectedTier) : null;
-  const assignedLabel = assigned ? (selectedTier === 'both' ? 'GOAT + Rising' : config[assigned].name) : complete ? (highest ? 'Choose an eligible tier' : 'No eligible active tier') : 'Add all three UTR values';
+  const assignedLabel = assigned ? (selectedTier === 'both' ? 'GOAT + Rising' : config[assigned].name) : complete ? (highest ? 'Choose an eligible tier or allow Rising fallback' : 'No eligible active tier') : 'Add all three UTR values';
   // Every reason the Register button is off, in the order a visitor can act on them.
   const blockers = [
     !connected && 'Connecting to the tournament server…',
@@ -114,6 +114,8 @@ export default function Register() {
   if (success) return <Success result={success} config={config} onAgain={() => setSuccess(null)} />;
 
   const tierLocked = t => complete && !!highest && !assignSelectedTier(combined, config, t.id);
+  const goatFallback = selectedTier === 'goat_fallback_rising';
+  const fallbackAvailable = !!config.goat?.active && !!config.rising?.active && (!complete || ['goat', 'rising'].includes(highest));
   return (
     <section className="register-screen">
       <header className="page-head">
@@ -133,18 +135,19 @@ export default function Register() {
         <form ref={form} onSubmit={submit} aria-label="Team registration">
           <fieldset disabled={busy}>
             <div className={`step-panel card${step === 0 ? ' on' : ''}`} role="group" aria-label="Choose your tier">
-              <div className="card-head stacked"><h2>Choose your tier</h2><p className="small">GOAT-qualified teams may enter GOAT, Rising, or both. Rising-qualified teams may enter Rising only.</p></div>
-              {!active.length && <p className="small note">{data ? 'No tiers are open yet.' : 'Tiers appear here once the tournament settings load.'}</p>}
+              <div className="card-head stacked"><h2>Choose your tier</h2><p className="small">Choose one list, both lists, or automatic placement. If you prefer GOAT, you can allow Rising as a fallback.</p></div>
+              {!active.length && <p className="small note">{data ? 'No active tiers are configured. Ask the admin to activate and save GOAT or Rising in Admin → Tiers.' : 'Loading tier settings…'}</p>}
               <div className="tier-options">
                 {active.map(t => (
-                  <TierOption key={t.id} value={t.id} tone={tierTone(t.id)} title={t.name} art={['goat', 'rising'].includes(t.id) ? `/${t.id}-tier.webp` : null}
+                  <TierOption key={t.id} value={t.id} tone={tierTone(t.id)} title={t.id === 'goat' ? `${t.name} only` : t.id === 'rising' ? `${t.name} only` : t.name} art={['goat', 'rising'].includes(t.id) ? `/${t.id}-tier.webp` : null}
                     detail={`${formatUtr(t.minCombinedUtr)}–${formatUtr(t.maxCombinedUtr)} combined UTR${tierLocked(t) ? ` · Not available at ${formatUtr(combined)}` : ''}`}
-                    selected={selectedTier === t.id} disabled={tierLocked(t)} onSelect={() => setSelectedTier(t.id)} />
+                    selected={selectedTier === t.id || (t.id === 'goat' && goatFallback)} disabled={tierLocked(t) && !(t.id === 'goat' && goatFallback)} onSelect={() => setSelectedTier(t.id)} />
                 ))}
                 <TierOption value="both" tone="both" title="GOAT + Rising" detail={complete && highest !== 'goat' ? 'Only for teams that qualify for GOAT' : 'Enter both tiers when your team qualifies for GOAT'}
                   selected={selectedTier === 'both'} disabled={!config.goat?.active || !config.rising?.active || (complete && highest !== 'goat')} onSelect={() => setSelectedTier('both')} />
                 <TierOption value="higher" tone="higher" title="Interested in a higher UTR tier" detail="Place us in the highest eligible tier" selected={selectedTier === 'higher'} onSelect={() => setSelectedTier('higher')} />
               </div>
+              {config.goat?.active && config.rising?.active && <label className="tier-fallback checkbox"><input type="checkbox" checked={goatFallback} disabled={!fallbackAvailable} onChange={e => setSelectedTier(e.target.checked ? 'goat_fallback_rising' : highest === 'goat' || !complete ? 'goat' : 'rising')} /><span><strong>GOAT preferred; Rising is okay if we do not qualify for GOAT.</strong><small>This enters one tier only. If you qualify for GOAT, you stay in GOAT; otherwise, Rising is used when eligible.</small></span></label>}
             </div>
 
             {PLAYERS.map((p, i) => (

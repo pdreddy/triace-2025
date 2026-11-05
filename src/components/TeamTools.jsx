@@ -41,6 +41,7 @@ export function TeamEditForm({ registration, tierConfig, onSave, onCancel }) {
           <select id={id('tier')} value={form.selectedTier} onChange={set('selectedTier')}>
             {orderedTiers(tierConfig || {}, true).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
             <option value="both">GOAT + Rising</option>
+            <option value="goat_fallback_rising">GOAT preferred; Rising fallback</option>
             <option value="higher">Highest eligible tier</option>
           </select>
         </div>

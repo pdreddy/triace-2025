@@ -43,7 +43,7 @@ export function validateTierConfig(value) {
   assert(Object.keys(value).length <= 20, 'A tournament supports at most 20 tiers.');
   const result = {};
   for (const [id, tier] of Object.entries(value)) {
-    assert(/^[a-z][a-z0-9_-]{0,39}$/.test(id) && !['higher', 'constructor', 'prototype'].includes(id), 'Tier IDs must use lowercase letters, numbers, hyphens or underscores, and cannot be "higher".');
+    assert(/^[a-z][a-z0-9_-]{0,39}$/.test(id) && !['higher', 'both', 'goat_fallback_rising', 'constructor', 'prototype'].includes(id), 'Tier ID is reserved or invalid. Use lowercase letters, numbers, hyphens or underscores.');
     exact(tier, ['name', 'minCombinedUtr', 'maxCombinedUtr', 'sortOrder', 'active'], 'Invalid tier fields.');
     assert(integer(tier.minCombinedUtr, 1, 4950) && integer(tier.maxCombinedUtr, tier.minCombinedUtr, 4950), 'Combined UTR limits must be between 0.01 and 49.50, with minimum ≤ maximum.');
     assert(integer(tier.sortOrder, 1, 999) && typeof tier.active === 'boolean', 'Each tier needs an order from 1 to 999 and an active status.');
@@ -62,6 +62,10 @@ export function assignSelectedTier(combinedUtr, config, selectedTier = 'higher')
   const highest = assignTier(combinedUtr, config);
   if (!highest) return null;
   if (selectedTier === 'higher') return highest;
+  if (selectedTier === 'goat_fallback_rising') {
+    if (!config.goat?.active || !config.rising?.active) return null;
+    return highest === 'goat' ? 'goat' : highest === 'rising' ? 'rising' : null;
+  }
   if (selectedTier === 'both') return highest === 'goat' && config.rising?.active ? 'goat' : null;
   const active = orderedTiers(config, true);
   const highestIndex = active.findIndex(tier => tier.id === highest);
@@ -89,7 +93,7 @@ export function validateRegistration(payload, settings, tiers, gapLimit = UTR_GA
   assert(typeof payload.teamId === 'string' && /^[a-zA-Z0-9_-]{16,80}$/.test(payload.teamId), 'Invalid registration identifier.');
   assert(payload.consent === true, 'Player consent is required.');
   assert(payload.rulesAccepted === true, 'Read and accept the tournament rules before registering.');
-  assert(payload.selectedTier === 'higher' || payload.selectedTier === 'both' || (typeof payload.selectedTier === 'string' && Object.hasOwn(tiers, payload.selectedTier) && tiers[payload.selectedTier].active), 'Select an active tier or the higher-tier interest option.');
+  assert(['higher', 'both', 'goat_fallback_rising'].includes(payload.selectedTier) || (typeof payload.selectedTier === 'string' && Object.hasOwn(tiers, payload.selectedTier) && tiers[payload.selectedTier].active), 'Select an active tier or a valid tier preference.');
   const captain = player(payload.captain, true, settings, gapLimit), ace1 = player(payload.ace1, false, settings, gapLimit), ace2 = player(payload.ace2, false, settings, gapLimit);
   const combinedUtr = captain.utr + ace1.utr + ace2.utr, assignedTier = assignSelectedTier(combinedUtr, tiers, payload.selectedTier);
   assert(assignedTier, 'Your team does not qualify for the selected tier. Choose an eligible tier or contact the tournament admin.');
