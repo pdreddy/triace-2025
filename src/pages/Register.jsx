@@ -1,38 +1,216 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTournament } from '../hooks/useTournament';
 import { useRulesAccess } from '../hooks/useRulesAccess';
-import { Field, Message } from '../components/UI';
-import { assignSelectedTier, assignTier, orderedTiers, parseUtr, formatUtr, validateRegistration } from '../../functions/lib/tournament.js';
-const empty = () => ({ captain: { name: '', singles: '', doubles: '' }, ace1: { name: '', singles: '', doubles: '' }, ace2: { name: '', singles: '', doubles: '' } });
+import { Field, Message, UtrMeter, tierTone } from '../components/UI';
+import { Icon } from '../components/Icons';
+import { assignSelectedTier, assignTier, orderedTiers, parseUtr, formatUtr, validateRegistration, playerUtr, UTR_GAP_LIMIT, DEFAULT_TIERS } from '../../functions/lib/tournament.js';
+
+const PLAYERS = [
+  { key: 'captain', title: 'Captain', note: 'First name public', label: 'Captain first name', placeholder: 'First name only', max: 40, autoComplete: 'given-name' },
+  { key: 'ace1', title: 'Ace 1', note: 'Full name private', label: 'Ace 1 full name', placeholder: 'Full name', max: 80, autoComplete: 'off' },
+  { key: 'ace2', title: 'Ace 2', note: 'Full name private', label: 'Ace 2 full name', placeholder: 'Full name', max: 80, autoComplete: 'off' }
+];
+const STEPS = ['Tier', 'Captain', 'Ace 1', 'Ace 2', 'Confirm'];
+const emptyPlayers = () => Object.fromEntries(PLAYERS.map(p => [p.key, { name: '', phone: '', singles: '', doubles: '' }]));
+// Counted rating for the live preview, using the same gap rule as the server (playerUtr).
+function rating(player, gap = UTR_GAP_LIMIT) {
+  try {
+    const singles = player.singles ? parseUtr(player.singles) : 0, doubles = player.doubles ? parseUtr(player.doubles) : null;
+    if (!singles) return { value: doubles || 0, averaged: false };
+    return { value: playerUtr(singles, doubles, gap), averaged: doubles != null && Math.abs(singles - doubles) > gap };
+  } catch { return { value: 0, averaged: false }; }
+}
+
+function TierOption({ value, tone, title, detail, eligibility, art, selected, disabled, onSelect }) {
+  return (
+    <label className={`tier-option ${tone}${selected ? ' selected' : ''}`}>
+      <input type="checkbox" value={value} disabled={disabled} checked={selected} onChange={onSelect} />
+      {art && <img className="tier-option-art" src={art} alt="" />}
+      <span><strong>{title}</strong><small>{detail}</small>{eligibility && <em className={`tier-eligibility${disabled ? ' unavailable' : ''}`}>{eligibility}</em>}</span>
+    </label>
+  );
+}
+
+function Success({ result, config, onAgain }) {
+  const listed = result.listedTiers?.length > 1 ? 'GOAT and Rising' : config[result.assignedTier]?.name || result.assignedTier;
+  return (
+    <section className="page success-screen" role="status">
+      <span className="success-icon"><Icon name="check" size={40} /></span>
+      <p className="eyebrow">Registration complete</p>
+      <h1>You’re in the <em>draw.</em></h1>
+      <p>Team registered successfully! Listed in {listed}, combined UTR {formatUtr(result.combinedUtr)}.</p>
+      <dl className="success-facts">
+        <div><dt>Combined UTR</dt><dd>{formatUtr(result.combinedUtr)}</dd></div>
+        <div><dt>Registration ID</dt><dd className="mono">{result.teamId}</dd></div>
+      </dl>
+      {result.captainCode && (
+        <div className="captain-code">
+          <p className="eyebrow">Your captain code</p>
+          <output className="mono" aria-label="Captain code">{result.captainCode}</output>
+          <p className="small">Save it now; it isn’t shown again. Use it to manage your team from another phone or browser (team page → “Captain of this team on a new device?”).</p>
+          <button type="button" className="secondary small" onClick={() => navigator.clipboard?.writeText(result.captainCode)}>Copy code</button>
+        </div>
+      )}
+      <div className="success-actions">
+        <Link className="button" to={`/team/${result.teamId}`}>Open my team <Icon name="arrow" size={18} /></Link>
+        <Link className="secondary" to="/tiers">View the lineup</Link>
+        <button type="button" className="secondary" onClick={onAgain}>Register another team</button>
+      </div>
+    </section>
+  );
+}
+
 export default function Register() {
-  const { data, service, user, connected } = useTournament();
+  const { data, service, user, connected, error: loadError } = useTournament();
   const { accepted } = useRulesAccess();
-  const [players, setPlayers] = useState(empty), [selectedTier, setSelectedTier] = useState('higher'), [consent, setConsent] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(''), [success, setSuccess] = useState(null);
-  const id = useRef(crypto.randomUUID());
-  const config = data?.tierConfig || {}, active = orderedTiers(config, true), settings = data?.settings;
+  const [players, setPlayers] = useState(emptyPlayers), [whatsappPhone, setWhatsappPhone] = useState(''), [selectedTier, setSelectedTier] = useState('higher'), [consent, setConsent] = useState(false);
+  const [busy, setBusy] = useState(false), [error, setError] = useState(''), [success, setSuccess] = useState(null), [step, setStep] = useState(0);
+  const id = useRef(crypto.randomUUID()), form = useRef(null);
+  const settings = data?.settings, config = settings ? data?.tierConfig || {} : DEFAULT_TIERS, active = orderedTiers(config, true), gap = data?.leagueRules?.utrGapLimit ?? UTR_GAP_LIMIT;
+
   let combined = 0, complete = true;
-  for (const value of Object.values(players)) { try { if (!value.singles) complete = false; combined += Math.max(value.singles ? parseUtr(value.singles) : 0, value.doubles ? parseUtr(value.doubles) : 0); } catch { complete = false; } }
+  for (const value of Object.values(players)) {
+    try {
+      if (!value.singles) { complete = false; continue; }
+      const singles = parseUtr(value.singles), doubles = value.doubles ? parseUtr(value.doubles) : null;
+      if (singles < (settings?.minPlayerUtr ?? 1) || singles > (settings?.maxPlayerUtr ?? 1650) || (doubles !== null && (doubles < (settings?.minPlayerUtr ?? 1) || doubles > (settings?.maxPlayerUtr ?? 1650)))) complete = false;
+      combined += playerUtr(singles, doubles, gap);
+    } catch { complete = false; }
+  }
   const highest = complete ? assignTier(combined, config) : null;
   const assigned = complete ? assignSelectedTier(combined, config, selectedTier) : null;
+  useEffect(() => {
+    if (complete && highest && !assigned) setSelectedTier('higher');
+  }, [complete, highest, assigned]);
+  const eligibleTiers = complete ? active.filter(t => assignSelectedTier(combined, config, t.id)) : [];
+  const goatShortfall = complete && config.goat?.active && combined < config.goat.minCombinedUtr ? config.goat.minCombinedUtr - combined : 0;
+  const assignedLabel = assigned ? (selectedTier === 'both' ? 'GOAT + Rising' : config[assigned].name) : complete ? (highest ? 'Choose an eligible tier or allow Rising fallback' : 'No eligible active tier') : 'Add all three UTR values';
+  // Every reason the Register button is off, in the order a visitor can act on them.
+  const blockers = [
+    !connected && 'Connecting to the tournament server…',
+    connected && !data && (loadError ? `Tournament data could not be loaded: ${loadError}` : 'Loading tournament settings…'),
+    data && !settings && (loadError ? `Registration setup is unavailable: ${loadError}` : 'Opening tournament registration…'),
+    settings && !settings.registrationEnabled && 'Registration is closed.',
+    data && settings && !active.length && 'No tier is open for registration. An admin must activate a tier.',
+    !user?.uid && 'Signing you in… (anonymous sign-in must be enabled in Firebase Authentication)'
+  ].filter(Boolean);
+  const filled = key => !!players[key].name.trim() && !!players[key].singles;
+  const stepDone = [true, filled('captain') && !!whatsappPhone.trim(), filled('ace1') && !!players.ace1.phone.trim(), filled('ace2') && !!players.ace2.phone.trim(), consent];
+  const utrLimits = { min: (settings?.minPlayerUtr || 1) / 100, max: (settings?.maxPlayerUtr || 1650) / 100 };
+
   function change(key, field, value) { setPlayers(old => ({ ...old, [key]: { ...old[key], [field]: value } })); setError(''); setSuccess(null); }
+  function next() {
+    const panel = form.current.querySelector('.step-panel.on'), invalid = [...panel.querySelectorAll('input')].find(i => !i.checkValidity());
+    if (invalid) { invalid.reportValidity(); return; }
+    setStep(old => Math.min(STEPS.length - 1, old + 1));
+  }
+  function jump(index) { setStep(index); form.current?.querySelectorAll('.step-panel')[index]?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
   async function submit(event) {
-    event.preventDefault(); if (busy) return;
+    event.preventDefault();
+    if (busy) return;
     if (!settings || !connected || !user?.uid) { setError('Registration is not connected. Please wait or contact the admin.'); return; }
     setError(''); setSuccess(null);
     try {
-      const payload = { teamId: id.current, selectedTier, consent, rulesAccepted: accepted };
+      const payload = { teamId: id.current, whatsappPhone, ace1Phone: players.ace1.phone, ace2Phone: players.ace2.phone, selectedTier, consent, rulesAccepted: accepted };
       for (const [key, value] of Object.entries(players)) payload[key] = { [key === 'captain' ? 'firstName' : 'fullName']: value.name.trim(), singlesUtr: parseUtr(value.singles), doublesUtr: value.doubles.trim() ? parseUtr(value.doubles) : null };
-      validateRegistration(payload, settings, config);
-      setBusy(true); const result = await service.register(payload); setSuccess(result); setPlayers(empty()); setConsent(false); id.current = crypto.randomUUID();
+      validateRegistration(payload, settings, config, gap);
+      setBusy(true);
+      setSuccess(await service.register(payload));
+      setPlayers(emptyPlayers()); setWhatsappPhone(''); setConsent(false); setStep(0); id.current = crypto.randomUUID();
     } catch (e) { setError(e.message); } finally { setBusy(false); }
   }
-  return <><section className="intro"><div><div className="eyebrow">THREE PLAYERS. ONE TEAM.</div><h1>Your team.<br />Your next <em>challenge.</em></h1><p>Find your tier. Bring your trio.<br />Register for Traice and let your game do the talking.</p></div><div className="hero-logo"><img src="/traice-tennis.webp" alt="Traice Tennis, powered by Prosper Open" /></div></section>
-    {success && <Message>Team registered successfully! Listed in {success.listedTiers?.length > 1 ? 'GOAT and Rising' : config[success.assignedTier]?.name || success.assignedTier}, combined UTR {formatUtr(success.combinedUtr)}. Registration ID: {success.teamId}. <Link to="/tiers">View the lineup →</Link></Message>}
-    <div className="registration-grid"><form onSubmit={submit} aria-label="Team registration"><div className="section-label">01 / TEAM REGISTRATION</div><h2>Let’s meet your team.</h2>
-      <fieldset disabled={busy}><legend>Choose your tier</legend><p className="small">GOAT-qualified teams may enter GOAT, Rising, or both. Rising-qualified teams may enter Rising only.</p><div className="tier-options">{active.map(t => <label className={`tier-option ${selectedTier === t.id ? 'selected' : ''}`} key={t.id}><input type="radio" name="tier" value={t.id} disabled={complete && !!highest && !assignSelectedTier(combined, config, t.id)} checked={selectedTier === t.id} onChange={() => setSelectedTier(t.id)} /><span>{["goat","rising"].includes(t.id) && <img className="tier-option-art" src={`/${t.id}-tier.webp`} alt="" />}<strong>{t.name}</strong><small>{formatUtr(t.minCombinedUtr)}–{formatUtr(t.maxCombinedUtr)} combined UTR</small></span></label>)}<label className={`tier-option ${selectedTier === 'both' ? 'selected' : ''}`}><input type="radio" name="tier" value="both" disabled={!config.goat?.active || !config.rising?.active || (complete && highest !== 'goat')} checked={selectedTier === 'both'} onChange={() => setSelectedTier('both')} /><span><strong>GOAT + Rising</strong><small>Enter both tiers when your team qualifies for GOAT</small></span></label><label className={`tier-option ${selectedTier === 'higher' ? 'selected' : ''}`}><input type="radio" name="tier" value="higher" checked={selectedTier === 'higher'} onChange={() => setSelectedTier('higher')} /><span><strong>Interested in a higher UTR tier</strong><small>Place us in the highest eligible tier</small></span></label></div>
-      {['captain', 'ace1', 'ace2'].map((key, i) => <section className="player" key={key}><div className="player-heading"><h3>0{i + 1} · {i === 0 ? 'Captain' : `Ace ${i}`}</h3><span>{i === 0 ? 'FIRST NAME PUBLIC' : 'FULL NAME PRIVATE'}</span></div><Field id={`${key}-name`} label={i === 0 ? 'Captain first name' : `Ace ${i} full name`} value={players[key].name} onChange={e => change(key, 'name', e.target.value)} required maxLength={i === 0 ? 40 : 80} autoComplete={i === 0 ? 'given-name' : 'off'} placeholder={i === 0 ? 'First name only' : 'Full name'} />
-        <div className="ratings"><Field id={`${key}-utr`} label="UTR / singles UTR" value={players[key].singles} onChange={e => change(key, 'singles', e.target.value)} required type="number" inputMode="decimal" step="0.01" min={(settings?.minPlayerUtr || 1) / 100} max={(settings?.maxPlayerUtr || 1650) / 100} placeholder="e.g. 6.50" /><Field id={`${key}-doubles`} label="Doubles UTR (optional)" value={players[key].doubles} onChange={e => change(key, 'doubles', e.target.value)} type="number" inputMode="decimal" step="0.01" min={(settings?.minPlayerUtr || 1) / 100} max={(settings?.maxPlayerUtr || 1650) / 100} placeholder="If applicable" /></div></section>)}
-      <p className="rules-confirmed">✓ Tournament rules accepted in this session. <Link to="/">Review rules</Link></p><label className="checkbox"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} required /><span>I have permission to register these players and publish the captain’s first name and all three UTR values. Ace names are public only when the admin turns masking off.</span></label><Message error>{error}</Message><button className="button" disabled={busy || !settings?.registrationEnabled || !connected || !user?.uid || !active.length}>{busy ? 'Saving registration…' : 'Register team ↗'}</button></fieldset>
-    </form><aside className="summary"><div className="eyebrow">YOUR TEAM AT A GLANCE</div><div className="total"><output aria-label="Combined UTR">{formatUtr(combined)}</output><span>COMBINED UTR</span></div><p className="assignment" role="status">Assigned tier: <strong>{assigned ? selectedTier === 'both' ? 'GOAT + Rising' : config[assigned].name : complete ? highest ? 'Choose an eligible tier' : 'No eligible active tier' : 'Add all three UTR values'}</strong></p><p>GOAT-qualified teams can enter both lists. Choose the higher-tier option to enter the highest tier you qualify for.</p><dl><div><dt>TEAM SIZE</dt><dd>Exactly 3 players</dd></div><div><dt>RATING RULE</dt><dd>Higher of singles or doubles</dd></div></dl><div className="privacy"><strong>A little privacy, by default.</strong><p>The captain’s first name and all three UTRs are public. The admin controls whether Ace 1 and Ace 2 names are masked in public lists.</p></div>{settings && !settings.registrationEnabled && <Message>Registration is closed.</Message>}{data && !settings && <Message>An admin must save the initial tournament configuration.</Message>}</aside></div></>;
+
+  if (success) return <Success result={success} config={config} onAgain={() => setSuccess(null)} />;
+
+  const tierLocked = t => complete && !assignSelectedTier(combined, config, t.id);
+  const goatFallback = selectedTier === 'goat_fallback_rising';
+  const fallbackAvailable = !!config.goat?.active && !!config.rising?.active && (!complete || ['goat', 'rising'].includes(highest));
+  return (
+    <section className="register-screen">
+      <header className="page-head">
+        <p className="eyebrow">Three players. One team.</p>
+        <h1>Build your <em>trio.</em></h1>
+        <p>Pick your tier, add your three players, and see where your team lands as you type.</p>
+      </header>
+
+      <ol className="step-rail" aria-label="Registration steps">
+        {STEPS.map((label, i) => {
+          const done = stepDone[i] && i > 0;
+          return <li key={label}><button type="button" className={`${step === i ? 'current' : ''}${done ? ' done' : ''}`} onClick={() => jump(i)}><span>{done ? <Icon name="check" size={14} /> : i + 1}</span>{label}</button></li>;
+        })}
+      </ol>
+
+      <div className="register-grid">
+        <form ref={form} onSubmit={submit} aria-label="Team registration">
+          <fieldset disabled={busy}>
+            <div className={`step-panel card${step === 0 ? ' on' : ''}`} role="group" aria-label="Choose your tier">
+              <div className="card-head stacked"><h2>Choose your tier</h2><p className="small">Automatic placement is selected by default: we use your combined UTR to place you in the highest eligible tier. Choose another preference only if you want it. GOAT only never moves to Rising because of team count.</p></div>
+              {!settings && <p className="small note">{loadError ? `Registration setup is unavailable: ${loadError}` : 'Opening tournament registration…'}</p>}
+              {settings && !active.length && <p className="small note">Registration is currently closed because no tiers are active.</p>}
+              <div className="tier-options">
+                {active.map(t => (
+                  <TierOption key={t.id} value={t.id} tone={tierTone(t.id)} title={t.id === 'goat' ? `${t.name} only` : t.id === 'rising' ? `${t.name} only` : t.name} art={['goat', 'rising'].includes(t.id) ? `/${t.id}-tier.webp` : null}
+                    detail={`${formatUtr(t.minCombinedUtr)}–${formatUtr(t.maxCombinedUtr)} combined UTR${t.id === 'goat' ? ' · Never moved to Rising for low team count' : ''}`}
+                    eligibility={complete ? tierLocked(t) ? t.id === 'goat' && goatShortfall ? `Need ${formatUtr(goatShortfall)} more combined UTR` : 'Not eligible at your current UTR' : 'Your team is UTR eligible' : 'Enter all three UTRs to check eligibility'}
+                    selected={selectedTier === t.id} disabled={tierLocked(t)} onSelect={() => setSelectedTier(t.id)} />
+                ))}
+                <TierOption value="both" tone="both" title="GOAT + Rising" detail={complete && highest !== 'goat' ? 'Only for teams that qualify for GOAT' : 'Enter both tiers when your team qualifies for GOAT'}
+                  selected={selectedTier === 'both'} disabled={!config.goat?.active || !config.rising?.active || (complete && highest !== 'goat')} onSelect={() => setSelectedTier('both')} />
+                <TierOption value="higher" tone="higher" title="Automatic placement (recommended)" detail="We use your combined UTR to select the highest eligible tier" selected={selectedTier === 'higher'} disabled={complete && !highest} onSelect={() => setSelectedTier('higher')} />
+              </div>
+              {config.goat?.active && config.rising?.active && <label className="tier-fallback checkbox"><input type="checkbox" checked={goatFallback} disabled={!fallbackAvailable} onChange={e => setSelectedTier(e.target.checked ? 'goat_fallback_rising' : highest === 'goat' || !complete ? 'goat' : 'rising')} /><span><strong>GOAT preferred; Rising is okay if our UTR does not qualify for GOAT.</strong><small>This enters one tier only. If you qualify for GOAT, you stay in GOAT regardless of team count.</small></span></label>}
+            </div>
+
+            {PLAYERS.map((p, i) => (
+              <section key={p.key} className={`step-panel card${step === i + 1 ? ' on' : ''}`}>
+                <div className="card-head"><h2><span className="player-num">0{i + 1}</span>{p.title}</h2><span className="pill">{p.note}</span></div>
+                <Field id={`${p.key}-name`} label={p.label} value={players[p.key].name} onChange={e => change(p.key, 'name', e.target.value)} required maxLength={p.max} autoComplete={p.autoComplete} placeholder={p.placeholder} />
+                {p.key === 'captain' && <Field id="captain-whatsapp" label="Captain WhatsApp number (private)" type="tel" inputMode="tel" autoComplete="tel" placeholder="+15551234567" hint="Include country code. This is visible to the team owner and admin, never on public pages." value={whatsappPhone} onChange={e => setWhatsappPhone(e.target.value)} required maxLength={25} />}
+                {p.key !== 'captain' && <Field id={`${p.key}-whatsapp`} label={`${p.title} WhatsApp number (private)`} type="tel" inputMode="tel" autoComplete="off" placeholder="+15551234567" hint="Include country code. This is visible to the team owner and admin, never on public pages." value={players[p.key].phone} onChange={e => change(p.key, 'phone', e.target.value)} required maxLength={25} />}
+                <div className="ratings">
+                  <Field id={`${p.key}-utr`} label="UTR / singles UTR" value={players[p.key].singles} onChange={e => change(p.key, 'singles', e.target.value)} required type="number" inputMode="decimal" step="0.01" min={utrLimits.min} max={utrLimits.max} placeholder="e.g. 6.50" />
+                  <Field id={`${p.key}-doubles`} label="Doubles UTR (optional)" value={players[p.key].doubles} onChange={e => change(p.key, 'doubles', e.target.value)} type="number" inputMode="decimal" step="0.01" min={utrLimits.min} max={utrLimits.max} placeholder="If applicable" />
+                </div>
+              </section>
+            ))}
+
+            <div className={`step-panel card${step === 4 ? ' on' : ''}`}>
+              <div className="card-head"><h2>Confirm &amp; register</h2></div>
+              <p className="confirmed"><Icon name="check" size={16} /> Tournament rules accepted in this session. <Link to="/">Review rules</Link></p>
+              <label className="checkbox">
+                <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} required />
+                <span>I have permission to register these players and publish the captain’s first name and all three UTR values. All three WhatsApp numbers stay private to the team owner and admin. Ace names are public only when the admin turns masking off.</span>
+              </label>
+              <Message error>{error}</Message>
+              <button className="button block" disabled={busy || !settings?.registrationEnabled || !connected || !user?.uid || !active.length}>{busy ? 'Saving registration…' : 'Register team ↗'}</button>
+            </div>
+
+            <div className="step-nav">
+              <button type="button" className="secondary" disabled={step === 0} onClick={() => setStep(step - 1)}><Icon name="back" size={16} /> Back</button>
+              <span>Step {step + 1} of {STEPS.length}</span>
+              {step < STEPS.length - 1 ? <button type="button" className="button" onClick={next}>Next <Icon name="arrow" size={16} /></button> : <span className="step-nav-spacer" />}
+            </div>
+          </fieldset>
+        </form>
+
+        <aside className="preview" aria-label="Your team at a glance">
+          <div className="preview-score">
+            <div><p className="eyebrow">Your team at a glance</p><output aria-label="Combined UTR">{formatUtr(combined)}</output><span className="preview-unit">Combined UTR</span></div>
+            <p className="assignment" role="status">{selectedTier === 'higher' ? 'Automatic placement' : 'Selected preference outcome'}: <strong>{assignedLabel}</strong></p>
+          </div>
+          <p className="eligibility-summary" role="status"><strong>UTR eligibility:</strong> {complete ? eligibleTiers.length ? eligibleTiers.map(t => t.name).join(' · ') : 'No active tier at this UTR' : 'Enter all three UTRs'}{goatShortfall > 0 && ` · GOAT needs ${formatUtr(goatShortfall)} more`}</p>
+          <UtrMeter tiers={active} value={combined} />
+          <ul className="preview-players">
+            {PLAYERS.map(p => <li key={p.key} className={filled(p.key) ? 'done' : ''}><span>{p.title}</span><b>{players[p.key].name.trim() || '—'}</b><em>{rating(players[p.key], gap).averaged && <small>avg</small>}{formatUtr(rating(players[p.key], gap).value)}</em></li>)}
+          </ul>
+          <div className="preview-notes">
+            <p><strong>Rating rule.</strong> Each player counts at the higher of singles or doubles UTR. If the two are more than {formatUtr(gap)} apart, their average counts instead.</p>
+            <p><strong>Privacy.</strong> The captain’s first name and all three UTRs are public. The admin controls whether Ace names are masked.</p>
+          </div>
+          {blockers.map(text => <Message key={text}>{text}</Message>)}
+        </aside>
+      </div>
+    </section>
+  );
 }

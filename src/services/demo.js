@@ -16,10 +16,25 @@ export function createDemoService() {
     subscribeConnection(callback) { callback(true); return () => {}; },
     subscribeAuth(callback, error) { authListeners.add(callback); refreshAuth().catch(error); return () => authListeners.delete(callback); },
     subscribePrivate: (callback, error) => poll('registrations', callback, error),
+    getMyRegistration: teamId => request(`my-registration?teamId=${encodeURIComponent(teamId)}`),
+    subscribeMyTeams: (uid, callback) => poll('my-teams', callback, () => callback({})),
     async login(username, password) { await request('login', { username, password }); await refreshAuth(); },
     async logout() { await request('logout', {}); await refreshAuth(); },
     register: payload => request('register', payload),
     saveConfiguration: payload => request('configuration', payload),
-    recalculate: () => request('recalculate', {})
+    recalculate: () => request('recalculate', {}),
+    generateFixtures: payload => request('generate-fixtures', payload),
+    generatePlayoffs: payload => request('generate-playoffs', payload),
+    saveLeagueRules: payload => request('league-rules', payload),
+    setSchedule: payload => request('set-schedule', payload),
+    moveFixture: payload => request('move-fixture', payload),
+    issueChallenge: payload => request('issue-challenge', payload),
+    updateTeam: payload => request('update-team', payload),
+    withdrawTeam: payload => request('withdraw-team', payload),
+    claimTeam: payload => request('claim-team', payload),
+    resetCaptainCode: payload => request('reset-captain-code', payload),
+    manageSeason: payload => request('season', payload),
+    submitResult: payload => request('submit-result', payload),
+    reviewResult: payload => request('review-result', payload)
   };
 }

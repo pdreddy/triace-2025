@@ -1,7 +1,9 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
 import path from 'node:path';
-import { initialState, publicState, applyRegistration, applyConfiguration, applyRecalculation, ValidationError } from '../functions/lib/tournament.js';
+import { initialState, publicState, applyRegistration, applyConfiguration, applyRecalculation, applyLeagueRules, isOwner, ValidationError } from '../functions/lib/tournament.js';
+import { applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult, applyManageSeason, applySetSchedule, applyMoveFixture, applyIssueChallenge, applyUpdateTeam, applyWithdrawTeam, applyClaimTeam, applyResetCaptainCode } from '../functions/lib/league.js';
+import { newCaptainCode, hashCaptainCode } from '../functions/lib/captainCode.js';
 const digest = value => createHash('sha256').update(value).digest();
 export function demoPlugin(env) {
   const password = env.TRAICE_ADMIN_PASSWORD;
@@ -41,6 +43,8 @@ export function demoPlugin(env) {
         if (req.method === 'GET') {
           if (endpoint === '/session') return send(200, safeUser());
           if (endpoint === '/public') return send(200, publicState(state));
+          if (endpoint === '/my-registration') { const reg = state.registrations?.[url.searchParams.get('teamId')]; return reg && session && (session.admin || isOwner(reg, session.uid)) ? send(200, reg) : send(403, { error: 'Only this team’s captain can read it.' }); }
+          if (endpoint === '/my-teams') return send(200, session ? state.teamsByOwner?.[session.uid] || {} : {});
           if (endpoint === '/registrations') return session?.admin ? send(200, state.registrations || {}) : send(403, { error: 'Administrator access is required.' });
           return send(404, { error: 'Unknown endpoint.' });
         }
@@ -59,9 +63,23 @@ export function demoPlugin(env) {
         }
         if (endpoint === '/logout') { session = newSession(); return send(200, safeUser()); }
         if (endpoint === '/register' && !session) return send(401, { error: 'Open the registration page before submitting.' });
-        if (endpoint === '/register') return send(200, await mutate(current => applyRegistration(current, payload, session.uid)));
+        if (endpoint === '/register') { const code = newCaptainCode(), result = await mutate(current => applyRegistration(current, payload, session.uid, Date.now(), hashCaptainCode(code))); return send(200, result.created ? { ...result, captainCode: code } : result); }
+        const signedIn = session && session.uid, admin = session?.admin === true;
+        if (endpoint === '/issue-challenge') return signedIn ? send(200, await mutate(current => applyIssueChallenge(current, payload, session.uid, admin))) : send(401, { error: 'Sign in first.' });
+        if (endpoint === '/update-team') return signedIn ? send(200, await mutate(current => applyUpdateTeam(current, payload, session.uid, admin))) : send(401, { error: 'Sign in first.' });
+        if (endpoint === '/withdraw-team') return signedIn ? send(200, await mutate(current => applyWithdrawTeam(current, payload, session.uid, admin))) : send(401, { error: 'Sign in first.' });
+        if (endpoint === '/claim-team') return signedIn ? send(200, await mutate(current => applyClaimTeam(current, { teamId: payload.teamId, codeHash: hashCaptainCode(payload.code) }, session.uid))) : send(401, { error: 'Sign in first.' });
+        if (endpoint === '/submit-result') return session ? send(200, await mutate(current => applySubmitResult(current, payload, session.uid, session.admin === true))) : send(401, { error: 'Sign in before submitting a score.' });
         if (!session?.admin) return send(403, { error: 'Administrator access is required.' });
         if (endpoint === '/configuration') return send(200, await mutate(current => applyConfiguration(current, payload)));
+        if (endpoint === '/generate-fixtures') return send(200, await mutate(current => applyGenerateFixtures(current, payload)));
+        if (endpoint === '/generate-playoffs') return send(200, await mutate(current => applyGeneratePlayoffs(current, payload)));
+        if (endpoint === '/set-schedule') return send(200, await mutate(current => applySetSchedule(current, payload)));
+        if (endpoint === '/move-fixture') return send(200, await mutate(current => applyMoveFixture(current, payload)));
+        if (endpoint === '/reset-captain-code') { const code = newCaptainCode(); await mutate(current => applyResetCaptainCode(current, { teamId: payload.teamId, codeHash: hashCaptainCode(code) })); return send(200, { teamId: payload.teamId, captainCode: code }); }
+        if (endpoint === '/league-rules') return send(200, await mutate(current => applyLeagueRules(current, payload)));
+        if (endpoint === '/season') return send(200, await mutate(current => applyManageSeason(current, payload)));
+        if (endpoint === '/review-result') return send(200, await mutate(current => applyReviewResult(current, payload)));
         if (endpoint === '/recalculate') return send(200, await mutate(current => applyRecalculation(current)));
         return send(404, { error: 'Unknown endpoint.' });
       } catch (error) { send(error instanceof ValidationError ? 400 : 500, { error: error instanceof ValidationError ? error.message : 'Local demo failed. Check its data directory and server output.' }); }

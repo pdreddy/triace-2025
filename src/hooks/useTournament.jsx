@@ -13,7 +13,7 @@ export function TournamentProvider({ children }) {
     if (service.setupError) { setError(service.setupError); return; }
     if (service.loading) return;
     const fail = e => setError(e.message);
-    const offPublic = service.subscribePublic(value => { setData(value); setError(''); }, fail);
+    const offPublic = service.subscribePublic(value => { setData(value); if (value.settings) setError(''); }, fail);
     const offAuth = service.subscribeAuth(setUser, fail), offConnection = service.subscribeConnection(setConnected);
     const timer = setTimeout(() => { if (!navigator.onLine) setError('You are offline. Reconnect before submitting.'); }, 10000);
     return () => { offPublic(); offAuth(); offConnection(); clearTimeout(timer); };
@@ -29,4 +29,15 @@ export function useRegistrations() {
     return service.subscribePrivate(value => { setTeams(value); setLoading(false); setError(''); }, e => { setError(e.message); setLoading(false); });
   }, [service, user?.uid, user?.admin]);
   return { teams, error, loading };
+}
+
+// Team IDs this browser's signed-in user registered (their captain teams).
+export function useMyTeams() {
+  const { service, user } = useTournament(), [teams, setTeams] = useState({});
+  useEffect(() => {
+    setTeams({});
+    if (!user?.uid || !service.subscribeMyTeams) return;
+    return service.subscribeMyTeams(user.uid, setTeams);
+  }, [service, user?.uid]);
+  return teams;
 }
