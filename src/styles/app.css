@@ -1407,7 +1407,7 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
 /* Partner board: keep the filters inside the page; make room in the top bar for the extra tab */
 .partner-filters .field input, .partner-filters .field select { width: 100%; min-width: 0; }
 .partner-filters .field:last-child { width: 140px; }
-@media (min-width: 761px) and (max-width: 1400px) {
+@media (min-width: 761px) and (max-width: 1500px) {
   .tabs a svg, .nav-locked svg { display: none; }
   .tabs a, .nav-locked { padding: 6px 12px; }
   .status-pill { padding: 6px 8px; font-size: 0; gap: 0; }
@@ -1421,3 +1421,17 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
   .partner-filters .field:last-child { flex: 1 1 130px; width: auto; }
 }
 .partner-foot a { display: inline-flex; align-items: center; min-height: 34px; padding: 0 2px; }
+
+/* Top tab: "Find a partner" on wide screens, "Partner" in the phone tab bar */
+.tabs .tab-short { display: none; }
+@media (max-width: 760px) { .tabs .tab-long { display: none; } .tabs .tab-short { display: inline; } }
+
+@media (min-width: 761px) and (max-width: 980px) {
+  .tabs .tab-long { display: none; }
+  .tabs .tab-short { display: inline; }
+  .tabs a, .nav-locked { padding: 6px 8px; font-size: 14px; letter-spacing: .02em; }
+  .tabs { gap: 2px; }
+  .topbar-inner { gap: 8px; }
+  .brand { font-size: 24px; gap: 8px; }
+  .brand img { width: 32px; height: 32px; }
+}

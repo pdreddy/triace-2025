@@ -68,7 +68,7 @@ function Layout() {
             <NavLink to="/tiers"><Icon name="trophy" /><span>Tier list</span></NavLink>
             <NavLink to="/league"><Icon name="calendar" /><span>League</span></NavLink>
             <NavLink to="/players"><Icon name="users" /><span>Players</span></NavLink>
-            <NavLink to="/partners"><Icon name="partner" /><span>Partners</span></NavLink>
+            <NavLink to="/partners" aria-label="Find a partner"><Icon name="partner" /><span className="tab-long">Find a partner</span><span className="tab-short">Partner</span></NavLink>
             <NavLink to="/champions"><Icon name="trophy" /><span>Champions</span></NavLink>
             <NavLink className="admin-tab" to={user?.admin ? '/admin' : '/admin/login'}><Icon name="shield" /><span>Admin</span></NavLink>
           </nav>

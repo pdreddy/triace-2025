@@ -39,3 +39,16 @@ test('the sign-in pages are one compact card', async ({ page }) => {
     expect(await page.evaluate(() => document.querySelector('main').scrollHeight <= document.querySelector('main').clientHeight + 1)).toBeTruthy();
   }
 });
+
+test('the top bar fits at tablet, laptop and desktop widths, with the Find a partner tab', async ({ page }) => {
+  for (const [width, label] of [[820, 'Partner'], [1024, 'Find a partner'], [1280, 'Find a partner'], [1440, 'Find a partner'], [1920, 'Find a partner']]) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto('/partners');
+    const tab = page.locator('.tabs a[href="/partners"]');
+    await expect(tab).toBeVisible();
+    await expect(tab).toHaveText(new RegExp(`^${label}$`, 'i'));
+    await expect(tab).toHaveAttribute('aria-label', 'Find a partner');
+    const overflow = await page.evaluate(() => { const bar = document.querySelector('.topbar-inner'); return bar.scrollWidth - bar.clientWidth; });
+    expect(overflow, `the top bar overflows at ${width}px`).toBeLessThanOrEqual(0);
+  }
+});
