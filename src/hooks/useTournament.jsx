@@ -13,7 +13,7 @@ export function TournamentProvider({ children }) {
     if (service.setupError) { setError(service.setupError); return; }
     if (service.loading) return;
     const fail = e => setError(e.message);
-    const offPublic = service.subscribePublic(value => { setData(value); setError(''); }, fail);
+    const offPublic = service.subscribePublic(value => { setData(value); if (value.settings) setError(''); }, fail);
     const offAuth = service.subscribeAuth(setUser, fail), offConnection = service.subscribeConnection(setConnected);
     const timer = setTimeout(() => { if (!navigator.onLine) setError('You are offline. Reconnect before submitting.'); }, 10000);
     return () => { offPublic(); offAuth(); offConnection(); clearTimeout(timer); };

@@ -527,6 +527,8 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
 .tier-option > span { display: block; padding-right: 26px; }
 .tier-option strong { display: block; font-family: var(--display); font-size: 21px; font-weight: 700; line-height: 1.1; text-transform: uppercase; }
 .tier-option small { display: block; margin-top: 4px; }
+.tier-eligibility { display: inline-block; margin-top: 8px; font-size: 12px; font-style: normal; font-weight: 700; color: var(--good); }
+.tier-eligibility.unavailable { color: var(--clay); }
 .tier-option.both, .tier-option.higher { flex-direction: row; }
 .tier-option.selected { border-color: var(--lime); box-shadow: 0 0 0 1px #d9f24b55, 0 10px 30px #d9f24b1a; }
 .tier-option.rising.selected { border-color: var(--sky); box-shadow: 0 0 0 1px #5fd3f355, 0 10px 30px #5fd3f31a; }
@@ -547,6 +549,8 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
 .preview-unit { font-family: var(--display); font-size: 15px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
 .assignment { font-size: 14px; }
 .assignment strong { color: var(--lime); }
+.eligibility-summary { margin: 0; padding: 10px 12px; border: 1px solid var(--line-2); border-radius: var(--r-sm); background: #0b172488; color: var(--soft); font-size: 13px; line-height: 1.4; }
+.eligibility-summary strong { color: var(--lime); }
 .preview-players { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
 .preview-players li { display: grid; grid-template-columns: 70px 1fr auto; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .preview-players span { font-family: var(--display); font-size: 14px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
@@ -989,6 +993,7 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
   .preview-score .eyebrow, .preview-unit, .preview .meter, .preview-players, .preview-notes { display: none; }
   .preview output { font-size: 40px; }
   .assignment { max-width: 58%; text-align: right; font-size: 12.5px; }
+  .eligibility-summary { padding: 6px 8px; font-size: 11px; }
   .success-facts { grid-template-columns: 1fr; }
 
   /* lineup */
