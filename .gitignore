@@ -11,3 +11,9 @@ firebase-config.json
 test-results/
 playwright-report/
 dist-pwa/
+
+# Editor and OS files
+.idea/
+.vscode/
+.DS_Store
+*.swp
