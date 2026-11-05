@@ -1,9 +1,10 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useRulesAccess } from '../hooks/useRulesAccess';
 import { Icon } from '../components/Icons';
 import { ruleCards } from '../rules/cards';
 import { useTournament } from '../hooks/useTournament';
+import { isMuted, playCardChange, playWelcome, setMuted } from '../audio/cardSound';
 
 // Played on every card change: a racquet swings and three balls bounce across the card.
 function Rally() {
@@ -20,14 +21,51 @@ function Rally() {
   );
 }
 
+// Shrinks each card's content just enough to fit its card, so no card needs scrolling.
+// Smallest scale that still reads well (a little lower when the card itself is tiny); below this the card scrolls as a last resort.
+const minFit = body => (body.clientHeight < 340 ? 0.5 : 0.6);
+function fitCard(body) {
+  const inner = body.firstElementChild;
+  if (!inner) return;
+  const fits = () => body.scrollHeight <= body.clientHeight + 1 && body.scrollWidth <= body.clientWidth + 1;
+  inner.style.zoom = 1;
+  if (fits()) { body.dataset.fit = '1'; return; }
+  let low = minFit(body), high = 1;
+  for (let i = 0; i < 8; i++) { const mid = (low + high) / 2; inner.style.zoom = mid; if (fits()) low = mid; else high = mid; }
+  inner.style.zoom = low;
+  body.dataset.fit = low.toFixed(2);
+}
+function useFitCards(track, deps) {
+  useLayoutEffect(() => {
+    const el = track.current;
+    if (!el || !CSS.supports?.('zoom', '1')) return;
+    const fitAll = () => el.querySelectorAll('.rule-card-body').forEach(fitCard);
+    fitAll();
+    const observer = new ResizeObserver(fitAll);
+    observer.observe(el);
+    document.fonts?.ready.then(fitAll);
+    return () => observer.disconnect();
+  }, deps); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
 export default function Rules() {
   const { accepted, accept } = useRulesAccess();
   const { data } = useTournament();
   const RULE_CARDS = useMemo(() => ruleCards(data?.settings ? data.tierConfig : undefined, data?.leagueRules), [data?.settings, data?.tierConfig, data?.leagueRules]);
   const COUNT = RULE_CARDS.length;
   const track = useRef(null);
+  useFitCards(track, [RULE_CARDS]);
+  const [muted, setMutedState] = useState(isMuted);
+  const firstCard = useRef(true);
   const [current, setCurrent] = useState(0), [seen, setSeen] = useState([0]), [checked, setChecked] = useState(false);
   const allSeen = seen.length === COUNT, last = current === COUNT - 1;
+  // Sound: a welcome on the first card, then a slice, swoosh and ball bounces every time a card flips in.
+  useEffect(() => playWelcome(), []);
+  useEffect(() => {
+    if (firstCard.current) { firstCard.current = false; return; }
+    playCardChange({ reducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches });
+  }, [current]);
+  function toggleSound() { const next = !muted; setMuted(next); setMutedState(next); if (!next) playCardChange({ reducedMotion: true }); }
 
   function show(index) {
     setCurrent(index);
@@ -52,10 +90,11 @@ export default function Rules() {
     <section className="rules-screen" aria-label="Official Triace tournament rules">
       <div className="deck">
         {current > 0 && <Rally key={current} />}
+        <button type="button" className="sound-toggle" onClick={toggleSound} aria-pressed={!muted} aria-label={muted ? 'Sound off. Turn card sounds on' : 'Sound on. Turn card sounds off'} title={muted ? 'Sound off' : 'Sound on'}><Icon name={muted ? 'volumeOff' : 'volume'} size={18} /></button>
         <div className="deck-track" ref={track} onScroll={onScroll} onKeyDown={onKeyDown} tabIndex={0} aria-roledescription="carousel" aria-label="Rule cards">
           {RULE_CARDS.map((card, i) => (
             <article key={card.title} className={`rule-card${card.hero ? ' hero' : ''}${i === current ? ' active' : ''}`} aria-roledescription="slide" aria-label={`${i + 1} of ${COUNT}: ${card.title}`} aria-hidden={i !== current}>
-              <div className="rule-card-body">{card.body}</div>
+              <div className="rule-card-body"><div className="rule-fit">{card.body}</div></div>
             </article>
           ))}
         </div>

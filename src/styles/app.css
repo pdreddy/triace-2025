@@ -339,6 +339,7 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
 /* card flips in while the rally plays */
 .rule-card.active .rule-card-body { border-color: var(--lime); box-shadow: 0 0 0 6px #d9f24b10; animation: card-in .45s cubic-bezier(.2, .8, .2, 1) both; }
 .rule-card-body { justify-content: safe center; }
+.rule-fit { display: flex; flex-direction: column; gap: 16px; flex: none; min-width: 0; }
 .rally { position: absolute; inset: 0 0 56px; z-index: 3; overflow: hidden; pointer-events: none; border-radius: var(--r-lg); }
 .racquet { position: absolute; left: 3%; top: 30%; width: 64px; height: 150px; transform-origin: 50% 95%; animation: racquet-swing 1.6s cubic-bezier(.3, 1.4, .5, 1) both; filter: drop-shadow(0 8px 14px #0009); }
 .racquet-frame { fill: #d9f24b14; stroke: var(--lime); stroke-width: 5; }
@@ -1175,3 +1176,80 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
 .early-bird.late .pill { background: #ff8a6b; }
 .early-bird strong { color: #fff; }
 @media (max-width: 700px) { .hero-format { grid-template-columns: 1fr; gap: 6px; } .hero-format > div { padding: 7px 12px; font-size: 12.5px; } .early-bird { padding: 7px 12px; font-size: 12.5px; } .early-bird .pill { font-size: 11px; padding: 3px 10px; } }
+
+/* ---------- Rules deck: compact steps so cards fit without shrinking too far ----------
+   Content is also auto-fitted by JS (Rules.jsx); these keep the natural size close to the card. */
+.rule-card-body { padding-top: clamp(14px, 3.2vh, 28px); padding-bottom: clamp(12px, 2.6vh, 24px); }
+.rule-fit { gap: clamp(8px, 1.8vh, 16px); }
+.rule-title { font-size: clamp(44px, 11vh, 104px); }
+@media (max-height: 880px) {
+  .rule-stats div { padding: 8px 12px; }
+  .rule-stats b { font-size: 28px; }
+  .rule-stats span { margin-top: 2px; font-size: 12px; line-height: 1.25; }
+  .hero-format > div { padding: 6px 12px; font-size: 13px; }
+  .early-bird { padding: 6px 12px; font-size: 13px; }
+  .hero-tier-meter { padding: 9px 12px; }
+  .hero-tier-tiles { margin-top: 6px; gap: 8px; }
+  .hero-tier-tile { padding: 6px 10px; }
+  .hero-tier-tile strong { font-size: 18px; }
+  .hero-tier-meter .meter-bar { height: 16px; }
+  .hero-tier-meter .rule-text { margin-top: 6px; font-size: 12.5px; line-height: 1.35; }
+  .rule-head h2 { font-size: clamp(22px, 4vh, 34px); }
+  .rule-box, .outcome { padding: 10px 12px; }
+  .rule-text, .ticks li { line-height: 1.4; }
+}
+@media (max-height: 760px) {
+  .rule-lead { margin: 0; font-size: 15px; }
+  .rule-hint { font-size: 13px; }
+  .eyebrow { margin-bottom: 0; }
+  .rule-box, .outcome { padding: 8px 10px; }
+}
+@media (max-width: 760px) {
+  .rule-card.hero .rule-fit { gap: 8px; }
+  .hero-format { gap: 6px; }
+  .hero-format > div { padding: 5px 10px; font-size: 12px; line-height: 1.3; }
+  .hero-tier-tile span, .hero-tier-tile small { font-size: 11px; }
+  .rule-stats span { font-size: 11px; }
+  .rule-title { font-size: clamp(40px, 9vh, 56px); }
+}
+
+/* Short screens (small phones, landscape): the dots already show progress, so the dock drops its bar and every row gets tighter. */
+@media (max-height: 700px) {
+  .rules-dock-row { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }  /* stays available to screen readers */
+  .rules-dock { gap: 0; padding: 7px 10px; }
+  .rules-agree { padding-top: 0; border-top: 0; gap: 8px; }
+  .rules-agree label { font-size: 12px; line-height: 1.25; gap: 8px; }
+  .rules-agree .button, .rules-agree button { padding: 8px 14px; font-size: 14px; min-height: 36px; }
+  .deck, .rules-screen { gap: 6px; }
+  .round-button { width: 36px; height: 36px; }
+  .deck-nav { gap: 8px; }
+  .screen-rules main { padding-top: 8px; padding-bottom: calc(8px + var(--tabbar) + env(safe-area-inset-bottom)); }
+}
+@media (max-height: 520px) {
+  .topbar-inner { min-height: 44px; padding: 4px var(--gutter); gap: 10px; }
+  .brand { font-size: 22px; }
+  .brand img { width: 28px; height: 28px; }
+  .tabs a, .nav-locked { padding: 4px 10px; font-size: 14px; }
+  .tabs a svg, .nav-locked svg { display: none; }
+  .rules-dock { flex-direction: row; align-items: center; justify-content: space-between; padding: 5px 10px; }
+  .rules-agree { flex: 1; }
+  .rule-card-body { padding-top: 10px; padding-bottom: 8px; }
+  .rule-title { font-size: 40px; }
+}
+
+/* Opening card on short phones: the tier tiles already show the ranges, so drop the duplicate bar, intro line and hint. */
+@media (max-width: 760px) and (max-height: 700px) {
+  .rule-card.hero .rule-lead, .rule-card.hero .rule-hint, .hero-tier-meter .meter { display: none; }
+  .rule-card.hero .rule-stats span { font-size: 10.5px; }
+}
+@media (max-height: 600px) {
+  .rule-card-body { padding-top: 8px; padding-bottom: 6px; }
+  .rule-fit { gap: 6px; }
+  .rule-head h2 { font-size: 20px; }
+}
+
+/* Sound on/off for the flash cards */
+.sound-toggle { position: absolute; top: 10px; right: 10px; z-index: 5; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line-2); background: #0b1724cc; color: var(--soft); cursor: pointer; backdrop-filter: blur(4px); }
+.sound-toggle:hover, .sound-toggle:focus-visible { color: #fff; border-color: var(--lime); }
+.sound-toggle[aria-pressed="true"] { color: var(--lime); }
+@media (max-height: 700px) { .sound-toggle { top: 6px; right: 6px; width: 30px; height: 30px; } }
