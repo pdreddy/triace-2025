@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTournament } from '../hooks/useTournament';
 import { useRulesAccess } from '../hooks/useRulesAccess';
@@ -71,10 +71,18 @@ export default function Register() {
 
   let combined = 0, complete = true;
   for (const value of Object.values(players)) {
-    try { if (!value.singles) complete = false; combined += playerUtr(value.singles ? parseUtr(value.singles) : 0, value.doubles ? parseUtr(value.doubles) : null, gap); } catch { complete = false; }
+    try {
+      if (!value.singles) { complete = false; continue; }
+      const singles = parseUtr(value.singles), doubles = value.doubles ? parseUtr(value.doubles) : null;
+      if (singles < (settings?.minPlayerUtr ?? 1) || singles > (settings?.maxPlayerUtr ?? 1650) || (doubles !== null && (doubles < (settings?.minPlayerUtr ?? 1) || doubles > (settings?.maxPlayerUtr ?? 1650)))) complete = false;
+      combined += playerUtr(singles, doubles, gap);
+    } catch { complete = false; }
   }
   const highest = complete ? assignTier(combined, config) : null;
   const assigned = complete ? assignSelectedTier(combined, config, selectedTier) : null;
+  useEffect(() => {
+    if (complete && highest && !assigned) setSelectedTier('higher');
+  }, [complete, highest, assigned]);
   const eligibleTiers = complete ? active.filter(t => assignSelectedTier(combined, config, t.id)) : [];
   const goatShortfall = complete && config.goat?.active && combined < config.goat.minCombinedUtr ? config.goat.minCombinedUtr - combined : 0;
   const assignedLabel = assigned ? (selectedTier === 'both' ? 'GOAT + Rising' : config[assigned].name) : complete ? (highest ? 'Choose an eligible tier or allow Rising fallback' : 'No eligible active tier') : 'Add all three UTR values';
