@@ -1083,22 +1083,20 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
 .podium dt { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
 .podium dd { margin: 2px 0 0; font-family: var(--display); font-size: 24px; text-transform: uppercase; color: #fff; overflow-wrap: anywhere; }
 .podium .silver dd { font-size: 19px; color: #c9d4de; }
-.final-note { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 14px 0 0; font-size: 14px; color: var(--muted); }
-.final-note b { color: #fff; }
-.grand-final { margin: 18px 0; }
-.grand-final h2 { margin-bottom: 10px; }
-.grand-final .champion-banner { margin-bottom: 10px; }
-.final-lines { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
-.final-lines li { display: grid; grid-template-columns: 34px 1fr auto 1fr; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 10px; background: #ffffff08; font-size: 14px; }
-.final-lines i { font-style: normal; font-weight: 700; color: var(--lime); text-align: center; }
-.final-lines span:last-child { text-align: right; }
-.final-lines .winner { color: #fff; font-weight: 700; }
-.final-lines span { color: var(--muted); }
+.members { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--muted); }
+.podium .members { font-size: 13px; }
+.published .short { display: none; }
 @media (max-width: 700px) {
+  .published .long { display: none; }
+  .published .short { display: inline; }
+  .published th, .published td { padding-left: 6px; padding-right: 6px; }
+  .published td:nth-child(2) { white-space: normal; min-width: 0; }
+  .published .members { font-size: 11px; line-height: 1.25; }
+  .published .num { font-size: 15px; }
+  .published .strong { font-size: 17px; }
+  .published .rank-cell { font-size: 16px; padding-right: 2px; }
   .podiums { grid-template-columns: 1fr 1fr; gap: 8px; }
   .podium { padding: 10px; }
   .podium dd { font-size: 19px; }
   .podium .silver dd { font-size: 16px; }
-  .final-lines li { grid-template-columns: 28px 1fr auto; }
-  .final-lines span:last-child { grid-column: 2 / 4; text-align: left; }
 }

@@ -24,13 +24,10 @@ const tierConfig = { a: { name: 'Group A', sortOrder: 1, active: true }, b: { na
 const tiers = { a: { teams: {} }, b: { teams: {} } }, fixtures = { a: {}, b: {} };
 const addTeam = name => { tiers[tierOf(name)].teams[teamId(name)] = { teamId: teamId(name), name }; };
 
-let grandFinal = null, round = {};
+const round = {};
 for (const r of raw) {
   addTeam(r.t1); addTeam(r.t2);
-  if (r.isPlayoff) {
-    grandFinal = { id: 'grand-final', stage: 'final', label: 'Grand final', ...fixture(r, { format: 'po', order: 1 }), homeTier: tierOf(r.t1), awayTier: tierOf(r.t2), score: [r.s1, r.s2] };
-    continue;
-  }
+  if (r.isPlayoff) continue; // the single playoff record is left out on purpose; winners are announced separately
   const tier = tierOf(r.t1), id = r.key;
   fixtures[tier][id] = { id, tierId: tier, round: (round[tier] = (round[tier] || 0) + 1), ...fixture(r) };
 }
@@ -38,9 +35,9 @@ for (const r of raw) {
 const season = {
   id: 's1', name: 'Season 1', legacy: true,
   startedAt: raw[0].ts, archivedAt: raw.at(-1).ts,
-  tierConfig, tiers, fixtures, grandFinal, champions: {},
+  tierConfig, tiers, fixtures,
   leagueRules: { pointsPerWin: 2, playoffThreshold: 99, playoffSpotsLarge: 1, playoffSpotsSmall: 1 }
 };
 writeFileSync(new URL('../src/data/season1.json', import.meta.url), `${JSON.stringify(season)}\n`);
 const count = Object.values(fixtures).reduce((n, f) => n + Object.keys(f).length, 0);
-console.log(`Season 1: ${Object.keys(tiers.a.teams).length} + ${Object.keys(tiers.b.teams).length} teams, ${count} league encounters, grand final: ${grandFinal ? `${grandFinal.home} v ${grandFinal.away}` : 'none'}`);
+console.log(`Season 1: ${Object.keys(tiers.a.teams).length} + ${Object.keys(tiers.b.teams).length} teams, ${count} league encounters`);

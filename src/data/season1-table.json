@@ -1,0 +1,190 @@
+{
+ "_note": "Season 1 final table as published by the organisers. Add \"champions\": {\"a\": {\"winner\": \"a2\", \"runnerUp\": \"a1\"}, \"b\": {...}} here once the winners are announced.",
+ "champions": {},
+ "tables": {
+  "a": [
+   {
+    "teamId": "a2",
+    "members": "Prashant/Vinoth/Vamsi",
+    "m": 10,
+    "w": 9,
+    "l": 1,
+    "game": 158,
+    "singles": 109,
+    "pts": 26
+   },
+   {
+    "teamId": "a1",
+    "members": "Yogesh/Dinkar/Sudarshan",
+    "m": 9,
+    "w": 9,
+    "l": 0,
+    "game": 91,
+    "singles": 49,
+    "pts": 17
+   },
+   {
+    "teamId": "a3",
+    "members": "Sudhakar/Dinesh/Uma",
+    "m": 11,
+    "w": 6,
+    "l": 5,
+    "game": 56,
+    "singles": 36,
+    "pts": 3
+   },
+   {
+    "teamId": "a7",
+    "members": "Sreekanth B/Uday P/Sashi R",
+    "m": 8,
+    "w": 4,
+    "l": 4,
+    "game": -8,
+    "singles": -1,
+    "pts": 0
+   },
+   {
+    "teamId": "a5",
+    "members": "Hari/Ram/Satish",
+    "m": 8,
+    "w": 4,
+    "l": 4,
+    "game": -25,
+    "singles": -8,
+    "pts": -2
+   },
+   {
+    "teamId": "a9",
+    "members": "Harsha S/Vijay V/Kartha V",
+    "m": 4,
+    "w": 1,
+    "l": 3,
+    "game": -51,
+    "singles": -32,
+    "pts": -6
+   },
+   {
+    "teamId": "a4",
+    "members": "Sandeep G/Damu/Vidhya Sagar",
+    "m": 10,
+    "w": 2,
+    "l": 8,
+    "game": -62,
+    "singles": -45,
+    "pts": -12
+   },
+   {
+    "teamId": "a6",
+    "members": "Nagarjuna/Mohan/Ganesh",
+    "m": 6,
+    "w": 1,
+    "l": 5,
+    "game": -69,
+    "singles": -46,
+    "pts": -12
+   },
+   {
+    "teamId": "a8",
+    "members": "Mayur Patel/Chandrakant/Pardeep K",
+    "m": 6,
+    "w": 0,
+    "l": 6,
+    "game": -90,
+    "singles": -62,
+    "pts": -14
+   }
+  ],
+  "b": [
+   {
+    "teamId": "b2",
+    "members": "Kalyan/Sandeep/Uday",
+    "m": 10,
+    "w": 9,
+    "l": 1,
+    "game": 92,
+    "singles": 56,
+    "pts": 16
+   },
+   {
+    "teamId": "b3",
+    "members": "Kails/Raja M/Vivek Reddy",
+    "m": 9,
+    "w": 6,
+    "l": 3,
+    "game": 43,
+    "singles": 34,
+    "pts": 15
+   },
+   {
+    "teamId": "b5",
+    "members": "Narayan P/Ratnesh/Jay S",
+    "m": 9,
+    "w": 6,
+    "l": 3,
+    "game": 34,
+    "singles": 36,
+    "pts": 5
+   },
+   {
+    "teamId": "b6",
+    "members": "Vinod A/Raj K/Krishna",
+    "m": 9,
+    "w": 5,
+    "l": 4,
+    "game": 20,
+    "singles": -9,
+    "pts": 5
+   },
+   {
+    "teamId": "b4",
+    "members": "Venky DH/Kalam/Vasu",
+    "m": 0,
+    "w": 0,
+    "l": 0,
+    "game": 0,
+    "singles": 0,
+    "pts": 0
+   },
+   {
+    "teamId": "b1",
+    "members": "Manish/Biju/Ritesh",
+    "m": 11,
+    "w": 5,
+    "l": 6,
+    "game": 36,
+    "singles": 11,
+    "pts": -1
+   },
+   {
+    "teamId": "b8",
+    "members": "Mahi/Shivaji/Vikas",
+    "m": 5,
+    "w": 2,
+    "l": 3,
+    "game": -22,
+    "singles": -20,
+    "pts": -3
+   },
+   {
+    "teamId": "b7",
+    "members": "Srikanth/Bharat/Sridhar",
+    "m": 8,
+    "w": 4,
+    "l": 4,
+    "game": -27,
+    "singles": 8,
+    "pts": -4
+   },
+   {
+    "teamId": "b9",
+    "members": "Chandu M/Dinesh K/Malla",
+    "m": 13,
+    "w": 0,
+    "l": 13,
+    "game": -176,
+    "singles": -116,
+    "pts": -33
+   }
+  ]
+ }
+}

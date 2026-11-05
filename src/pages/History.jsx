@@ -17,25 +17,28 @@ export function PageTabs({ active }) {
   );
 }
 
-function GrandFinal({ season, teams }) {
-  const f = season.grandFinal;
-  if (!f) return null;
-  const winner = f.result.winner, name = side => teamName(teams.get(f[side]));
+const signed = n => (n > 0 ? `+${n}` : String(n));
+export const Members = ({ team }) => (team?.members ? <small className="members">{team.members.split('/').join(' · ')}</small> : null);
+
+// Season 1's published table: matches, wins, losses, game and singles difference, points.
+function PublishedTable({ rows, teams }) {
   return (
-    <section className="grand-final">
-      <h2>{f.label}</h2>
-      <p className="champion-banner"><Icon name="trophy" size={22} /><span>Champions</span><b>{name(winner)}</b><em>Runners-up: {name(winner === 'home' ? 'away' : 'home')}</em></p>
-      <ul className="final-lines">
-        {f.result.matches.map(m => (
-          <li key={m.key} className={m.winner}>
-            <b>{m.label}</b>
-            <span className={m.winner === 'home' ? 'winner' : ''}>{m.home.join(' + ')}</span>
-            <i>{m.score}</i>
-            <span className={m.winner === 'away' ? 'winner' : ''}>{m.away.join(' + ')}</span>
-          </li>
-        ))}
-      </ul>
-    </section>
+    <div className="table-wrap">
+      <table className="standings league-table published">
+        <thead><tr><th scope="col">#</th><th scope="col">Team</th><th scope="col" className="num">M</th><th scope="col" className="num">W</th><th scope="col" className="num">L</th><th scope="col" className="num"><span className="long">Game +/-</span><span className="short">Gm</span></th><th scope="col" className="num"><span className="long">Singles +/-</span><span className="short">Sg</span></th><th scope="col" className="num">Pts</th></tr></thead>
+        <tbody>
+          {rows.map((row, i) => (
+            <tr key={row.teamId} className={i < 3 ? 'qualify' : ''}>
+              <td className="rank-cell">{i + 1}</td>
+              <td><b>{teamName(teams.get(row.teamId))}</b><Members team={teams.get(row.teamId)} /></td>
+              <td className="num">{row.m}</td><td className="num">{row.w}</td><td className="num">{row.l}</td>
+              <td className="num">{signed(row.game)}</td><td className="num">{signed(row.singles)}</td><td className="num strong">{row.pts}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="table-note">Top 3 teams advance · ranking: match points, game difference (+ doubles bonus), singles game difference, head-to-head.</p>
+    </div>
   );
 }
 
@@ -59,7 +62,7 @@ function SeasonList({ data }) {
               <ul className="champions">
                 {tiers.map(t => {
                   const champ = tierResult(season, t.id);
-                  return <li key={t.id} className={tierTone(t.id)}><Icon name="trophy" size={18} /><span>{t.name}</span><b>{champ ? teamName(teams.get(champ.winner)) : 'No champion recorded'}</b></li>;
+                  return <li key={t.id} className={tierTone(t.id)}><Icon name="trophy" size={18} /><span>{t.name}</span><b>{champ ? teamName(teams.get(champ.winner)) : season.legacy ? 'To be announced' : 'No champion recorded'}</b></li>;
                 })}
               </ul>
               <span className="text-link">{teams.size} teams · view season <Icon name="arrow" size={14} /></span>
@@ -73,7 +76,7 @@ function SeasonList({ data }) {
 
 function SeasonDetail({ season }) {
   const teams = seasonTeams(season), tiers = seasonTiers(season);
-  const encounters = Object.values(season.fixtures || {}).flatMap(f => Object.values(f || {})).filter(f => f.status === 'final').length + (season.grandFinal ? 1 : 0);
+  const encounters = Object.values(season.fixtures || {}).flatMap(f => Object.values(f || {})).filter(f => f.status === 'final').length;
   return (
     <section className="page history-screen">
       <header className="page-head with-actions">
@@ -87,18 +90,17 @@ function SeasonDetail({ season }) {
         <Stat value={teams.size} label="Teams" />
         <Stat value={tiers.length} label="Tiers" />
         <Stat value={encounters} label="Encounters played" />
-        <Stat value={tiers.filter(t => tierResult(season, t.id)).length} label={season.legacy ? 'Group winners' : 'Champions'} tone="accent" />
+        {season.legacy ? <Stat value="TBA" label="Winners" tone="accent" /> : <Stat value={tiers.filter(t => tierResult(season, t.id)).length} label="Champions" tone="accent" />}
       </div>
-      <GrandFinal season={season} teams={teams} />
       {tiers.map(tier => {
         const tierFixtures = season.fixtures?.[tier.id] || {}, champ = tierResult(season, tier.id);
-        const rows = seasonTable(season, tier.id);
+        const rows = season.legacy ? season.table[tier.id] : seasonTable(season, tier.id);
         const playoffs = Object.values(tierFixtures).filter(f => f.stage);
         return (
           <section key={tier.id} className={`tier-group ${tierTone(tier.id)}`}>
             <div className="tier-head"><div><h2>{tier.name}</h2><span>{rows.length} teams</span></div></div>
-            {champ && <p className="champion-banner"><Icon name="trophy" size={22} /><span>{champ.basis === 'table' ? 'Group winners' : 'Champions'}</span><b>{teamName(teams.get(champ.winner))}</b><em>Runners-up: {teamName(teams.get(champ.runnerUp))}</em></p>}
-            {rows.length > 0 && <StandingsTable rows={rows} rules={season.leagueRules} archived />}
+            {champ && <p className="champion-banner"><Icon name="trophy" size={22} /><span>Champions</span><b>{teamName(teams.get(champ.winner))}</b><em>Runners-up: {teamName(teams.get(champ.runnerUp))}</em></p>}
+            {rows.length > 0 && (season.legacy ? <PublishedTable rows={rows} teams={teams} /> : <StandingsTable rows={rows} rules={season.leagueRules} archived />)}
             {playoffs.length > 0 && <><h3 className="round-title">Playoffs</h3><Bracket fixtures={playoffs} teams={teams} archived /></>}
           </section>
         );

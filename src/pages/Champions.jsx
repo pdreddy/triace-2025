@@ -3,7 +3,7 @@ import { useTournament } from '../hooks/useTournament';
 import { EmptyState, tierTone } from '../components/UI';
 import { Icon } from '../components/Icons';
 import { teamName } from '../components/League';
-import { PageTabs } from './History';
+import { Members, PageTabs } from './History';
 import { seasonList, seasonTeams, seasonTiers, tierResult } from '../data/seasons.js';
 
 const year = ms => (ms ? new Date(ms).getFullYear() : '');
@@ -15,10 +15,10 @@ function Podium({ tier, result, teams, legacy }) {
       <h3>{tier.name}</h3>
       {result ? (
         <dl>
-          <div className="gold"><dt><Icon name="trophy" size={16} /> {legacy ? 'Group winner' : 'Winner'}</dt><dd>{teamName(teams.get(result.winner))}</dd></div>
-          <div className="silver"><dt>Runner-up</dt><dd>{teamName(teams.get(result.runnerUp))}</dd></div>
+          <div className="gold"><dt><Icon name="trophy" size={16} /> Winner</dt><dd>{teamName(teams.get(result.winner))}</dd><Members team={teams.get(result.winner)} /></div>
+          <div className="silver"><dt>Runner-up</dt><dd>{teamName(teams.get(result.runnerUp))}</dd><Members team={teams.get(result.runnerUp)} /></div>
         </dl>
-      ) : <p className="muted">No champion recorded.</p>}
+      ) : <p className="muted">{legacy ? 'Winners to be announced.' : 'No champion recorded.'}</p>}
     </div>
   );
 }
@@ -37,7 +37,7 @@ export default function Champions() {
       <PageTabs active="champions" />
       {!seasons.length && <EmptyState icon="trophy" title="No champions yet.">Champions appear here once a season is closed.</EmptyState>}
       {seasons.map(season => {
-        const teams = seasonTeams(season), tiers = seasonTiers(season), final = season.grandFinal;
+        const teams = seasonTeams(season), tiers = seasonTiers(season);
         return (
           <article key={season.id} className="champ-season">
             <header>
@@ -46,7 +46,6 @@ export default function Champions() {
               <Link className="text-link" to={`/history/${season.id}`}>Full season <Icon name="arrow" size={14} /></Link>
             </header>
             <div className="podiums">{tiers.map(t => <Podium key={t.id} tier={t} result={tierResult(season, t.id)} teams={teams} legacy={season.legacy} />)}</div>
-            {final && <p className="final-note"><Icon name="trophy" size={16} /> Grand final: <b>{teamName(teams.get(final.result.winner === 'home' ? final.home : final.away))}</b> beat {teamName(teams.get(final.result.winner === 'home' ? final.away : final.home))}</p>}
           </article>
         );
       })}
