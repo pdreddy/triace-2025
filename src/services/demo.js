@@ -26,6 +26,7 @@ export function createDemoService() {
     recalculate: () => request('recalculate', {}),
     generateFixtures: payload => request('generate-fixtures', payload),
     generatePlayoffs: payload => request('generate-playoffs', payload),
+    saveEarlyBird: payload => request('early-bird', payload),
     saveLeagueRules: payload => request('league-rules', payload),
     setSchedule: payload => request('set-schedule', payload),
     moveFixture: payload => request('move-fixture', payload),

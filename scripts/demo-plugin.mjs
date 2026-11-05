@@ -1,7 +1,7 @@
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
 import path from 'node:path';
-import { initialState, publicState, applyRegistration, applyConfiguration, applyRecalculation, applyLeagueRules, isOwner, ValidationError } from '../functions/lib/tournament.js';
+import { initialState, publicState, applyRegistration, applyConfiguration, applyEarlyBird, applyRecalculation, applyLeagueRules, isOwner, ValidationError } from '../functions/lib/tournament.js';
 import { applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult, applyManageSeason, applySetSchedule, applyMoveFixture, applyIssueChallenge, applyUpdateTeam, applyWithdrawTeam, applySetCaptainLogin } from '../functions/lib/league.js';
 import { newLogin, newPassword, captainUid, loginEmail, normalizePassword } from '../functions/lib/captainLogin.js';
 import { validateLegacySeason } from '../functions/lib/legacy.js';
@@ -121,6 +121,7 @@ export function demoPlugin(env) {
           });
           return send(200, { teamId: record.teamId, username, password });
         }
+        if (endpoint === '/early-bird') return send(200, await mutate(current => applyEarlyBird(current, payload)));
         if (endpoint === '/league-rules') return send(200, await mutate(current => applyLeagueRules(current, payload)));
         if (endpoint === '/season') return send(200, await mutate(current => applyManageSeason(current, payload)));
         if (endpoint === '/review-result') return send(200, await mutate(current => applyReviewResult(current, payload)));

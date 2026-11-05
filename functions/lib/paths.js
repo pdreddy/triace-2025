@@ -5,7 +5,7 @@ export const DEFAULT_DB_ROOT = 'traice2_0';
 const SEGMENT = /^[A-Za-z0-9_-]+$/; // Realtime Database keys cannot contain . $ # [ ] /
 
 // Every child node the tournament itself owns under the root. Season 1 may never be written on top of one.
-export const RESERVED_ROOT_CHILDREN = ['settings', 'tierConfig', 'configRevision', 'tiers', 'registrations', 'teamsByOwner', 'fixtures', 'leagueRules', 'season', 'seasons', 'schedules', 'archive'];
+export const RESERVED_ROOT_CHILDREN = ['settings', 'tierConfig', 'configRevision', 'tiers', 'registrations', 'teamsByOwner', 'fixtures', 'leagueRules', 'season', 'seasons', 'schedules', 'archive', 'earlyBird'];
 
 export function cleanPath(value, label) {
   const path = String(value ?? '').trim().replace(/^\/+|\/+$/g, '');

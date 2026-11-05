@@ -4,6 +4,7 @@ import { useRulesAccess } from '../hooks/useRulesAccess';
 import { Icon } from '../components/Icons';
 import { ruleCards } from '../rules/cards';
 import { useTournament } from '../hooks/useTournament';
+import { useEarlyBird } from '../hooks/useEarlyBird';
 import { isMuted, playCardChange, playWelcome, setMuted } from '../audio/cardSound';
 
 // Played on every card change: a racquet swings and three balls bounce across the card.
@@ -23,7 +24,7 @@ function Rally() {
 
 // Shrinks each card's content just enough to fit its card, so no card needs scrolling.
 // Smallest scale that still reads well (a little lower when the card itself is tiny); below this the card scrolls as a last resort.
-const minFit = body => (body.clientHeight < 340 ? 0.5 : 0.6);
+const minFit = body => (body.clientHeight < 340 ? 0.5 : body.clientHeight < 420 ? 0.56 : 0.6);
 function fitCard(body) {
   const inner = body.firstElementChild;
   if (!inner) return;
@@ -51,7 +52,8 @@ function useFitCards(track, deps) {
 export default function Rules() {
   const { accepted, accept } = useRulesAccess();
   const { data } = useTournament();
-  const RULE_CARDS = useMemo(() => ruleCards(data?.settings ? data.tierConfig : undefined, data?.leagueRules), [data?.settings, data?.tierConfig, data?.leagueRules]);
+  const { bird } = useEarlyBird();
+  const RULE_CARDS = useMemo(() => ruleCards(data?.settings ? data.tierConfig : undefined, data?.leagueRules, bird), [data?.settings, data?.tierConfig, data?.leagueRules, bird.phase, bird.short, bird.countdown]);
   const COUNT = RULE_CARDS.length;
   const track = useRef(null);
   useFitCards(track, [RULE_CARDS]);

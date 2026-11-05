@@ -42,6 +42,9 @@
       "schedules": {
         ".read": true
       },
+      "earlyBird": {
+        ".read": true
+      },
       "season1": {
         ".read": true
       }

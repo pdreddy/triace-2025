@@ -87,3 +87,73 @@ test('League has Schedule and Score entry tabs', async ({ page }) => {
   await expect(page.getByRole('tab', { name: 'Schedule' })).toBeVisible();
   await expect(page.getByRole('tab', { name: 'Score entry' })).toBeVisible();
 });
+
+// ---- Early bird ----
+const localDay = offset => { const d = new Date(); d.setDate(d.getDate() + offset); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+async function acceptRules(page) {
+  await page.goto('/');
+  for (let i = 0; i < 9; i++) await page.getByRole('button', { name: 'Next rule card' }).click();
+  await page.getByRole('checkbox', { name: /read all sections/ }).check();
+  await page.getByRole('button', { name: 'Agree to rules' }).click();
+  await expect(page.getByRole('link', { name: 'Register team ↗' })).toBeVisible();
+}
+async function savePlan(page, { enabled = true, opens, ends, fee }) {
+  const box = page.getByLabel('Show the early bird to visitors');
+  if ((await box.isChecked()) !== enabled) await box.setChecked(enabled);
+  await page.getByLabel('Early bird opens').fill(opens);
+  await page.getByLabel('Last early-bird day').fill(ends);
+  await page.getByLabel('Late fee (US$ more)').fill(String(fee));
+  await page.getByRole('button', { name: 'Save early-bird settings' }).click();
+  await expect(page.getByText('Early-bird settings saved', { exact: false })).toBeVisible();
+}
+
+test('early bird: shown on every page, editable by the admin without a rebuild', async ({ page, browser }) => {
+  await adminLogin(page);
+  await savePlan(page, { opens: localDay(-1), ends: localDay(3), fee: 25 });          // open now: 4 days left
+  const visitor = await (await browser.newContext()).newPage();
+  for (const route of ['/', '/tiers', '/league', '/champions', '/history', '/captain']) {
+    await visitor.goto(route);
+    const bar = visitor.locator('.early-bar');
+    await expect(bar, `${route} shows the early-bird bar`).toBeVisible();
+    await expect(bar).toContainText('4 days left');
+    await expect(bar).toContainText('+$25');
+  }
+  await acceptRules(visitor);
+  await visitor.goto('/register');
+  const card = visitor.locator('.early-card');
+  await expect(card).toContainText('Early-bird registration is open');
+  await expect(card).toContainText('registration costs $25 more');
+  await expect(card.locator('.early-steps li')).toHaveCount(3);
+  await expect(card.locator('.early-steps li.current')).toHaveCount(1);
+  await visitor.screenshot({ path: 'test-results/early-bird-register.png' });
+  // the rules card shows it too
+  await visitor.goto('/');
+  await expect(visitor.locator('.rule-card.hero .early-bird')).toContainText('+$25');
+
+  await savePlan(page, { opens: localDay(-10), ends: localDay(-2), fee: 25 });        // ended: the late fee applies now
+  await visitor.goto('/register');
+  await expect(visitor.locator('.early-card')).toContainText('Early-bird registration ended');
+  await expect(visitor.locator('.early-card')).toContainText('costs $25 more');
+  await expect(visitor.locator('.early-bar')).toHaveCount(0);                          // the top bar is only for open / coming up
+
+  await savePlan(page, { opens: localDay(5), ends: localDay(9), fee: 10 });            // coming up
+  await visitor.goto('/');
+  await expect(visitor.locator('.early-bar')).toContainText('Opens in 5 days');
+
+  await savePlan(page, { enabled: false, opens: localDay(5), ends: localDay(9), fee: 10 });   // off: nothing anywhere
+  await visitor.goto('/');
+  await expect(visitor.locator('.early-bar')).toHaveCount(0);
+  await expect(visitor.locator('.rule-card.hero .early-bird')).toHaveCount(0);
+  await visitor.goto('/register');
+  await expect(visitor.locator('.early-card')).toHaveCount(0);
+
+  await savePlan(page, { opens: '2026-11-06', ends: '2026-11-13', fee: 10 });          // put the real plan back
+});
+
+test('early bird: the admin cannot save an impossible plan', async ({ page }) => {
+  await adminLogin(page);
+  await page.getByLabel('Early bird opens').fill('2026-11-20');
+  await page.getByLabel('Last early-bird day').fill('2026-11-13');
+  await expect(page.getByText('cannot end before it opens')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save early-bird settings' })).toBeDisabled();
+});

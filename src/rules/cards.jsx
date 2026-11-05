@@ -54,7 +54,7 @@ function Match({ title, seeds, final = false }) {
 
 // The official Triace 2.0 rules, one flash card per entry, filled in from the admin's tier and
 // league settings. Ratings are in hundredths of a UTR.
-export function ruleCards(tierConfig = DEFAULT_TIERS, rules = DEFAULT_LEAGUE_RULES) {
+export function ruleCards(tierConfig = DEFAULT_TIERS, rules = DEFAULT_LEAGUE_RULES, bird = earlyBirdStatus()) {
   const tiers = orderedTiers(tierConfig, true).sort((a, b) => a.minCombinedUtr - b.minCombinedUtr);
   const configuredShowcase = orderedTiers(tierConfig, false).filter(t => t.id === 'rising' || t.id === 'goat');
   const showcase = (configuredShowcase.length ? configuredShowcase : orderedTiers(DEFAULT_TIERS, false)).sort((a, b) => a.minCombinedUtr - b.minCombinedUtr);
@@ -64,7 +64,6 @@ export function ruleCards(tierConfig = DEFAULT_TIERS, rules = DEFAULT_LEAGUE_RUL
   const gap = formatUtr(rules.utrGapLimit), pct = rules.singlesMinPercent;
   const exampleDoubles = 500 + rules.utrGapLimit + 25, exampleAverage = Math.round((500 + exampleDoubles) / 2);
   const exampleNeed = Math.floor((8 * pct) / 100);
-  const bird = earlyBirdStatus();
   return [
   {
     title: 'Triace 2.0',
@@ -84,7 +83,7 @@ export function ruleCards(tierConfig = DEFAULT_TIERS, rules = DEFAULT_LEAGUE_RUL
           <div><strong className="rule-label">Round-robin league</strong><span>Every team plays every other team in its tier once. Win 2 of 3 matches.</span></div>
           <div><strong className="rule-label">Playoffs</strong><span>Top {rules.playoffSpotsSmall}–{rules.playoffSpotsLarge} teams per tier advance. Best of 5; first to 3 wins.</span></div>
         </div>
-        <p className={`early-bird ${bird.phase}`}><span className="pill">{bird.label}</span><span>{bird.short}</span></p>
+        {bird.phase !== 'off' && <p className={`early-bird ${bird.phase}`}><span className="pill">{bird.label}</span><span>{bird.countdown && <strong>{bird.countdown} · </strong>}{bird.short}</span></p>}
         <div className="hero-tier-meter">
           <strong className="rule-label">Find your team’s tier</strong>
           <div className="hero-tier-tiles">

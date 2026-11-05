@@ -12,6 +12,35 @@ npm run check         # everything: unit, build, PWA, browser tests
 
 `npm run preflight` fails on anything that would break production and warns on anything to double-check.
 
+## 0. Deploy in one command
+
+```bash
+./deploy.sh --dry-run     # runs every check and the build, deploys nothing
+./deploy.sh               # checks, build, then deploys Cloud Functions and Firebase Hosting after you type the project id
+./deploy.sh --no-hosting  # functions only, when Netlify builds the site from git
+./deploy.sh --rules       # also publishes the database rules (merge them with the live rules first)
+```
+
+It refuses to deploy with uncommitted changes, failing tests, a failing PWA or preflight check. Database rules are never deployed unless you pass `--rules` and type `MERGED`, because the project's database may be shared with other apps.
+
+## Where to enter data (live site)
+
+All of this is in the browser, on the **Admin** page (sign in at `/admin/login`). Nothing below needs a rebuild or deploy unless it says so.
+
+| What | Where |
+| --- | --- |
+| Registration open or closed, name privacy, minimum and maximum player rating | Admin → **Registration & privacy** |
+| **Early bird**: on/off, opening date, last day, late fee in dollars | Admin → **Early-bird registration** (saved instantly; shown on the rules, the registration page and a bar on every page) |
+| Tier names and rating ranges, add or remove tiers | Admin → **Tier configuration**, then **Recalculate tiers** |
+| Registered teams: view, edit, search, export, withdraw | Admin → **Private registrations**; **Captain only** hides the other players |
+| A captain lost their login | Admin → **Private registrations** → the team's card → **Reset login** (shown once; send it to the captain) |
+| League rules (points, playoff spots, challenge rule), season name, schedule dates, create fixtures, approve scores, playoffs, close a season | Admin → **League & results** |
+| Scores | Captains: **Captain** sign-in, then **League → Fixtures**. Admin: enter or approve in **League & results** |
+| Season 1 history in the database | Admin → **Firebase & data paths** → **Copy Season 1 into Firebase** (once) |
+| Season 1 winners, squads, Super Six details | `src/data/season1-table.json`, then deploy (these are code files) |
+| Firebase project, database paths | `.env` / `functions/.env` (see README), then deploy |
+| The admin password | Firebase Console → Authentication → Users |
+
 ## 1. Firebase project (needs your Firebase account)
 
 - [ ] Realtime Database enabled; Authentication → **Email/Password** and **Anonymous** enabled.

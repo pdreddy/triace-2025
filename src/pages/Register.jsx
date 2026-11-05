@@ -4,7 +4,8 @@ import { useTournament } from '../hooks/useTournament';
 import { useRulesAccess } from '../hooks/useRulesAccess';
 import { Field, Message, UtrMeter, tierTone } from '../components/UI';
 import { Icon } from '../components/Icons';
-import { earlyBirdStatus } from '../config/earlyBird.js';
+import { EarlyBirdCard } from '../components/EarlyBird';
+import { useEarlyBird } from '../hooks/useEarlyBird';
 import LoginCard from '../components/LoginCard';
 import { assignSelectedTier, assignTier, orderedTiers, parseUtr, formatUtr, validateRegistration, playerUtr, UTR_GAP_LIMIT, DEFAULT_TIERS } from '../../functions/lib/tournament.js';
 
@@ -36,6 +37,7 @@ function TierOption({ value, tone, title, detail, eligibility, art, selected, di
 
 function Success({ result, config, onAgain }) {
   const [saved, setSaved] = useState(!result.login);   // must confirm the login is saved before leaving
+  const { bird } = useEarlyBird();
   const listed = result.listedTiers?.length > 1 ? 'GOAT and Rising' : config[result.assignedTier]?.name || result.assignedTier;
   return (
     <section className="page success-screen" role="status">
@@ -43,6 +45,7 @@ function Success({ result, config, onAgain }) {
       <p className="eyebrow">Registration complete</p>
       <h1>You’re in the <em>draw.</em></h1>
       <p>Team registered successfully! Listed in {listed}, combined UTR {formatUtr(result.combinedUtr)}.</p>
+      {(bird.phase === 'open' || bird.phase === 'late') && <p className={`early-bird ${bird.phase}`}><span className="pill">{bird.phase === 'open' ? 'Early bird' : 'After early bird'}</span><span>{bird.phase === 'open' ? 'You registered during the early-bird period.' : bird.detail}</span></p>}
       <dl className="success-facts">
         <div><dt>Combined UTR</dt><dd>{formatUtr(result.combinedUtr)}</dd></div>
         <div><dt>Registration ID</dt><dd className="mono">{result.teamId}</dd></div>
@@ -122,16 +125,16 @@ export default function Register() {
 
   const tierLocked = t => complete && !assignSelectedTier(combined, config, t.id);
   const goatFallback = selectedTier === 'goat_fallback_rising';
-  const bird = earlyBirdStatus();
-  const fallbackAvailable =!!config.goat?.active && !!config.rising?.active && (!complete || ['goat', 'rising'].includes(highest));
+  const fallbackAvailable = !!config.goat?.active && !!config.rising?.active && (!complete || ['goat', 'rising'].includes(highest));
   return (
     <section className="register-screen">
       <header className="page-head">
         <p className="eyebrow">Three players. One team.</p>
         <h1>Build your <em>trio.</em></h1>
         <p>Pick your tier, add your three players, and see where your team lands as you type.</p>
-        <p className={`early-bird ${bird.phase}`}><span className="pill">{bird.label}</span><span><strong>{bird.headline}.</strong> {bird.detail}</span></p>
       </header>
+
+      <EarlyBirdCard />
 
       <ol className="step-rail" aria-label="Registration steps">
         {STEPS.map((label, i) => {

@@ -57,7 +57,7 @@ export function createFirebaseService() {
       };
       const off = keys.map(key => onValue(ref(database, `${ROOT}/${key}`), snapshot => { state[key] = snapshot.val() ?? (key === 'configRevision' ? 0 : key === 'settings' ? null : {}); ready.add(key); emit(); }, error => onError(new Error(rulesHint(error, ROOT)))));
       // League data loads on its own so a missing database rule for it never blocks the core tournament data.
-      for (const key of ['fixtures', 'leagueRules', 'season', 'seasons', 'schedules']) off.push(onValue(ref(database, `${ROOT}/${key}`), snapshot => { state[key] = snapshot.val() || undefined; emit(); }, () => { state[key] = undefined; emit(); }));
+      for (const key of ['fixtures', 'leagueRules', 'season', 'seasons', 'schedules', 'earlyBird']) off.push(onValue(ref(database, `${ROOT}/${key}`), snapshot => { state[key] = snapshot.val() || undefined; emit(); }, () => { state[key] = undefined; emit(); }));
       // Season 1 (legacy) lives in the same database at its own configurable path.
       off.push(onValue(ref(database, paths.season1), snapshot => { state.legacySeasons = snapshot.exists() ? { s1: snapshot.val() } : undefined; emit(); }, () => { state.legacySeasons = undefined; emit(); }));
       return () => off.forEach(unsubscribe => unsubscribe());
@@ -90,6 +90,7 @@ export function createFirebaseService() {
     recalculate: withError(async () => (await httpsCallable(functions, 'recalculateTiers')({})).data),
     generateFixtures: withError(async payload => (await httpsCallable(functions, 'generateFixtures')(payload)).data),
     generatePlayoffs: withError(async payload => (await httpsCallable(functions, 'generatePlayoffs')(payload)).data),
+    saveEarlyBird: withError(async payload => (await httpsCallable(functions, 'saveEarlyBird')(payload)).data),
     saveLeagueRules: withError(async payload => (await httpsCallable(functions, 'saveLeagueRules')(payload)).data),
     setSchedule: withError(async payload => (await httpsCallable(functions, 'setSchedule')(payload)).data),
     moveFixture: withError(async payload => (await httpsCallable(functions, 'moveFixture')(payload)).data),

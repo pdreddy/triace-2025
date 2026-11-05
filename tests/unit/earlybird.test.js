@@ -1,20 +1,65 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { earlyBirdStatus, nextDay, EARLY_BIRD } from '../../src/config/earlyBird.js';
+import { DEFAULT_EARLY_BIRD, earlyBirdStatus, validateEarlyBird, nextDay, daysBetween } from '../../src/config/earlyBird.js';
+import { applyEarlyBird, initialState, publicState } from '../../functions/lib/tournament.js';
 
-const plan = { opens: '2026-11-06', ends: '2026-11-13', surchargeUsd: 10 };
+const plan = { enabled: true, opens: '2026-11-06', ends: '2026-11-13', surchargeUsd: 10 };
 
-test('early bird defaults: opens tomorrow (6 Nov), ends 13 Nov, $10 more from 14 Nov', () => {
-  assert.deepEqual(EARLY_BIRD, plan);
+test('defaults: opens 6 Nov, ends 13 Nov, $10 more from 14 Nov', () => {
+  assert.deepEqual(DEFAULT_EARLY_BIRD, plan);
   assert.equal(nextDay('2026-11-13'), '2026-11-14');
+  assert.equal(daysBetween('2026-11-05', '2026-11-13'), 8);
 });
 
-test('status follows the calendar day', () => {
-  assert.equal(earlyBirdStatus(plan, '2026-11-05').phase, 'upcoming');
-  assert.match(earlyBirdStatus(plan, '2026-11-05').headline, /opens Nov 6/);
-  assert.equal(earlyBirdStatus(plan, '2026-11-06').phase, 'open');
-  assert.equal(earlyBirdStatus(plan, '2026-11-13').phase, 'open');   // last early-bird day
-  assert.equal(earlyBirdStatus(plan, '2026-11-14').phase, 'late');   // from the 14th: $10 more
-  assert.match(earlyBirdStatus(plan, '2026-11-10').detail, /From Nov 14, registration costs \$10 more/);
-  assert.match(earlyBirdStatus(plan, '2026-12-01').detail, /\$10 more/);
+test('status follows the calendar day, with a countdown', () => {
+  const day = d => earlyBirdStatus(plan, d);
+  assert.equal(day('2026-11-05').phase, 'upcoming');
+  assert.equal(day('2026-11-05').countdown, 'Opens tomorrow');
+  assert.equal(day('2026-11-01').countdown, 'Opens in 5 days');
+  assert.match(day('2026-11-05').headline, /opens Nov 6/);
+  assert.equal(day('2026-11-06').phase, 'open');
+  assert.equal(day('2026-11-06').countdown, '8 days left');
+  assert.equal(day('2026-11-12').countdown, '2 days left');
+  assert.equal(day('2026-11-13').phase, 'open');                       // last early-bird day
+  assert.equal(day('2026-11-13').countdown, 'Last day!');
+  assert.equal(day('2026-11-14').phase, 'late');                       // from the 14th: $10 more
+  assert.match(day('2026-11-10').detail, /From Nov 14, registration costs \$10 more/);
+  assert.match(day('2026-12-01').detail, /\$10 more/);
+  assert.deepEqual(day('2026-11-10').steps.map(s => s.text), ['Nov 6', 'Nov 13', 'From Nov 14']);
+  assert.equal(day('2026-11-10').step, 0);
+  assert.equal(day('2026-11-13').step, 1);
+  assert.equal(day('2026-11-20').step, 2);
+});
+
+test('turned off, or with no surcharge, nothing misleading is shown', () => {
+  assert.equal(earlyBirdStatus({ ...plan, enabled: false }, '2026-11-08').phase, 'off');
+  assert.equal(earlyBirdStatus({ ...plan, enabled: false }, '2026-11-08').short, '');
+  const free = earlyBirdStatus({ ...plan, surchargeUsd: 0 }, '2026-11-08');
+  assert.doesNotMatch(free.detail + free.short, /\$/);
+  assert.equal(earlyBirdStatus({ ...plan, surchargeUsd: 0 }, '2026-11-20').detail, 'Standard registration applies.');
+});
+
+test('the admin can only save a sensible plan', () => {
+  assert.deepEqual(validateEarlyBird({ ...plan, surchargeUsd: 25 }), { ...plan, surchargeUsd: 25 });
+  for (const [bad, pattern] of [
+    [{ ...plan, opens: '2026-11-14' }, /cannot end before it opens/],
+    [{ ...plan, opens: '2026-02-30' }, /real calendar days/],
+    [{ ...plan, ends: 'tomorrow' }, /real calendar days/],
+    [{ ...plan, surchargeUsd: -1 }, /whole number/],
+    [{ ...plan, surchargeUsd: 10.5 }, /whole number/],
+    [{ ...plan, surchargeUsd: 1001 }, /whole number/],
+    [{ ...plan, surchargeUsd: NaN }, /whole number/],
+    [{ ...plan, enabled: 'yes' }, /on or off/],
+    [{ ...plan, extra: 1 }, /Invalid early-bird/],
+    [{ enabled: true }, /Invalid early-bird/],
+    [null, /Send the early-bird/]
+  ]) assert.throws(() => validateEarlyBird(bad), pattern, JSON.stringify(bad));
+});
+
+test('the saved plan is public and survives in the state', () => {
+  const state = applyEarlyBird(initialState(), { ...plan, surchargeUsd: 15 }).state;
+  assert.equal(state.earlyBird.surchargeUsd, 15);
+  assert.equal(publicState(state).earlyBird.surchargeUsd, 15);
+  assert.equal(publicState(initialState()).earlyBird, undefined, 'no saved plan yet: the app uses the default');
+  assert.throws(() => applyEarlyBird(initialState(), { ...plan, ends: '2026-01-01' }), /cannot end before/);
 });

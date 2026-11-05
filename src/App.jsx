@@ -5,6 +5,7 @@ import { RulesAccessProvider, useRulesAccess } from './hooks/useRulesAccess';
 import { usePwa } from './hooks/usePwa';
 import { Message } from './components/UI';
 import { Icon } from './components/Icons';
+import { EarlyBirdBar } from './components/EarlyBird';
 
 const Rules = lazy(() => import('./pages/Rules'));
 const Register = lazy(() => import('./pages/Register'));
@@ -78,6 +79,7 @@ function Layout() {
         </div>
       </header>
 
+      <EarlyBirdBar />
       <main>
         {!online && <p className="banner offline" role="status"><Icon name="wifiOff" size={16} /> You’re offline. Saved pages still work; reconnect before registering.</p>}
         {savedAt && <p className="banner offline" role="status"><Icon name="wifiOff" size={16} /> Showing data saved {new Date(savedAt).toLocaleString()}. It refreshes as soon as a connection is available.</p>}

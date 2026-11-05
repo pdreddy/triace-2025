@@ -1,3 +1,4 @@
+import { validateEarlyBird } from './earlyBird.js';
 export const DEFAULT_SETTINGS = { registrationEnabled: true, aceNameMaskingEnabled: true, minPlayerUtr: 1, maxPlayerUtr: 1650 };
 export const DEFAULT_TIERS = {
   goat: { name: 'GOAT Tier', minCombinedUtr: 1750, maxCombinedUtr: 2200, sortOrder: 1, active: true },
@@ -117,7 +118,7 @@ export function bootstrapState(current) {
   const defaults = initialState();
   return { state: { ...defaults, ...(current || {}), settings: defaults.settings, tierConfig: current?.tierConfig && Object.keys(current.tierConfig).length ? current.tierConfig : defaults.tierConfig, configRevision: current?.configRevision || 1 }, result: { created: true } };
 }
-export function publicState(state) { return { settings: state.settings, tierConfig: state.tierConfig || {}, configRevision: state.configRevision || 0, tiers: state.tiers || {}, fixtures: state.fixtures || {}, leagueRules: rulesOf(state), season: state.season || { name: DEFAULT_SEASON_NAME }, seasons: state.seasons || {}, schedules: state.schedules || {} }; }
+export function publicState(state) { return { earlyBird: state.earlyBird, settings: state.settings, tierConfig: state.tierConfig || {}, configRevision: state.configRevision || 0, tiers: state.tiers || {}, fixtures: state.fixtures || {}, leagueRules: rulesOf(state), season: state.season || { name: DEFAULT_SEASON_NAME }, seasons: state.seasons || {}, schedules: state.schedules || {} }; }
 function canonical(value) { return JSON.stringify(value, (_, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).filter(key => item[key] !== null && item[key] !== undefined).sort().map(key => [key, item[key]])) : item); }
 // `login` is the captain's new login account ({ uid, username }); it is added as an owner so signing in on any device manages the team.
 export function applyRegistration(current, payload, uid, now = Date.now(), login = null) {
@@ -138,6 +139,11 @@ export function applyRegistration(current, payload, uid, now = Date.now(), login
   state.tiers ||= {};
   for (const tierId of team.listedTiers) { state.tiers[tierId] ||= { teams: {} }; state.tiers[tierId].teams ||= {}; state.tiers[tierId].teams[team.teamId] = publicRecord(record, state.settings); }
   return { state, result: { teamId: record.teamId, assignedTier: record.assignedTier, combinedUtr: record.combinedUtr, listedTiers: record.listedTiers, created: true } };
+}
+// Admin: the early-bird dates and late surcharge (shown on the rules, the registration page and a site-wide bar).
+export function applyEarlyBird(current, payload) {
+  const plan = validateEarlyBird(payload);
+  return { state: { ...structuredClone(current || initialState()), earlyBird: plan }, result: { earlyBird: plan } };
 }
 export function applyConfiguration(current, payload) {
   exact(payload, ['settings', 'tierConfig', 'expectedRevision'], 'Invalid configuration request.');

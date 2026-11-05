@@ -7,6 +7,7 @@ import { FixtureCard, teamIndex } from '../components/League';
 import { LeagueRulesCard, PlayoffPlanner, ScheduleForm, SeasonCard } from '../components/AdminLeague';
 import { TeamEditForm } from '../components/TeamTools';
 import FirebasePanel from '../components/FirebasePanel';
+import EarlyBirdAdmin from '../components/EarlyBirdAdmin';
 import LoginCard from '../components/LoginCard';
 import { DEFAULT_SETTINGS, DEFAULT_TIERS, orderedTiers, parseUtr, validateSettings, validateTierConfig, registrationsCsv } from '../../functions/lib/tournament.js';
 
@@ -201,6 +202,8 @@ export default function Admin() {
               </div>
             </fieldset>
           </form>
+
+          <EarlyBirdAdmin service={service} saved={data?.earlyBird} disabled={busy || !connected || !data} />
 
           <section className="recalculate pane pane-tiers">
             <div>

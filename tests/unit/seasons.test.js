@@ -93,7 +93,7 @@ test('Season 1 can never be pointed at live tournament data', () => {
   refuse({ season1: 'traice2_0/' }, /cannot be the database root/);
   refuse({ root: 'clubs/triace', season1: 'clubs' }, /contains the database root/);
   refuse({ root: 'clubs/triace', season1: 'clubs/triace' }, /cannot be the database root/);
-  for (const node of ['settings', 'tierConfig', 'tiers', 'registrations', 'teamsByOwner', 'fixtures', 'leagueRules', 'season', 'seasons', 'schedules', 'archive', 'configRevision']) {
+  for (const node of ['settings', 'tierConfig', 'tiers', 'registrations', 'teamsByOwner', 'fixtures', 'leagueRules', 'season', 'seasons', 'schedules', 'archive', 'configRevision', 'earlyBird']) {
     refuse({ season1: `traice2_0/${node}` }, /inside/);
     refuse({ season1: `traice2_0/${node}/s1` }, /inside/);
   }
