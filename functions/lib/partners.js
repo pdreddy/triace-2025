@@ -96,10 +96,11 @@ export function applyExpressInterest(current, payload, uid, now = Date.now(), in
   return { state, result: { postId: payload.postId, firstName: post.firstName, contact: secret.whatsapp } };
 }
 
+// Only the admin removes posts (everything else expires after 30 days).
 export function applyClosePost(current, payload, uid, isAdmin = false) {
   const secret = current?.partnerPrivate?.[payload?.postId];
   assert(secret && current.partnerPosts?.[payload.postId], 'That post is already gone.');
-  assert(isAdmin || (uid && secret.ownerUid === uid), 'Only the person who posted it, or the admin, can remove it.');
+  assert(isAdmin, 'Only the admin can remove posts. Ask the tournament admin.');
   const state = structuredClone(current);
   removePost(state, payload.postId);
   return { state, result: { postId: payload.postId } };

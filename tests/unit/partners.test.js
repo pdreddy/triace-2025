@@ -94,18 +94,19 @@ test('one person cannot contact more than the limit of posts', () => {
   assert.throws(() => applyExpressInterest(state, interest({ postId: `post_${String(LIMITS.interestsPerUser).padStart(6, '0')}` }), 'eager', 2000, 'int_8888888'), /contacted a lot/);
 });
 
-test('only the poster or the admin can remove a post, and it all goes', () => {
+test('only the admin can remove a post, and it all goes', () => {
   const state = post(initialState(), player()).state;
-  assert.throws(() => applyClosePost(state, { postId: 'post_000001' }, 'u2'), /Only the person who posted/);
+  assert.throws(() => applyClosePost(state, { postId: 'post_000001' }, 'u2'), /Only the admin can remove/);
+  assert.throws(() => applyClosePost(state, { postId: 'post_000001' }, 'u1'), /Only the admin can remove/, 'not even the poster');
   assert.throws(() => applyClosePost(state, { postId: 'nope' }, 'u1'), /already gone/);
-  for (const [uid, admin] of [['u1', false], ['someone', true]]) {
+  for (const [uid, admin] of [['someone', true], ['u1', true]]) {
     const next = applyClosePost(state, { postId: 'post_000001' }, uid, admin).state;
     assert.equal(next.partnerPosts.post_000001, undefined);
     assert.equal(next.partnerPrivate.post_000001, undefined);
     assert.equal(next.partnerByOwner.u1.post_000001, undefined);
   }
-  // a removed post frees a slot
-  assert.ok(post(applyClosePost(post(post(initialState(), player(), 'u1', 'post_000001').state, player(), 'u1', 'post_000002').state, { postId: 'post_000001' }, 'u1').state, player(), 'u1', 'post_000003'));
+  // a removed post frees the poster's slot
+  assert.ok(post(applyClosePost(post(post(initialState(), player(), 'u1', 'post_000001').state, player(), 'u1', 'post_000002').state, { postId: 'post_000001' }, 'admin', true).state, player(), 'u1', 'post_000003'));
 });
 
 test('old posts are cleaned up when anyone posts', () => {

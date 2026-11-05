@@ -46,7 +46,7 @@ test('the top bar fits at tablet, laptop and desktop widths, with the Find a par
     await page.goto('/partners');
     const tab = page.locator('.tabs a[href="/partners"]');
     await expect(tab).toBeVisible();
-    await expect(tab).toHaveText(new RegExp(`^${label}$`, 'i'));
+    expect((await tab.evaluate(el => el.innerText)).trim().toLowerCase()).toBe(label.toLowerCase());   // the label you can actually see
     await expect(tab).toHaveAttribute('aria-label', 'Find a partner');
     const overflow = await page.evaluate(() => { const bar = document.querySelector('.topbar-inner'); return bar.scrollWidth - bar.clientWidth; });
     expect(overflow, `the top bar overflows at ${width}px`).toBeLessThanOrEqual(0);

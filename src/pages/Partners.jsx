@@ -91,7 +91,8 @@ function PostCard({ post, secret, mine, admin, service, onMessage }) {
       <footer>
         {!mine && !contact && !open && <button type="button" className="button small" onClick={() => setOpen(true)}>I’m interested</button>}
         {open && <button type="button" className="secondary small" onClick={() => setOpen(false)}>Cancel</button>}
-        {(mine || admin) && <button type="button" className="danger small" disabled={busy} onClick={remove}>Remove{admin && !mine ? ' (admin)' : ''}</button>}
+        {admin && <button type="button" className="danger small" disabled={busy} onClick={remove}>Remove</button>}
+        {mine && !admin && <small className="partner-hint">Only the admin can remove posts. It also disappears by itself after {LIMITS.expireDays} days.</small>}
         {post.interested > 0 && <small>{post.interested} interested</small>}
       </footer>
     </article>
@@ -192,7 +193,7 @@ export default function Partners() {
         : <EmptyState icon="users" title={tab === 'teams' ? 'No team is looking for players yet.' : 'Nobody is available yet.'}>{posts.length ? 'Nobody matches this UTR range.' : 'Be the first: post to the board and teams will find you.'}</EmptyState>)}
       {data && tab === 'mine' && (myPosts.length
         ? <div className="partner-list">{myPosts.map(p => <PostCard key={p.id} post={p} mine secret={mine[p.id]} admin={admin} service={service} onMessage={setMessage} />)}</div>
-        : <EmptyState icon="users" title="You have no posts.">Post to the board and replies will appear here. Posts are saved on this device, so use the same phone or browser to see them.</EmptyState>)}
+        : <EmptyState icon="users" title="You have no posts.">Post to the board and replies will appear here. Use the same phone or browser to see them.</EmptyState>)}
 
       <p className="small partner-foot">Already have three players? <Link to="/register">Register your team</Link>. Posts disappear after {LIMITS.expireDays} days.</p>
     </section>

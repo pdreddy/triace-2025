@@ -33,7 +33,7 @@ test('partner board: a player posts, a captain replies, numbers are swapped but 
   await expect(card).toContainText('Singles 6.25 · Doubles 6.80');
   await expect(card).toContainText('Free weekday evenings');
   await expect(card).not.toContainText('5550102000');              // the poster's number is not on the page
-  await expect(card.getByRole('button', { name: 'Remove' })).toHaveCount(0);   // only the poster or the admin can remove
+  await expect(card.getByRole('button', { name: 'Remove' })).toHaveCount(0);   // only the admin can remove
 
   // UTR filter: Zelda counts as 6.80
   await other.getByLabel('UTR from').fill('7');
@@ -75,7 +75,7 @@ test('partner board: a player posts, a captain replies, numbers are swapped but 
   await expect(admin).toHaveURL(/\/admin$/);
   await admin.goto('/partners');
   admin.on('dialog', d => d.accept());
-  await admin.locator('.partner-card', { hasText: 'Zelda' }).getByRole('button', { name: /Remove/ }).click();
+  await admin.locator('.partner-card', { hasText: 'Zelda' }).getByRole('button', { name: 'Remove' }).click();
   await expect(admin.locator('.partner-card', { hasText: 'Zelda' })).toHaveCount(0);
   await other.reload();
   await expect(other.locator('.partner-card', { hasText: 'Zelda' })).toHaveCount(0);
@@ -104,9 +104,20 @@ test('partner board: a team with two players looks for a third, and posts are ch
   await seeker.reload();
   await expect(seeker.locator('.partner-card', { hasText: 'Linkman' })).toHaveCount(0);
 
-  // the poster removes their own post
-  captain.on('dialog', d => d.accept());
+  // the poster cannot remove their own post; the admin can
   await captain.getByRole('tab', { name: /My posts/ }).click();
-  await captain.locator('.partner-card', { hasText: 'Ravi' }).getByRole('button', { name: 'Remove' }).click();
-  await expect(captain.locator('.partner-card', { hasText: 'Ravi' })).toHaveCount(0);
+  const own = captain.locator('.partner-card', { hasText: 'Ravi' });
+  await expect(own).toContainText('Only the admin can remove posts');
+  await expect(own.getByRole('button', { name: 'Remove' })).toHaveCount(0);
+  const admin = await (await browser.newContext()).newPage();
+  await admin.goto('/admin/login');
+  await admin.getByLabel('Username or email').fill('reddi2026');
+  await admin.getByLabel('Password', { exact: true }).fill(password);
+  await admin.getByRole('button', { name: 'Sign in ↗', exact: true }).click();
+  await expect(admin).toHaveURL(/\/admin$/);
+  await admin.goto('/partners');
+  admin.on('dialog', d => d.accept());
+  await admin.getByRole('tab', { name: /^Teams/ }).click();
+  await admin.locator('.partner-card', { hasText: 'Ravi' }).getByRole('button', { name: 'Remove' }).click();
+  await expect(admin.locator('.partner-card', { hasText: 'Ravi' })).toHaveCount(0);
 });
