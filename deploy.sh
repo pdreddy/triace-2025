@@ -5,13 +5,14 @@
 #   --no-hosting         functions only (use this when Netlify builds the site from git)
 #   --rules              ALSO deploy the Realtime Database rules (read the warning first)
 #   --skip-browser-tests skip the 40+ browser tests (unit tests, build, PWA and preflight checks still run)
+#   --allow-dirty        deploy even though git shows uncommitted files (they are listed first)
 # Needs: Node 22+, and `npx firebase login` done once on this machine by someone with deploy rights.
 set -uo pipefail
 cd "$(dirname "$0")"
 
-DRY=0; HOSTING=1; RULES=0; BROWSER=1
+DRY=0; HOSTING=1; RULES=0; BROWSER=1; DIRTY_OK=0
 for arg in "$@"; do
-  case "$arg" in --dry-run) DRY=1 ;; --no-hosting) HOSTING=0 ;; --rules) RULES=1 ;; --skip-browser-tests) BROWSER=0 ;; *) echo "Unknown option: $arg"; exit 1 ;; esac
+  case "$arg" in --dry-run) DRY=1 ;; --no-hosting) HOSTING=0 ;; --rules) RULES=1 ;; --skip-browser-tests) BROWSER=0 ;; --allow-dirty) DIRTY_OK=1 ;; *) echo "Unknown option: $arg"; exit 1 ;; esac
 done
 step() { printf '\n\033[1m== %s\033[0m\n' "$1"; }
 fail() { printf '\033[31m%s\033[0m\n' "$1"; exit 1; }
@@ -22,7 +23,12 @@ PROJECT=$(grep -E '^VITE_FIREBASE_PROJECT_ID=' .env | cut -d= -f2)
 step "1/6 Source"
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)
 echo "branch: $BRANCH   project: $PROJECT"
-[ -z "$(git status --porcelain 2>/dev/null)" ] || fail "You have uncommitted changes. Commit or stash them so what you deploy matches git."
+CHANGES=$(git status --porcelain 2>/dev/null)
+if [ -n "$CHANGES" ]; then
+  echo "Git shows these uncommitted files:"; echo "$CHANGES" | sed 's/^/    /'
+  if [ "$DIRTY_OK" = 1 ]; then echo "(continuing because of --allow-dirty)"
+  else fail "What you deploy should match git. Commit or stash those files (git stash -u), or re-run with --allow-dirty if they do not matter (for example .firebaserc)."; fi
+fi
 [ "$BRANCH" = "main" ] || echo "WARNING: you are on '$BRANCH', not 'main'. Production should normally be deployed from main."
 
 step "2/6 Dependencies"
