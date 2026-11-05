@@ -12,7 +12,7 @@ const PLAYERS = [
   { key: 'ace2', title: 'Ace 2', note: 'Full name private', label: 'Ace 2 full name', placeholder: 'Full name', max: 80, autoComplete: 'off' }
 ];
 const STEPS = ['Tier', 'Captain', 'Ace 1', 'Ace 2', 'Confirm'];
-const emptyPlayers = () => Object.fromEntries(PLAYERS.map(p => [p.key, { name: '', singles: '', doubles: '' }]));
+const emptyPlayers = () => Object.fromEntries(PLAYERS.map(p => [p.key, { name: '', phone: '', singles: '', doubles: '' }]));
 // Counted rating for the live preview, using the same gap rule as the server (playerUtr).
 function rating(player, gap = UTR_GAP_LIMIT) {
   try {
@@ -86,7 +86,7 @@ export default function Register() {
     !user?.uid && 'Signing you in… (anonymous sign-in must be enabled in Firebase Authentication)'
   ].filter(Boolean);
   const filled = key => !!players[key].name.trim() && !!players[key].singles;
-  const stepDone = [true, filled('captain') && !!whatsappPhone.trim(), filled('ace1'), filled('ace2'), consent];
+  const stepDone = [true, filled('captain') && !!whatsappPhone.trim(), filled('ace1') && !!players.ace1.phone.trim(), filled('ace2') && !!players.ace2.phone.trim(), consent];
   const utrLimits = { min: (settings?.minPlayerUtr || 1) / 100, max: (settings?.maxPlayerUtr || 1650) / 100 };
 
   function change(key, field, value) { setPlayers(old => ({ ...old, [key]: { ...old[key], [field]: value } })); setError(''); setSuccess(null); }
@@ -102,7 +102,7 @@ export default function Register() {
     if (!settings || !connected || !user?.uid) { setError('Registration is not connected. Please wait or contact the admin.'); return; }
     setError(''); setSuccess(null);
     try {
-      const payload = { teamId: id.current, whatsappPhone, selectedTier, consent, rulesAccepted: accepted };
+      const payload = { teamId: id.current, whatsappPhone, ace1Phone: players.ace1.phone, ace2Phone: players.ace2.phone, selectedTier, consent, rulesAccepted: accepted };
       for (const [key, value] of Object.entries(players)) payload[key] = { [key === 'captain' ? 'firstName' : 'fullName']: value.name.trim(), singlesUtr: parseUtr(value.singles), doublesUtr: value.doubles.trim() ? parseUtr(value.doubles) : null };
       validateRegistration(payload, settings, config, gap);
       setBusy(true);
@@ -155,6 +155,7 @@ export default function Register() {
                 <div className="card-head"><h2><span className="player-num">0{i + 1}</span>{p.title}</h2><span className="pill">{p.note}</span></div>
                 <Field id={`${p.key}-name`} label={p.label} value={players[p.key].name} onChange={e => change(p.key, 'name', e.target.value)} required maxLength={p.max} autoComplete={p.autoComplete} placeholder={p.placeholder} />
                 {p.key === 'captain' && <Field id="captain-whatsapp" label="Captain WhatsApp number (private)" type="tel" inputMode="tel" autoComplete="tel" placeholder="+15551234567" hint="Include country code. This is visible to the team owner and admin, never on public pages." value={whatsappPhone} onChange={e => setWhatsappPhone(e.target.value)} required maxLength={25} />}
+                {p.key !== 'captain' && <Field id={`${p.key}-whatsapp`} label={`${p.title} WhatsApp number (private)`} type="tel" inputMode="tel" autoComplete="off" placeholder="+15551234567" hint="Include country code. This is visible to the team owner and admin, never on public pages." value={players[p.key].phone} onChange={e => change(p.key, 'phone', e.target.value)} required maxLength={25} />}
                 <div className="ratings">
                   <Field id={`${p.key}-utr`} label="UTR / singles UTR" value={players[p.key].singles} onChange={e => change(p.key, 'singles', e.target.value)} required type="number" inputMode="decimal" step="0.01" min={utrLimits.min} max={utrLimits.max} placeholder="e.g. 6.50" />
                   <Field id={`${p.key}-doubles`} label="Doubles UTR (optional)" value={players[p.key].doubles} onChange={e => change(p.key, 'doubles', e.target.value)} type="number" inputMode="decimal" step="0.01" min={utrLimits.min} max={utrLimits.max} placeholder="If applicable" />
@@ -167,7 +168,7 @@ export default function Register() {
               <p className="confirmed"><Icon name="check" size={16} /> Tournament rules accepted in this session. <Link to="/">Review rules</Link></p>
               <label className="checkbox">
                 <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} required />
-                <span>I have permission to register these players and publish the captain’s first name and all three UTR values. The captain’s WhatsApp number stays private to the team owner and admin. Ace names are public only when the admin turns masking off.</span>
+                <span>I have permission to register these players and publish the captain’s first name and all three UTR values. All three WhatsApp numbers stay private to the team owner and admin. Ace names are public only when the admin turns masking off.</span>
               </label>
               <Message error>{error}</Message>
               <button className="button block" disabled={busy || !settings?.registrationEnabled || !connected || !user?.uid || !active.length}>{busy ? 'Saving registration…' : 'Register team ↗'}</button>

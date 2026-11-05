@@ -95,7 +95,7 @@ function player(value, captain, settings, gapLimit) {
 export function validateRegistration(payload, settings, tiers, gapLimit = UTR_GAP_LIMIT) {
   validateSettings(settings); validateTierConfig(tiers);
   assert(settings.registrationEnabled, 'Registration is currently closed.');
-  exact(payload, ['teamId', 'captain', 'ace1', 'ace2', 'selectedTier', 'consent', 'rulesAccepted', ...(Object.hasOwn(payload || {}, 'whatsappPhone') ? ['whatsappPhone'] : [])], 'Invalid registration fields.');
+  exact(payload, ['teamId', 'captain', 'ace1', 'ace2', 'selectedTier', 'consent', 'rulesAccepted', ...['whatsappPhone', 'ace1Phone', 'ace2Phone'].filter(key => Object.hasOwn(payload || {}, key))], 'Invalid registration fields.');
   assert(typeof payload.teamId === 'string' && /^[a-zA-Z0-9_-]{16,80}$/.test(payload.teamId), 'Invalid registration identifier.');
   assert(payload.consent === true, 'Player consent is required.');
   assert(payload.rulesAccepted === true, 'Read and accept the tournament rules before registering.');
@@ -103,7 +103,7 @@ export function validateRegistration(payload, settings, tiers, gapLimit = UTR_GA
   const captain = player(payload.captain, true, settings, gapLimit), ace1 = player(payload.ace1, false, settings, gapLimit), ace2 = player(payload.ace2, false, settings, gapLimit);
   const combinedUtr = captain.utr + ace1.utr + ace2.utr, assignedTier = assignSelectedTier(combinedUtr, tiers, payload.selectedTier);
   assert(assignedTier, 'Your team does not qualify for the selected tier. Choose an eligible tier or contact the tournament admin.');
-  return { teamId: payload.teamId, captain, ace1, ace2, ...(Object.hasOwn(payload, 'whatsappPhone') ? { whatsappPhone: normalizeWhatsAppPhone(payload.whatsappPhone) } : {}), combinedUtr, selectedTier: payload.selectedTier, assignedTier, listedTiers: listedTiers(combinedUtr, tiers, payload.selectedTier), rulesAccepted: true };
+  return { teamId: payload.teamId, captain, ace1, ace2, ...Object.fromEntries(['whatsappPhone', 'ace1Phone', 'ace2Phone'].filter(key => Object.hasOwn(payload, key)).map(key => [key, normalizeWhatsAppPhone(payload[key])])), combinedUtr, selectedTier: payload.selectedTier, assignedTier, listedTiers: listedTiers(combinedUtr, tiers, payload.selectedTier), rulesAccepted: true };
 }
 export function publicRecord(team, settings = DEFAULT_SETTINGS) {
   return { teamId: team.teamId, captainFirstName: team.captain.firstName, captainUtr: team.captain.utr, ace1Utr: team.ace1.utr, ace2Utr: team.ace2.utr, ...(!settings.aceNameMaskingEnabled && team.rulesAccepted === true ? { ace1Name: team.ace1.fullName, ace2Name: team.ace2.fullName } : {}), combinedUtr: team.combinedUtr, assignedTier: team.assignedTier, registeredAt: team.registeredAt };
@@ -122,7 +122,7 @@ function canonical(value) { return JSON.stringify(value, (_, item) => item && ty
 export function applyRegistration(current, payload, uid, now = Date.now(), recoveryHash = null) {
   assert(typeof uid === 'string' && uid.length > 0, 'Sign in before registering.');
   assert(current?.settings, 'The admin must initialize tournament settings first.');
-  assert(Object.hasOwn(payload || {}, 'whatsappPhone'), 'Enter the captain’s WhatsApp number to register.');
+  for (const [key, label] of [['whatsappPhone', 'captain'], ['ace1Phone', 'Ace 1'], ['ace2Phone', 'Ace 2']]) assert(Object.hasOwn(payload || {}, key), `Enter ${label}’s WhatsApp number to register.`);
   const team = validateRegistration(payload, current.settings, current.tierConfig || {}, rulesOf(current).utrGapLimit);
   const state = structuredClone(current), previous = state.registrations?.[team.teamId];
   if (previous) {
@@ -167,9 +167,9 @@ export function applyRecalculation(current) {
   return { state, result: summary };
 }
 export function registrationsCsv(teams, tiers) {
-  const columns = ['Team ID', 'Captain first name', 'Captain WhatsApp', 'Captain UTR', 'Ace 1 full name', 'Ace 1 UTR', 'Ace 2 full name', 'Ace 2 UTR', 'Combined UTR', 'Selected tier', 'Assigned tier', 'Registered at'];
+  const columns = ['Team ID', 'Captain first name', 'Captain WhatsApp', 'Captain UTR', 'Ace 1 full name', 'Ace 1 WhatsApp', 'Ace 1 UTR', 'Ace 2 full name', 'Ace 2 WhatsApp', 'Ace 2 UTR', 'Combined UTR', 'Selected tier', 'Assigned tier', 'Registered at'];
   const cell = value => { let text = String(value ?? ''); if (/^[\s]*[=+@-]/.test(text)) text = "'" + text; return '"' + text.replaceAll('"', '""') + '"'; };
-  const rows = Object.values(teams || {}).map(t => [t.teamId, t.captain.firstName, t.whatsappPhone || '', formatUtr(t.captain.utr), t.ace1.fullName, formatUtr(t.ace1.utr), t.ace2.fullName, formatUtr(t.ace2.utr), formatUtr(t.combinedUtr), tiers[t.selectedTier]?.name || t.selectedTier, tiers[t.assignedTier]?.name || 'Unassigned', new Date(t.registeredAt).toISOString()]);
+  const rows = Object.values(teams || {}).map(t => [t.teamId, t.captain.firstName, t.whatsappPhone || '', formatUtr(t.captain.utr), t.ace1.fullName, t.ace1Phone || '', formatUtr(t.ace1.utr), t.ace2.fullName, t.ace2Phone || '', formatUtr(t.ace2.utr), formatUtr(t.combinedUtr), tiers[t.selectedTier]?.name || t.selectedTier, tiers[t.assignedTier]?.name || 'Unassigned', new Date(t.registeredAt).toISOString()]);
   return [columns, ...rows].map(row => row.map(cell).join(',')).join('\r\n');
 }
 

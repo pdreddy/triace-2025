@@ -31,7 +31,7 @@ export default function Admin() {
   const { teams, loading, error: readError } = useRegistrations();
   const [draft, setDraft] = useState(() => draftFrom(data)), [dirty, setDirty] = useState(false), [busy, setBusy] = useState(false);
   const [error, setError] = useState(''), [message, setMessage] = useState(''), [summary, setSummary] = useState(null);
-  const [query, setQuery] = useState(''), [filter, setFilter] = useState('all'), [reveal, setReveal] = useState(false), [newId, setNewId] = useState(''), [tab, setTab] = useState('settings'), [editing, setEditing] = useState(null);
+  const [query, setQuery] = useState(''), [filter, setFilter] = useState('all'), [reveal, setReveal] = useState(true), [newId, setNewId] = useState(''), [tab, setTab] = useState('settings'), [editing, setEditing] = useState(null);
 
   useEffect(() => {
     if (data && !dirty && (data.configRevision || 0) >= draft.expectedRevision) setDraft(draftFrom(data));

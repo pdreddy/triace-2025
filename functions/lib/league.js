@@ -314,8 +314,9 @@ export function applyUpdateTeam(current, payload, uid, isAdmin = false) {
   assert(isAdmin || isOwner(previous, uid), 'Only this team’s captain or the admin can edit it.');
   const scheduled = fixturesWith(current, previous.teamId);
   assert(isAdmin || !scheduled.length, 'Fixtures are already scheduled. Ask the admin to edit the team.');
-  const { teamId, captain, ace1, ace2, selectedTier, whatsappPhone } = payload;
-  const team = validateRegistration({ teamId, captain, ace1, ace2, selectedTier, ...(whatsappPhone === undefined ? {} : { whatsappPhone }), consent: true, rulesAccepted: true }, { ...current.settings, registrationEnabled: true }, current.tierConfig || {}, rulesOf(current).utrGapLimit);
+  const { teamId, captain, ace1, ace2, selectedTier } = payload;
+  const phones = Object.fromEntries(['whatsappPhone', 'ace1Phone', 'ace2Phone'].filter(key => Object.hasOwn(payload, key)).map(key => [key, payload[key]]));
+  const team = validateRegistration({ teamId, captain, ace1, ace2, selectedTier, ...phones, consent: true, rulesAccepted: true }, { ...current.settings, registrationEnabled: true }, current.tierConfig || {}, rulesOf(current).utrGapLimit);
   assert(!scheduled.length || JSON.stringify(team.listedTiers) === JSON.stringify(previous.listedTiers || [previous.assignedTier]), 'This change moves the team to another tier, but it already has fixtures. Withdraw it or regenerate the fixtures first.');
   const state = structuredClone(current), record = { ...previous, ...team };
   state.registrations[teamId] = record;
