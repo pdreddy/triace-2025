@@ -12,6 +12,7 @@ export function createDemoService() {
   async function refreshAuth() { const user = await request('session'); authListeners.forEach(fn => fn(user)); }
   return {
     mode: 'Local demo',
+    info: { projectId: 'local demo (no Firebase)', root: 'in-memory demo state', season1Path: 'in-memory demo state', emulators: false, demo: true },
     subscribePublic: (callback, error) => poll('public', callback, error),
     subscribeConnection(callback) { callback(true); return () => {}; },
     subscribeAuth(callback, error) { authListeners.add(callback); refreshAuth().catch(error); return () => authListeners.delete(callback); },
@@ -33,6 +34,7 @@ export function createDemoService() {
     withdrawTeam: payload => request('withdraw-team', payload),
     claimTeam: payload => request('claim-team', payload),
     resetCaptainCode: payload => request('reset-captain-code', payload),
+    importSeason1: season => request('import-season1', { season }),
     manageSeason: payload => request('season', payload),
     submitResult: payload => request('submit-result', payload),
     reviewResult: payload => request('review-result', payload)

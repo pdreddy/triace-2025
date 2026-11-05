@@ -4,7 +4,11 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { applyRegistration, applyConfiguration, applyRecalculation, applyLeagueRules, bootstrapState, ValidationError } from './lib/tournament.js';
 import { applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult, applyManageSeason, applySetSchedule, applyMoveFixture, applyIssueChallenge, applyUpdateTeam, applyWithdrawTeam, applyClaimTeam, applyResetCaptainCode } from './lib/league.js';
 import { newCaptainCode, hashCaptainCode } from './lib/captainCode.js';
+import { resolveDbPaths } from './lib/paths.js';
+import { validateLegacySeason } from './lib/legacy.js';
 initializeApp();
+// TRAICE_DB_ROOT / TRAICE_DB_SEASON1_PATH come from functions/.env (see functions/.env.example).
+const paths = resolveDbPaths({ root: process.env.TRAICE_DB_ROOT, season1: process.env.TRAICE_DB_SEASON1_PATH });
 const options = { region: 'us-central1', maxInstances: 10, timeoutSeconds: 60 };
 function requireAuth(request, admin = false) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in to continue.');
@@ -12,7 +16,7 @@ function requireAuth(request, admin = false) {
 }
 async function mutate(operation) {
   let outcome, updateError;
-  const root = getDatabase().ref('traice2_0');
+  const root = getDatabase().ref(paths.root);
   let listener;
   try {
     // Keep a value listener alive so the transaction starts with authoritative
@@ -34,8 +38,14 @@ async function mutate(operation) {
 }
 
 export const bootstrapTournament = onCall(options, async () => {
-  if ((await getDatabase().ref('traice2_0/settings').get()).exists()) return { created: false };
+  if ((await getDatabase().ref(`${paths.root}/settings`).get()).exists()) return { created: false };
   return mutate(bootstrapState);
+});
+export const importSeason1 = onCall(options, async request => {
+  requireAuth(request, true);
+  try { validateLegacySeason(request.data?.season); } catch (error) { throw new HttpsError('failed-precondition', error.message); }
+  await getDatabase().ref(paths.season1).set(request.data.season);
+  return { path: paths.season1 };
 });
 export const registerTeam = onCall(options, async request => {
   requireAuth(request);

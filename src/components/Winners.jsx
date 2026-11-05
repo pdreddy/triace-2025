@@ -37,11 +37,17 @@ export function Medal({ size = 34 }) {
   );
 }
 
+// A squad written as "A · B · C" (or "A / B / C"), one name per line so full names stay readable.
+export function Squad({ names, big = false }) {
+  const list = String(names || '').split(/\s*[·/]\s*/).filter(Boolean);
+  return list.length ? <ul className={`squad${big ? ' big' : ''}`}>{list.map(n => <li key={n}>{n}</li>)}</ul> : null;
+}
+
 // Winner and runner-up of one tier. `members(team)` returns the squad line to show.
-export function WinnerCard({ tier, result, teams, members, empty = 'Winners to be announced.', children }) {
+export function WinnerCard({ tier, result, teams, members, large = false, empty = 'Winners to be announced.', children }) {
   const name = id => teamName(teams.get(id));
   return (
-    <article className={`winner-card ${tierTone(tier.id)}`}>
+    <article className={`winner-card ${tierTone(tier.id)}${large ? ' large' : ''}`}>
       <span className="winner-ribbon">{tier.name}</span>
       {result ? (
         <>
@@ -49,11 +55,11 @@ export function WinnerCard({ tier, result, teams, members, empty = 'Winners to b
             <Trophy />
             <p className="winner-label">Champions</p>
             <h3>{name(result.winner)}</h3>
-            <p className="winner-members">{members(teams.get(result.winner))}</p>
+            <Squad names={members(teams.get(result.winner))} big={large} />
           </div>
           <div className="runner-up">
             <Medal />
-            <div><span>Runner-up</span><b>{name(result.runnerUp)}</b><small>{members(teams.get(result.runnerUp))}</small></div>
+            <div><span>Runner-up</span><b>{name(result.runnerUp)}</b><Squad names={members(teams.get(result.runnerUp))} /></div>
           </div>
         </>
       ) : <p className="muted winner-empty">{empty}</p>}

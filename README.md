@@ -121,6 +121,20 @@ On first visit, the deployed `bootstrapTournament` callable initializes default 
 - For demo mode, edit `TRAICE_ADMIN_USERNAME`, `TRAICE_ADMIN_EMAIL`, and `TRAICE_ADMIN_PASSWORD` in `.env.demo.local`, then restart the server (which invalidates demo sessions).
 - For emulators, reseed with a new local password. It updates the same emulator account and preserves tournament records.
 
+## Firebase project and database paths
+
+Season 2 (the live tournament and its closed seasons) and Season 1 (the imported legacy season) are stored in **one Firebase project**.
+
+| Setting (web app, `.env.local`) | Setting (functions, `functions/.env`) | Default |
+| --- | --- | --- |
+| `VITE_DB_ROOT` | `TRAICE_DB_ROOT` | `traice2_0` |
+| `VITE_DB_SEASON1_PATH` | `TRAICE_DB_SEASON1_PATH` | `<root>/season1` |
+
+- Keep the web and functions values equal, then rebuild and redeploy. Paths use letters, numbers, `-` and `_`, separated by `/`.
+- A custom root needs matching rules: `TRAICE_DB_ROOT=your/root node scripts/generate-rules.mjs`, then merge `database.rules.json` into the shared project's rules. A Season 1 path outside the root needs its own public read rule.
+- **Admin → Firebase & data paths** shows the project, both paths and where Season 1 is loaded from. Until it is copied into Firebase, Season 1 uses the snapshot bundled with the app; **Copy Season 1 into Firebase** (admin only, calls `importSeason1`) writes it to the Season 1 path, after which the live copy is used.
+- Redeploy functions (`firebase deploy --only functions,database`) to get `importSeason1` and the `season1` read rule.
+
 ## Database model and privacy
 
 Realtime Database forbids dots in node keys. The requested logical root `traice2.0` therefore uses **`traice2_0`**:

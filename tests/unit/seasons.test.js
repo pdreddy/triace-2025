@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { seasonsOf, seasonTiers, tierResult, seasonTeams } from '../../src/data/seasons.js';
+import { seasonsOf, seasonTiers, tierResult, seasonTeams, bundledSeason1, season1Source } from '../../src/data/seasons.js';
+import { resolveDbPaths } from '../../functions/lib/paths.js';
+import { validateLegacySeason } from '../../functions/lib/legacy.js';
 
 const season1 = seasonsOf({}).s1;
 
@@ -51,4 +53,34 @@ test('closed seasons use their recorded champions', () => {
   const closed = { champions: { goat: { winner: 'x', runnerUp: 'y' } } };
   assert.deepEqual(tierResult(closed, 'goat'), { winner: 'x', runnerUp: 'y' });
   assert.equal(tierResult(closed, 'rising'), null);
+});
+
+test('Season 1 read back from Firebase (JSON round trip) gives the same season', () => {
+  const stored = JSON.parse(JSON.stringify(bundledSeason1()));   // what the Realtime Database returns
+  const data = { legacySeasons: { s1: stored } };
+  assert.equal(season1Source(data), 'firebase');
+  assert.equal(season1Source({}), 'bundled');
+  const live = seasonsOf(data).s1;
+  assert.deepEqual(live.table, season1.table);
+  assert.deepEqual(tierResult(live, 'goat'), { winner: 'a1', runnerUp: 'a2' });
+});
+
+test('full names appear only where the database spells them out, and only in the champions fields', () => {
+  const a5 = seasonTeams(season1).get('a5');
+  assert.equal(a5.members, 'Hari/Ram/Satish');
+  assert.equal(a5.fullMembers, 'Hari Mothkuri / Ram / Satish');
+});
+
+test('database paths: defaults, overrides and validation', () => {
+  assert.deepEqual(resolveDbPaths(), { root: 'traice2_0', season1: 'traice2_0/season1', season1UnderRoot: true });
+  assert.deepEqual(resolveDbPaths({ root: '/clubs/triace/', season1: 'legacy/s1' }), { root: 'clubs/triace', season1: 'legacy/s1', season1UnderRoot: false });
+  assert.equal(resolveDbPaths({ root: 'live' }).season1, 'live/season1');
+  assert.throws(() => resolveDbPaths({ root: 'bad.path' }), /not a valid database path/);
+  assert.throws(() => resolveDbPaths({ season1: 'a/$b' }), /not a valid database path/);
+});
+
+test('Season 1 import validation', () => {
+  assert.doesNotThrow(() => validateLegacySeason(bundledSeason1()));
+  assert.throws(() => validateLegacySeason({}), /not the Season 1 data/);
+  assert.throws(() => validateLegacySeason({ ...bundledSeason1(), fixtures: null }), /missing “fixtures”/);
 });

@@ -3,6 +3,7 @@ import { getAuth, onAuthStateChanged, signInAnonymously, signInWithEmailAndPassw
 import { getDatabase, ref, onValue, get, connectDatabaseEmulator } from 'firebase/database';
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/functions';
 import { rulesOf, DEFAULT_SEASON_NAME } from '../../functions/lib/tournament.js';
+import { dbPaths } from '../config/dbPaths.js';
 const env = import.meta.env;
 function errorMessage(error) { return error?.message?.replace(/^Firebase:\s*/, '').replace(/\s*\(auth\/[^)]+\)\.?$/, '') || 'The operation failed. Please retry.'; }
 // Sign-in failures worth telling the admin apart (Firebase reports wrong password and unknown user the same way).
@@ -18,6 +19,7 @@ const LOGIN_ERRORS = {
 export function createFirebaseService() {
   const config = { apiKey: env.VITE_FIREBASE_API_KEY, authDomain: env.VITE_FIREBASE_AUTH_DOMAIN, databaseURL: env.VITE_FIREBASE_DATABASE_URL, projectId: env.VITE_FIREBASE_PROJECT_ID, storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET, messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID, appId: env.VITE_FIREBASE_APP_ID };
   if (!config.apiKey || !config.databaseURL || !config.projectId) throw new Error('Firebase setup is missing. Add the web configuration to .env.local, or run npm run demo.');
+  const paths = dbPaths(), ROOT = paths.root;
   const app = initializeApp(config), auth = getAuth(app), database = getDatabase(app), functions = getFunctions(app, 'us-central1');
   if (env.VITE_USE_EMULATORS === 'true') {
     if (!['localhost', '127.0.0.1'].includes(location.hostname) || !config.projectId.startsWith('demo-')) throw new Error('Emulators require a loopback hostname and a demo- project.');
@@ -28,12 +30,13 @@ export function createFirebaseService() {
   const withError = fn => async (...args) => { try { return await fn(...args); } catch (error) { throw new Error(errorMessage(error)); } };
   return {
     mode: env.VITE_USE_EMULATORS === 'true' ? 'Firebase Emulators' : 'Firebase',
+    info: { projectId: config.projectId, authDomain: config.authDomain, databaseURL: config.databaseURL, root: paths.root, season1Path: paths.season1, emulators: env.VITE_USE_EMULATORS === 'true' },
     subscribePublic(callback, onError) {
       const state = {}, ready = new Set(), keys = ['settings', 'tierConfig', 'configRevision', 'tiers'];
       let bootstrapAttempted = false;
       const emit = () => {
         if (ready.size !== keys.length) return;
-        callback({ ...state, fixtures: state.fixtures || {}, leagueRules: rulesOf(state), season: state.season || { name: DEFAULT_SEASON_NAME }, seasons: state.seasons || {}, schedules: state.schedules || {} });
+        callback({ ...state, legacySeasons: state.legacySeasons, fixtures: state.fixtures || {}, leagueRules: rulesOf(state), season: state.season || { name: DEFAULT_SEASON_NAME }, seasons: state.seasons || {}, schedules: state.schedules || {} });
         if (!state.settings && !bootstrapAttempted) {
           bootstrapAttempted = true;
           httpsCallable(functions, 'bootstrapTournament')({}).catch(error => {
@@ -45,9 +48,11 @@ export function createFirebaseService() {
           });
         }
       };
-      const off = keys.map(key => onValue(ref(database, `traice2_0/${key}`), snapshot => { state[key] = snapshot.val() ?? (key === 'configRevision' ? 0 : key === 'settings' ? null : {}); ready.add(key); emit(); }, error => onError(new Error(errorMessage(error)))));
+      const off = keys.map(key => onValue(ref(database, `${ROOT}/${key}`), snapshot => { state[key] = snapshot.val() ?? (key === 'configRevision' ? 0 : key === 'settings' ? null : {}); ready.add(key); emit(); }, error => onError(new Error(errorMessage(error)))));
       // League data loads on its own so a missing database rule for it never blocks the core tournament data.
-      for (const key of ['fixtures', 'leagueRules', 'season', 'seasons', 'schedules']) off.push(onValue(ref(database, `traice2_0/${key}`), snapshot => { state[key] = snapshot.val() || undefined; emit(); }, () => { state[key] = undefined; emit(); }));
+      for (const key of ['fixtures', 'leagueRules', 'season', 'seasons', 'schedules']) off.push(onValue(ref(database, `${ROOT}/${key}`), snapshot => { state[key] = snapshot.val() || undefined; emit(); }, () => { state[key] = undefined; emit(); }));
+      // Season 1 (legacy) lives in the same database at its own configurable path.
+      off.push(onValue(ref(database, paths.season1), snapshot => { state.legacySeasons = snapshot.exists() ? { s1: snapshot.val() } : undefined; emit(); }, () => { state.legacySeasons = undefined; emit(); }));
       return () => off.forEach(unsubscribe => unsubscribe());
     },
     subscribeConnection(callback) { return onValue(ref(database, '.info/connected'), snapshot => callback(snapshot.val() === true)); },
@@ -64,9 +69,9 @@ export function createFirebaseService() {
       });
       return () => { stopped = true; unsubscribe(); };
     },
-    getMyRegistration: withError(async teamId => (await get(ref(database, `traice2_0/registrations/${teamId}`))).val()),
-    subscribeMyTeams(uid, callback) { return onValue(ref(database, `traice2_0/teamsByOwner/${uid}`), snapshot => callback(snapshot.val() || {}), () => callback({})); },
-    subscribePrivate(callback, onError) { return onValue(ref(database, 'traice2_0/registrations'), snapshot => callback(snapshot.val() || {}), error => onError(new Error(errorMessage(error)))); },
+    getMyRegistration: withError(async teamId => (await get(ref(database, `${ROOT}/registrations/${teamId}`))).val()),
+    subscribeMyTeams(uid, callback) { return onValue(ref(database, `${ROOT}/teamsByOwner/${uid}`), snapshot => callback(snapshot.val() || {}), () => callback({})); },
+    subscribePrivate(callback, onError) { return onValue(ref(database, `${ROOT}/registrations`), snapshot => callback(snapshot.val() || {}), error => onError(new Error(errorMessage(error)))); },
     async login(username, password) {
       const alias = env.VITE_ADMIN_USERNAME || 'reddi2026', email = env.VITE_ADMIN_EMAIL || 'reddi2026@traice.local';
       try { await signInWithEmailAndPassword(auth, username.trim().toLowerCase() === alias.toLowerCase() ? email : username.trim(), password); }
@@ -86,6 +91,7 @@ export function createFirebaseService() {
     withdrawTeam: withError(async payload => (await httpsCallable(functions, 'withdrawTeam')(payload)).data),
     claimTeam: withError(async payload => (await httpsCallable(functions, 'claimTeam')(payload)).data),
     resetCaptainCode: withError(async payload => (await httpsCallable(functions, 'resetCaptainCode')(payload)).data),
+    importSeason1: withError(async season => (await httpsCallable(functions, 'importSeason1')({ season })).data),
     manageSeason: withError(async payload => (await httpsCallable(functions, 'manageSeason')(payload)).data),
     submitResult: withError(async payload => (await httpsCallable(functions, 'submitResult')(payload)).data),
     reviewResult: withError(async payload => (await httpsCallable(functions, 'reviewResult')(payload)).data)

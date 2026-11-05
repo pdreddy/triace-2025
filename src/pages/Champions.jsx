@@ -9,7 +9,7 @@ import { seasonList, seasonTeams, championTiers, tierResult } from '../data/seas
 const year = ms => (ms ? new Date(ms).getFullYear() : '');
 const years = s => (year(s.startedAt) && year(s.startedAt) !== year(s.archivedAt) ? `${year(s.startedAt)}–${year(s.archivedAt)}` : String(year(s.archivedAt)));
 
-const squad = team => (team?.superSixMembers || team?.members || '').split('/').map(n => n.trim()).join(' · ');
+const squad = team => (team?.superSixFullMembers || team?.fullMembers || team?.superSixMembers || team?.members || '').split('/').map(n => n.trim()).join(' · ');
 
 export default function Champions() {
   const { data } = useTournament();
@@ -33,7 +33,7 @@ export default function Champions() {
               <span className="muted">{years(season)}</span>
               <Link className="text-link" to={`/history/${season.id}`}>Full season <Icon name="arrow" size={14} /></Link>
             </header>
-            <div className="podiums">{tiers.map(t => <WinnerCard key={t.id} tier={t} result={tierResult(season, t.id)} teams={teams} members={squad} empty={season.legacy ? 'Winners to be announced.' : 'No champion recorded.'} />)}</div>
+            <div className="podiums">{tiers.map(t => <WinnerCard key={t.id} tier={t} result={tierResult(season, t.id)} teams={teams} members={squad} large empty={season.legacy ? 'Winners to be announced.' : 'No champion recorded.'} />)}</div>
           </article>
         );
       })}

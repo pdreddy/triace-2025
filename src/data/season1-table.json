@@ -356,5 +356,11 @@
    ],
    "note": "Bigger win = more points"
   }
- }
+ },
+ "fullNames": {
+  "Hari": "Hari Mothkuri",
+  "Chandrakant": "Chandrakant Dharme",
+  "Raj C": "Raj Chinta"
+ },
+ "_fullNamesNote": "Short name used in the squads -> full name found in the Season 1 database (only names the DB actually spells out). Add more here as they are confirmed."
 }

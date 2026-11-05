@@ -4,6 +4,7 @@ import path from 'node:path';
 import { initialState, publicState, applyRegistration, applyConfiguration, applyRecalculation, applyLeagueRules, isOwner, ValidationError } from '../functions/lib/tournament.js';
 import { applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult, applyManageSeason, applySetSchedule, applyMoveFixture, applyIssueChallenge, applyUpdateTeam, applyWithdrawTeam, applyClaimTeam, applyResetCaptainCode } from '../functions/lib/league.js';
 import { newCaptainCode, hashCaptainCode } from '../functions/lib/captainCode.js';
+import { validateLegacySeason } from '../functions/lib/legacy.js';
 const digest = value => createHash('sha256').update(value).digest();
 export function demoPlugin(env) {
   // An unset password no longer stops the demo: a random one is made for this run and printed once.
@@ -48,7 +49,7 @@ export function demoPlugin(env) {
         const safeUser = () => ({ uid: session.uid, admin: session.admin, anonymous: session.anonymous, ...(session.email ? { email: session.email } : {}) });
         if (req.method === 'GET') {
           if (endpoint === '/session') return send(200, safeUser());
-          if (endpoint === '/public') return send(200, publicState(state));
+          if (endpoint === '/public') return send(200, { ...publicState(state), ...(state.season1 ? { legacySeasons: { s1: state.season1 } } : {}) });
           if (endpoint === '/my-registration') { const reg = state.registrations?.[url.searchParams.get('teamId')]; return reg && session && (session.admin || isOwner(reg, session.uid)) ? send(200, reg) : send(403, { error: 'Only this team’s captain can read it.' }); }
           if (endpoint === '/my-teams') return send(200, session ? state.teamsByOwner?.[session.uid] || {} : {});
           if (endpoint === '/registrations') return session?.admin ? send(200, state.registrations || {}) : send(403, { error: 'Administrator access is required.' });
@@ -71,6 +72,11 @@ export function demoPlugin(env) {
         if (endpoint === '/register' && !session) return send(401, { error: 'Open the registration page before submitting.' });
         if (endpoint === '/register') { const code = newCaptainCode(), result = await mutate(current => applyRegistration(current, payload, session.uid, Date.now(), hashCaptainCode(code))); return send(200, result.created ? { ...result, captainCode: code } : result); }
         const signedIn = session && session.uid, admin = session?.admin === true;
+        if (endpoint === '/import-season1') {
+          if (!admin) return send(403, { error: 'Administrator access is required.' });
+          validateLegacySeason(payload.season);
+          return send(200, await mutate(current => ({ state: { ...current, season1: payload.season }, result: { path: 'demo state' } })));
+        }
         if (endpoint === '/issue-challenge') return signedIn ? send(200, await mutate(current => applyIssueChallenge(current, payload, session.uid, admin))) : send(401, { error: 'Sign in first.' });
         if (endpoint === '/update-team') return signedIn ? send(200, await mutate(current => applyUpdateTeam(current, payload, session.uid, admin))) : send(401, { error: 'Sign in first.' });
         if (endpoint === '/withdraw-team') return signedIn ? send(200, await mutate(current => applyWithdrawTeam(current, payload, session.uid, admin))) : send(401, { error: 'Sign in first.' });

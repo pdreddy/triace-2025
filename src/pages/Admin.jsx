@@ -6,6 +6,7 @@ import { Icon } from '../components/Icons';
 import { FixtureCard, teamIndex } from '../components/League';
 import { LeagueRulesCard, PlayoffPlanner, ScheduleForm, SeasonCard } from '../components/AdminLeague';
 import { TeamEditForm } from '../components/TeamTools';
+import FirebasePanel from '../components/FirebasePanel';
 import { DEFAULT_SETTINGS, DEFAULT_TIERS, orderedTiers, parseUtr, validateSettings, validateTierConfig, registrationsCsv } from '../../functions/lib/tournament.js';
 
 const SECTIONS = [
@@ -267,6 +268,7 @@ export default function Admin() {
           </div>
         </div>
       </div>
+      <FirebasePanel service={service} data={data} />
     </section>
   );
 }
