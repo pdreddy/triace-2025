@@ -14,13 +14,13 @@ export default function LoginCard({ login, teamLabel, title = 'Your team login' 
     link.click(); URL.revokeObjectURL(url);
   }
   return (
-    <div className="login-card" role="group" aria-label={title}>
+    <div className="credential-card" role="group" aria-label={title}>
       <p className="eyebrow">{title}</p>
       <dl>
         <div><dt>Username</dt><dd><output className="mono" aria-label="Username">{login.username}</output><button type="button" className="secondary small" onClick={() => copy('Username copied', login.username)}>Copy</button></dd></div>
         <div><dt>Password</dt><dd><output className="mono password" aria-label="Password">{login.password}</output><button type="button" className="secondary small" onClick={() => copy('Password copied', login.password)}>Copy</button></dd></div>
       </dl>
-      <div className="login-actions">
+      <div className="credential-actions">
         <button type="button" className="secondary small" onClick={() => copy('Username and password copied', loginText(login, teamLabel))}><Icon name="copy" size={16} /> Copy both</button>
         <button type="button" className="secondary small" onClick={download}><Icon name="download" size={16} /> Download</button>
         <button type="button" className="secondary small" onClick={() => window.print()}>Print</button>
