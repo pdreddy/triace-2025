@@ -52,6 +52,7 @@ All of this is in the browser, on the **Admin** page (sign in at `/admin/login`)
 ## 2. Admin account (needs your Firebase account)
 
 - [ ] Authentication → Users: create `reddi2026@traice.local` with a **new, unique password**. The temporary password in the README is only for testing; remove it from the README.
+- [ ] If the account already exists and you are unsure of its password, set a new one (typed twice, never saved): `GOOGLE_CLOUD_PROJECT=<project> node scripts/set-admin-password.cjs reddi2026@traice.local`
 - [ ] Grant the admin claim: `GOOGLE_CLOUD_PROJECT=<project> node scripts/grant-admin.cjs reddi2026@traice.local`
 - [ ] Sign in on the live site; confirm the **Admin** page opens.
 
