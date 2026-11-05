@@ -25,8 +25,21 @@ test('published table agrees with the imported results on played, won and lost',
   }
 });
 
-test('Season 1 has no winners until they are announced; closed seasons use their recorded champions', () => {
-  assert.equal(tierResult(season1, 'a'), null);
+test('Season 1 Super Six winners and squads', () => {
+  assert.deepEqual(season1.championTiers.map(t => t.name), ['GOAT tier', 'Rising Aces']);
+  assert.deepEqual(tierResult(season1, 'goat'), { winner: 'a1', runnerUp: 'a2' });
+  assert.deepEqual(tierResult(season1, 'rising'), { winner: 'a5', runnerUp: 'b5' });
+  const { tiers, weeks, rosters } = season1.superSix, teams = seasonTeams(season1);
+  assert.ok(Object.values(tiers).every(t => t.teams.length === 6));
+  assert.equal(weeks.length, 3);
+  for (const week of weeks) for (const [tier, matches] of Object.entries(week.matches)) {
+    assert.equal(matches.length, 3);
+    assert.ok(matches.every(m => tiers[tier].teams.includes(m.home) && tiers[tier].teams.includes(m.away) && rosters[m.home] && rosters[m.away]));
+  }
+  assert.equal(teams.get('a1').superSixMembers, 'Yogesh / Dinkar / Sudharshan');
+});
+
+test('closed seasons use their recorded champions', () => {
   const closed = { champions: { goat: { winner: 'x', runnerUp: 'y' } } };
   assert.deepEqual(tierResult(closed, 'goat'), { winner: 'x', runnerUp: 'y' });
   assert.equal(tierResult(closed, 'rising'), null);

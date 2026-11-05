@@ -4,7 +4,7 @@ import { EmptyState, tierTone } from '../components/UI';
 import { Icon } from '../components/Icons';
 import { teamName } from '../components/League';
 import { Members, PageTabs } from './History';
-import { seasonList, seasonTeams, seasonTiers, tierResult } from '../data/seasons.js';
+import { seasonList, seasonTeams, championTiers, tierResult } from '../data/seasons.js';
 
 const year = ms => (ms ? new Date(ms).getFullYear() : '');
 const years = s => (year(s.startedAt) && year(s.startedAt) !== year(s.archivedAt) ? `${year(s.startedAt)}–${year(s.archivedAt)}` : String(year(s.archivedAt)));
@@ -15,8 +15,8 @@ function Podium({ tier, result, teams, legacy }) {
       <h3>{tier.name}</h3>
       {result ? (
         <dl>
-          <div className="gold"><dt><Icon name="trophy" size={16} /> Winner</dt><dd>{teamName(teams.get(result.winner))}</dd><Members team={teams.get(result.winner)} /></div>
-          <div className="silver"><dt>Runner-up</dt><dd>{teamName(teams.get(result.runnerUp))}</dd><Members team={teams.get(result.runnerUp)} /></div>
+          <div className="gold"><dt><Icon name="trophy" size={16} /> Winner</dt><dd>{teamName(teams.get(result.winner))}</dd><Members team={teams.get(result.winner)} superSix /></div>
+          <div className="silver"><dt>Runner-up</dt><dd>{teamName(teams.get(result.runnerUp))}</dd><Members team={teams.get(result.runnerUp)} superSix /></div>
         </dl>
       ) : <p className="muted">{legacy ? 'Winners to be announced.' : 'No champion recorded.'}</p>}
     </div>
@@ -37,7 +37,7 @@ export default function Champions() {
       <PageTabs active="champions" />
       {!seasons.length && <EmptyState icon="trophy" title="No champions yet.">Champions appear here once a season is closed.</EmptyState>}
       {seasons.map(season => {
-        const teams = seasonTeams(season), tiers = seasonTiers(season);
+        const teams = seasonTeams(season), tiers = championTiers(season);
         return (
           <article key={season.id} className="champ-season">
             <header>

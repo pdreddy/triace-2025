@@ -1,9 +1,9 @@
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useTournament } from '../hooks/useTournament';
 import { EmptyState, Stat, tierTone } from '../components/UI';
 import { Icon } from '../components/Icons';
 import { Bracket, StandingsTable, teamName } from '../components/League';
-import { seasonList, seasonsOf, seasonTeams, seasonTable, seasonTiers, tierResult } from '../data/seasons.js';
+import { seasonList, seasonsOf, seasonTeams, seasonTable, seasonTiers, championTiers, tierResult } from '../data/seasons.js';
 
 const date = ms => (ms ? new Date(ms).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—');
 const span = s => (s.startedAt ? `${date(s.startedAt)} – ${date(s.archivedAt)}` : `Closed ${date(s.archivedAt)}`);
@@ -18,7 +18,66 @@ export function PageTabs({ active }) {
 }
 
 const signed = n => (n > 0 ? `+${n}` : String(n));
-export const Members = ({ team }) => (team?.members ? <small className="members">{team.members.split('/').join(' · ')}</small> : null);
+export const Members = ({ team, superSix = false }) => {
+  const names = (superSix && team?.superSixMembers) || team?.members;
+  return names ? <small className="members">{names.split('/').map(n => n.trim()).join(' · ')}</small> : null;
+};
+
+// Season 1's Super Six: the top six teams of each tier play a three-week round robin.
+function SuperSix({ season, teams }) {
+  const { tiers, weeks, scoring } = season.superSix, tierIds = Object.keys(tiers);
+  const squad = id => teams.get(id)?.superSixMembers || teams.get(id)?.members || '';
+  return (
+    <div className="super-six">
+      <div className="podiums">
+        {tierIds.map(id => {
+          const result = tierResult(season, id);
+          return (
+            <section key={id} className={`podium ${tierTone(id)}`}>
+              <h3>{tiers[id].name} · Super Six</h3>
+              {result ? (
+                <dl>
+                  <div className="gold"><dt><Icon name="trophy" size={16} /> Winner</dt><dd>{teamName(teams.get(result.winner))}</dd><Members team={teams.get(result.winner)} superSix /></div>
+                  <div className="silver"><dt>Runner-up</dt><dd>{teamName(teams.get(result.runnerUp))}</dd><Members team={teams.get(result.runnerUp)} superSix /></div>
+                </dl>
+              ) : <p className="muted">To be announced.</p>}
+              <ul className="six-teams">{tiers[id].teams.map(t => <li key={t}><b>{teamName(teams.get(t))}</b> <small>{squad(t)}</small></li>)}</ul>
+            </section>
+          );
+        })}
+      </div>
+      <section className="scoring-card">
+        <h3 className="round-title">Scoring system &amp; ranking</h3>
+        <div className="scoring-grid">
+          <div><b>1 · Match result points</b><ul>{scoring.matchPoints.map(([k, v]) => <li key={k}>{k} <i>{v}</i></li>)}</ul><small>{scoring.note}</small></div>
+          <div><b>2 · Game difference</b><ul><li>Base: game margin (8–1 = +7)</li><li>Bonus: D1/D2 straight (2–0) = +5</li><li>D3: no bonus</li></ul></div>
+          <div><b>3 · Singles game diff</b><ul><li>Count S1 + S2 games</li><li>Used only if tied</li></ul><small>Then head-to-head.</small></div>
+        </div>
+      </section>
+      <h3 className="round-title">Schedule</h3>
+      {weeks.map(week => (
+        <section key={week.label} className="six-week">
+          <h4>{week.date} — {week.label}</h4>
+          <div className="six-week-tiers">
+            {tierIds.map(id => (
+              <div key={id} className={`six-card ${tierTone(id)}`}>
+                <h5>{tiers[id].name}</h5>
+                <ul>
+                  {week.matches[id].map(m => (
+                    <li key={m.home + m.away}>
+                      <span>{squad(m.home)}</span><i>vs</i><span>{squad(m.away)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
 
 // Season 1's published table: matches, wins, losses, game and singles difference, points.
 function PublishedTable({ rows, teams }) {
@@ -55,14 +114,14 @@ function SeasonList({ data }) {
       {!seasons.length && <EmptyState icon="trophy" title="No past seasons yet.">When the admin closes a season, it appears here with its champions and final tables.</EmptyState>}
       <div className="season-list">
         {seasons.map(season => {
-          const teams = seasonTeams(season), tiers = seasonTiers(season);
+          const teams = seasonTeams(season), tiers = championTiers(season);
           return (
             <Link key={season.id} className="season-tile" to={`/history/${season.id}`}>
               <div className="season-tile-top"><h2>{season.name}</h2><span className="muted">{span(season)}</span></div>
               <ul className="champions">
                 {tiers.map(t => {
                   const champ = tierResult(season, t.id);
-                  return <li key={t.id} className={tierTone(t.id)}><Icon name="trophy" size={18} /><span>{t.name}</span><b>{champ ? teamName(teams.get(champ.winner)) : season.legacy ? 'To be announced' : 'No champion recorded'}</b></li>;
+                  return <li key={t.id} className={tierTone(t.id)}><Icon name="trophy" size={18} /><span>{t.name}</span><b>{champ ? teamName(teams.get(champ.winner)) : 'No champion recorded'}</b></li>;
                 })}
               </ul>
               <span className="text-link">{teams.size} teams · view season <Icon name="arrow" size={14} /></span>
@@ -75,6 +134,8 @@ function SeasonList({ data }) {
 }
 
 function SeasonDetail({ season }) {
+  const [params, setParams] = useSearchParams();
+  const stage = season.legacy && params.get('stage') !== 'groups' ? 'super-six' : 'groups';
   const teams = seasonTeams(season), tiers = seasonTiers(season);
   const encounters = Object.values(season.fixtures || {}).flatMap(f => Object.values(f || {})).filter(f => f.status === 'final').length;
   return (
@@ -90,9 +151,16 @@ function SeasonDetail({ season }) {
         <Stat value={teams.size} label="Teams" />
         <Stat value={tiers.length} label="Tiers" />
         <Stat value={encounters} label="Encounters played" />
-        {season.legacy ? <Stat value="TBA" label="Winners" tone="accent" /> : <Stat value={tiers.filter(t => tierResult(season, t.id)).length} label="Champions" tone="accent" />}
+        <Stat value={season.legacy ? season.championTiers.filter(t => tierResult(season, t.id)).length : tiers.filter(t => tierResult(season, t.id)).length} label="Champions" tone="accent" />
       </div>
-      {tiers.map(tier => {
+      {season.legacy && (
+        <nav className="subtabs" aria-label="Season stages">
+          <button type="button" className={stage === 'super-six' ? 'active' : ''} onClick={() => setParams({})}>Super Six</button>
+          <button type="button" className={stage === 'groups' ? 'active' : ''} onClick={() => setParams({ stage: 'groups' })}>Group stage</button>
+        </nav>
+      )}
+      {stage === 'super-six' && <SuperSix season={season} teams={teams} />}
+      {stage === 'groups' && tiers.map(tier => {
         const tierFixtures = season.fixtures?.[tier.id] || {}, champ = tierResult(season, tier.id);
         const rows = season.legacy ? season.table[tier.id] : seasonTable(season, tier.id);
         const playoffs = Object.values(tierFixtures).filter(f => f.stage);

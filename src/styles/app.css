@@ -1069,8 +1069,8 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
 
 /* Champions and season history */
 .subtabs { display: inline-flex; gap: 4px; margin: 0 0 18px; padding: 4px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); }
-.subtabs a { padding: 8px 16px; border-radius: 999px; font-size: 14px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
-.subtabs a.active { background: var(--lime); color: var(--ink); }
+.subtabs a, .subtabs button { padding: 8px 16px; border-radius: 999px; font-size: 14px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.subtabs a.active, .subtabs button.active { background: var(--lime); color: var(--ink); }
 .champ-season { margin: 0 0 18px; padding: 18px; border-radius: var(--r); background: linear-gradient(165deg, var(--surface-2), var(--surface)); border: 1px solid var(--line); }
 .champ-season header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-bottom: 14px; }
 .champ-season h2 { font-size: 28px; }
@@ -1086,7 +1086,29 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
 .members { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--muted); }
 .podium .members { font-size: 13px; }
 .published .short { display: none; }
+.subtabs button { border: 0; background: transparent; cursor: pointer; font-family: inherit; }
+.super-six .podiums { margin-bottom: 18px; }
+.six-teams { display: grid; gap: 4px; margin: 14px 0 0; padding: 12px 0 0; list-style: none; border-top: 1px solid var(--line); font-size: 13px; }
+.six-teams small { display: block; color: var(--muted); }
+.scoring-card { margin: 0 0 8px; }
+.scoring-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.scoring-grid > div { padding: 14px; border-radius: var(--r); border: 1px solid var(--line); background: #ffffff08; font-size: 14px; }
+.scoring-grid ul { margin: 8px 0; padding: 0; list-style: none; display: grid; gap: 4px; color: var(--muted); }
+.scoring-grid li i { font-style: normal; font-weight: 700; color: var(--lime); }
+.scoring-grid small { color: var(--muted); }
+.six-week { margin: 0 0 14px; }
+.six-week h4 { margin: 0 0 8px; font-family: var(--display); font-size: 20px; text-transform: uppercase; }
+.six-week-tiers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.six-card { padding: 12px 14px; border-radius: var(--r); border: 1px solid var(--line); background: #ffffff08; }
+.six-card h5 { margin: 0 0 8px; font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--lime); }
+.six-card.rising h5 { color: var(--sky); }
+.six-card ul { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.six-card li { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.six-card li:first-child { border-top: 0; }
+.six-card li i { padding: 2px 7px; border-radius: 6px; font-size: 11px; font-style: normal; font-weight: 700; text-transform: uppercase; color: var(--ink); background: var(--lime); }
+.six-card li span:last-child { text-align: right; }
 @media (max-width: 700px) {
+  .scoring-grid, .six-week-tiers, .super-six .podiums { grid-template-columns: 1fr; }
   .published .long { display: none; }
   .published .short { display: inline; }
   .published th, .published td { padding-left: 6px; padding-right: 6px; }

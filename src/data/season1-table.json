@@ -1,6 +1,15 @@
 {
- "_note": "Season 1 final table as published by the organisers. Add \"champions\": {\"a\": {\"winner\": \"a2\", \"runnerUp\": \"a1\"}, \"b\": {...}} here once the winners are announced.",
- "champions": {},
+ "_note": "Season 1 published group tables, team members and Super Six details, edited by hand. 'champions' are the Super Six tier winners.",
+ "champions": {
+  "goat": {
+   "winner": "a1",
+   "runnerUp": "a2"
+  },
+  "rising": {
+   "winner": "a5",
+   "runnerUp": "b5"
+  }
+ },
  "tables": {
   "a": [
    {
@@ -186,5 +195,166 @@
     "pts": -33
    }
   ]
+ },
+ "superSix": {
+  "tiers": {
+   "goat": {
+    "name": "GOAT tier",
+    "teams": [
+     "a1",
+     "a2",
+     "a3",
+     "b1",
+     "b2",
+     "b3"
+    ]
+   },
+   "rising": {
+    "name": "Rising Aces",
+    "teams": [
+     "a4",
+     "a5",
+     "a7",
+     "b5",
+     "b6",
+     "b7"
+    ]
+   }
+  },
+  "rosters": {
+   "a1": "Yogesh / Dinkar / Sudharshan",
+   "a2": "Prashanth / Vinoth / Vamsi",
+   "a3": "Sudhakar / Dinesh / Uma",
+   "b1": "Manish / Biju / Ritesh",
+   "b2": "Kalyan / Kalam / Uday",
+   "b3": "Kailas / Raja M / Vivek Reddy",
+   "a4": "Sandeep G / Damu / Raj C",
+   "a5": "Hari / Ram / Satish",
+   "a7": "Sreekanth B / Uday P / Sashi R",
+   "b5": "Narayan P / Ratnesh / Jay S",
+   "b6": "Vinod A / Raj K / Krishna",
+   "b7": "Avinash / Bharat / Sridhar"
+  },
+  "weeks": [
+   {
+    "date": "Apr 10",
+    "label": "Week 1",
+    "matches": {
+     "goat": [
+      {
+       "home": "a1",
+       "away": "b1"
+      },
+      {
+       "home": "a2",
+       "away": "b2"
+      },
+      {
+       "home": "a3",
+       "away": "b3"
+      }
+     ],
+     "rising": [
+      {
+       "home": "a7",
+       "away": "b6"
+      },
+      {
+       "home": "a5",
+       "away": "b5"
+      },
+      {
+       "home": "a4",
+       "away": "b7"
+      }
+     ]
+    }
+   },
+   {
+    "date": "Apr 17",
+    "label": "Week 2",
+    "matches": {
+     "goat": [
+      {
+       "home": "a1",
+       "away": "b2"
+      },
+      {
+       "home": "a2",
+       "away": "b3"
+      },
+      {
+       "home": "a3",
+       "away": "b1"
+      }
+     ],
+     "rising": [
+      {
+       "home": "a7",
+       "away": "b5"
+      },
+      {
+       "home": "a5",
+       "away": "b7"
+      },
+      {
+       "home": "a4",
+       "away": "b6"
+      }
+     ]
+    }
+   },
+   {
+    "date": "Apr 24",
+    "label": "Week 3",
+    "matches": {
+     "goat": [
+      {
+       "home": "a1",
+       "away": "b3"
+      },
+      {
+       "home": "a2",
+       "away": "b1"
+      },
+      {
+       "home": "a3",
+       "away": "b2"
+      }
+     ],
+     "rising": [
+      {
+       "home": "a7",
+       "away": "b7"
+      },
+      {
+       "home": "a5",
+       "away": "b6"
+      },
+      {
+       "home": "a4",
+       "away": "b5"
+      }
+     ]
+    }
+   }
+  ],
+  "scoring": {
+   "matchPoints": [
+    [
+     "3–0 win",
+     "+3 pts"
+    ],
+    [
+     "3–1 win",
+     "+2 pts"
+    ],
+    [
+     "3–2 win",
+     "+1 pt"
+    ]
+   ],
+   "note": "Bigger win = more points"
+  }
  }
 }
