@@ -36,7 +36,13 @@ export function createFirebaseService() {
         callback({ ...state, fixtures: state.fixtures || {}, leagueRules: rulesOf(state), season: state.season || { name: DEFAULT_SEASON_NAME }, seasons: state.seasons || {}, schedules: state.schedules || {} });
         if (!state.settings && !bootstrapAttempted) {
           bootstrapAttempted = true;
-          httpsCallable(functions, 'bootstrapTournament')({}).catch(error => onError(new Error(`Tournament setup could not finish: ${errorMessage(error)}`)));
+          httpsCallable(functions, 'bootstrapTournament')({}).catch(error => {
+            const detail = errorMessage(error);
+            const hint = env.VITE_USE_EMULATORS === 'true'
+              ? 'Start the Firebase emulators and seed the local demo project.'
+              : 'The Firebase tournament backend may not be deployed. Deploy Cloud Functions and database rules before using the live site.';
+            onError(new Error(`Tournament setup could not finish: ${detail}. ${hint}`));
+          });
         }
       };
       const off = keys.map(key => onValue(ref(database, `traice2_0/${key}`), snapshot => { state[key] = snapshot.val() ?? (key === 'configRevision' ? 0 : key === 'settings' ? null : {}); ready.add(key); emit(); }, error => onError(new Error(errorMessage(error)))));
