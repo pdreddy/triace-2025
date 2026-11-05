@@ -20,6 +20,13 @@ function legacySeason() {
       team.members = row.members;
     }
   }
+  // Last five results per team, oldest first, from the imported encounters.
+  const played = Object.values(season.fixtures).flatMap(f => Object.values(f)).sort((a, b) => a.completedAt - b.completedAt);
+  for (const rows of Object.values(season.table)) {
+    for (const row of rows) {
+      row.form = played.filter(f => f.home === row.teamId || f.away === row.teamId).map(f => (f[f.result.winner] === row.teamId ? 'W' : 'L')).slice(-5);
+    }
+  }
   for (const [teamId, roster] of Object.entries(published.superSix.rosters)) {
     const team = Object.values(season.tiers).map(t => t.teams[teamId]).find(Boolean);
     if (team) team.superSixMembers = roster; // the Super Six squads differ slightly from the group-stage ones

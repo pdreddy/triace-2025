@@ -1086,6 +1086,7 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
 .members { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--muted); }
 .podium .members { font-size: 13px; }
 .published .short { display: none; }
+.published .form-inline { display: none; }
 .subtabs button { border: 0; background: transparent; cursor: pointer; font-family: inherit; }
 .super-six .podiums { margin-bottom: 18px; }
 .six-teams { display: grid; gap: 4px; margin: 14px 0 0; padding: 12px 0 0; list-style: none; border-top: 1px solid var(--line); font-size: 13px; }
@@ -1110,6 +1111,8 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
 @media (max-width: 700px) {
   .scoring-grid, .six-week-tiers, .super-six .podiums { grid-template-columns: 1fr; }
   .published .long { display: none; }
+  .published .form-inline { display: block; margin-top: 4px; }
+  .published .form i { width: 16px; height: 16px; font-size: 10px; }
   .published .short { display: inline; }
   .published th, .published td { padding-left: 6px; padding-right: 6px; }
   .published td:nth-child(2) { white-space: normal; min-width: 0; }

@@ -17,6 +17,7 @@ export function PageTabs({ active }) {
   );
 }
 
+const Form = ({ results }) => <span className="form">{results.map((r, i) => <i key={i} className={r === 'W' ? 'win' : 'loss'}>{r}</i>)}</span>;
 const signed = n => (n > 0 ? `+${n}` : String(n));
 export const Members = ({ team, superSix = false }) => {
   const names = (superSix && team?.superSixMembers) || team?.members;
@@ -84,14 +85,15 @@ function PublishedTable({ rows, teams }) {
   return (
     <div className="table-wrap">
       <table className="standings league-table published">
-        <thead><tr><th scope="col">#</th><th scope="col">Team</th><th scope="col" className="num">M</th><th scope="col" className="num">W</th><th scope="col" className="num">L</th><th scope="col" className="num"><span className="long">Game +/-</span><span className="short">Gm</span></th><th scope="col" className="num"><span className="long">Singles +/-</span><span className="short">Sg</span></th><th scope="col" className="num">Pts</th></tr></thead>
+        <thead><tr><th scope="col">#</th><th scope="col">Team</th><th scope="col" className="num">M</th><th scope="col" className="num">W</th><th scope="col" className="num">L</th><th scope="col" className="num"><span className="long">Game +/-</span><span className="short">Gm</span></th><th scope="col" className="num"><span className="long">Singles +/-</span><span className="short">Sg</span></th><th scope="col" className="num">Pts</th><th scope="col" className="form-col">Form</th></tr></thead>
         <tbody>
           {rows.map((row, i) => (
             <tr key={row.teamId} className={i < 3 ? 'qualify' : ''}>
               <td className="rank-cell">{i + 1}</td>
-              <td><b>{teamName(teams.get(row.teamId))}</b><Members team={teams.get(row.teamId)} /></td>
+              <td><b>{teamName(teams.get(row.teamId))}</b><Members team={teams.get(row.teamId)} /><span className="form-inline"><Form results={row.form} /></span></td>
               <td className="num">{row.m}</td><td className="num">{row.w}</td><td className="num">{row.l}</td>
               <td className="num">{signed(row.game)}</td><td className="num">{signed(row.singles)}</td><td className="num strong">{row.pts}</td>
+              <td className="form-col"><Form results={row.form} /></td>
             </tr>
           ))}
         </tbody>

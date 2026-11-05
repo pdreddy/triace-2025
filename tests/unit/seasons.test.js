@@ -25,6 +25,14 @@ test('published table agrees with the imported results on played, won and lost',
   }
 });
 
+test('Season 1 table rows carry the last five results', () => {
+  for (const row of [...season1.table.a, ...season1.table.b]) {
+    assert.equal(row.form.length, Math.min(5, row.m), row.teamId);
+    assert.ok(row.form.every(r => r === 'W' || r === 'L'));
+  }
+  assert.equal(season1.table.b.find(r => r.teamId === 'b9').form.join(''), 'LLLLL');
+});
+
 test('Season 1 Super Six winners and squads', () => {
   assert.deepEqual(season1.championTiers.map(t => t.name), ['GOAT tier', 'Rising Aces']);
   assert.deepEqual(tierResult(season1, 'goat'), { winner: 'a1', runnerUp: 'a2' });
