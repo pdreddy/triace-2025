@@ -6,8 +6,14 @@ import { applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyR
 import { newCaptainCode, hashCaptainCode } from '../functions/lib/captainCode.js';
 const digest = value => createHash('sha256').update(value).digest();
 export function demoPlugin(env) {
-  const password = env.TRAICE_ADMIN_PASSWORD;
-  if (!password || password.length < 8) throw new Error('Local demo needs TRAICE_ADMIN_PASSWORD (8+ characters) in .env.demo.local or your shell. See README.md.');
+  // An unset password no longer stops the demo: a random one is made for this run and printed once.
+  // A password that is set but shorter than 8 characters is still an error.
+  let password = env.TRAICE_ADMIN_PASSWORD;
+  if (!password) {
+    password = randomBytes(9).toString('base64url');
+    console.log(`\n  Demo admin password for this run: ${password}\n  (set TRAICE_ADMIN_PASSWORD in .env.demo.local to choose your own)\n`);
+  }
+  if (password.length < 8) throw new Error(`TRAICE_ADMIN_PASSWORD is only ${password.length} characters; use 8 or more.`);
   const username = env.TRAICE_ADMIN_USERNAME || 'reddi2026', email = env.TRAICE_ADMIN_EMAIL || 'reddi2026@traice.local';
   const directory = path.resolve(env.TRAICE_DEMO_DATA_DIR || '.local-demo'), file = path.join(directory, 'state.json');
   const sessions = new Map(), attempts = new Map();
