@@ -6,6 +6,7 @@ import { usePwa } from './hooks/usePwa';
 import { Message } from './components/UI';
 import { Icon } from './components/Icons';
 import { EarlyBirdBar } from './components/EarlyBird';
+import { diagnose } from './services/diagnose.js';
 
 const Rules = lazy(() => import('./pages/Rules'));
 const Register = lazy(() => import('./pages/Register'));
@@ -85,6 +86,13 @@ function Layout() {
         {savedAt && <p className="banner offline" role="status"><Icon name="wifiOff" size={16} /> Showing data saved {new Date(savedAt).toLocaleString()}. It refreshes as soon as a connection is available.</p>}
         {updated && <p className="banner update" role="status"><Icon name="refresh" size={16} /> A new version is ready. <button type="button" onClick={() => location.reload()}>Reload</button></p>}
         <Message error>{shownError}</Message>
+        {error && shownError === FRIENDLY_ERROR && (
+          <details className="error-details">
+            <summary>Technical details (for the tournament admin)</summary>
+            <p><code>{error}</code></p>
+            <p><strong>Likely fix:</strong> {diagnose(error)}</p>
+          </details>
+        )}
         <Suspense fallback={<div className="page-loading" aria-busy="true"><span className="spinner" /> Loading…</div>}>
           <Routes>
             <Route path="/" element={<Rules />} />

@@ -1318,3 +1318,8 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
   .deck-dots button.current::before { width: 14px; }
   .deck-nav { gap: 4px; }
 }
+
+.error-details { margin: 0 0 12px; padding: 8px 14px; border-radius: var(--r); border: 1px solid var(--line); background: #ffffff08; font-size: 13px; color: var(--soft); }
+.error-details summary { cursor: pointer; font-weight: 700; color: var(--muted); }
+.error-details code { overflow-wrap: anywhere; color: #fff; }
+.error-details p { margin: 8px 0 0; }

@@ -16,7 +16,7 @@ export function TournamentProvider({ children }) {
   useEffect(() => {
     if (service.setupError) { setError(service.setupError); return; }
     if (service.loading) return;
-    const fail = e => setError(e.message);
+    const fail = e => { console.error('[triace]', e); setError(e.message); };
     let live = false;
     const offPublic = service.subscribePublic(value => { live = true; setData(value); setSavedAt(null); if (value.settings) { setError(''); writeSnapshot(value); } }, fail);
     // Offline, or no live data after a few seconds: fall back to the last saved public data.
