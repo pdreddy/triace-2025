@@ -22,12 +22,12 @@ function rating(player, gap = UTR_GAP_LIMIT) {
   } catch { return { value: 0, averaged: false }; }
 }
 
-function TierOption({ value, tone, title, detail, art, selected, disabled, onSelect }) {
+function TierOption({ value, tone, title, detail, eligibility, art, selected, disabled, onSelect }) {
   return (
     <label className={`tier-option ${tone}${selected ? ' selected' : ''}`}>
       <input type="checkbox" value={value} disabled={disabled} checked={selected} onChange={onSelect} />
       {art && <img className="tier-option-art" src={art} alt="" />}
-      <span><strong>{title}</strong><small>{detail}</small></span>
+      <span><strong>{title}</strong><small>{detail}</small>{eligibility && <em className={`tier-eligibility${disabled ? ' unavailable' : ''}`}>{eligibility}</em>}</span>
     </label>
   );
 }
@@ -75,12 +75,14 @@ export default function Register() {
   }
   const highest = complete ? assignTier(combined, config) : null;
   const assigned = complete ? assignSelectedTier(combined, config, selectedTier) : null;
+  const eligibleTiers = complete ? active.filter(t => assignSelectedTier(combined, config, t.id)) : [];
+  const goatShortfall = complete && config.goat?.active && combined < config.goat.minCombinedUtr ? config.goat.minCombinedUtr - combined : 0;
   const assignedLabel = assigned ? (selectedTier === 'both' ? 'GOAT + Rising' : config[assigned].name) : complete ? (highest ? 'Choose an eligible tier or allow Rising fallback' : 'No eligible active tier') : 'Add all three UTR values';
   // Every reason the Register button is off, in the order a visitor can act on them.
   const blockers = [
     !connected && 'Connecting to the tournament server…',
     connected && !data && (loadError ? `Tournament data could not be loaded: ${loadError}` : 'Loading tournament settings…'),
-    data && !settings && 'Opening tournament registration…',
+    data && !settings && (loadError ? `Registration setup is unavailable: ${loadError}` : 'Opening tournament registration…'),
     settings && !settings.registrationEnabled && 'Registration is closed.',
     data && settings && !active.length && 'No tier is open for registration. An admin must activate a tier.',
     !user?.uid && 'Signing you in… (anonymous sign-in must be enabled in Firebase Authentication)'
@@ -113,7 +115,7 @@ export default function Register() {
 
   if (success) return <Success result={success} config={config} onAgain={() => setSuccess(null)} />;
 
-  const tierLocked = t => complete && !!highest && !assignSelectedTier(combined, config, t.id);
+  const tierLocked = t => complete && !assignSelectedTier(combined, config, t.id);
   const goatFallback = selectedTier === 'goat_fallback_rising';
   const fallbackAvailable = !!config.goat?.active && !!config.rising?.active && (!complete || ['goat', 'rising'].includes(highest));
   return (
@@ -135,17 +137,19 @@ export default function Register() {
         <form ref={form} onSubmit={submit} aria-label="Team registration">
           <fieldset disabled={busy}>
             <div className={`step-panel card${step === 0 ? ' on' : ''}`} role="group" aria-label="Choose your tier">
-              <div className="card-head stacked"><h2>Choose your tier</h2><p className="small">Check one division preference. GOAT only requires a GOAT-qualifying UTR and will never move to Rising because of team count.</p></div>
-              {!active.length && <p className="small note">{settings ? 'Registration is currently closed because no tiers are active.' : 'Opening tournament registration…'}</p>}
+              <div className="card-head stacked"><h2>Choose your tier</h2><p className="small">Automatic placement is selected by default: we use your combined UTR to place you in the highest eligible tier. Choose another preference only if you want it. GOAT only never moves to Rising because of team count.</p></div>
+              {!settings && <p className="small note">{loadError ? `Registration setup is unavailable: ${loadError}` : 'Opening tournament registration…'}</p>}
+              {settings && !active.length && <p className="small note">Registration is currently closed because no tiers are active.</p>}
               <div className="tier-options">
                 {active.map(t => (
                   <TierOption key={t.id} value={t.id} tone={tierTone(t.id)} title={t.id === 'goat' ? `${t.name} only` : t.id === 'rising' ? `${t.name} only` : t.name} art={['goat', 'rising'].includes(t.id) ? `/${t.id}-tier.webp` : null}
-                    detail={`${formatUtr(t.minCombinedUtr)}–${formatUtr(t.maxCombinedUtr)} combined UTR${t.id === 'goat' ? ' · GOAT UTR required; never moved to Rising for low team count' : ''}${tierLocked(t) ? ` · Not available at ${formatUtr(combined)}` : ''}`}
-                    selected={selectedTier === t.id || (t.id === 'goat' && goatFallback)} disabled={tierLocked(t) && !(t.id === 'goat' && goatFallback)} onSelect={() => setSelectedTier(t.id)} />
+                    detail={`${formatUtr(t.minCombinedUtr)}–${formatUtr(t.maxCombinedUtr)} combined UTR${t.id === 'goat' ? ' · Never moved to Rising for low team count' : ''}`}
+                    eligibility={complete ? tierLocked(t) ? t.id === 'goat' && goatShortfall ? `Need ${formatUtr(goatShortfall)} more combined UTR` : 'Not eligible at your current UTR' : 'Your team is UTR eligible' : 'Enter all three UTRs to check eligibility'}
+                    selected={selectedTier === t.id} disabled={tierLocked(t)} onSelect={() => setSelectedTier(t.id)} />
                 ))}
                 <TierOption value="both" tone="both" title="GOAT + Rising" detail={complete && highest !== 'goat' ? 'Only for teams that qualify for GOAT' : 'Enter both tiers when your team qualifies for GOAT'}
                   selected={selectedTier === 'both'} disabled={!config.goat?.active || !config.rising?.active || (complete && highest !== 'goat')} onSelect={() => setSelectedTier('both')} />
-                <TierOption value="higher" tone="higher" title="Interested in a higher UTR tier" detail="Place us in the highest eligible tier" selected={selectedTier === 'higher'} onSelect={() => setSelectedTier('higher')} />
+                <TierOption value="higher" tone="higher" title="Automatic placement (recommended)" detail="We use your combined UTR to select the highest eligible tier" selected={selectedTier === 'higher'} disabled={complete && !highest} onSelect={() => setSelectedTier('higher')} />
               </div>
               {config.goat?.active && config.rising?.active && <label className="tier-fallback checkbox"><input type="checkbox" checked={goatFallback} disabled={!fallbackAvailable} onChange={e => setSelectedTier(e.target.checked ? 'goat_fallback_rising' : highest === 'goat' || !complete ? 'goat' : 'rising')} /><span><strong>GOAT preferred; Rising is okay if our UTR does not qualify for GOAT.</strong><small>This enters one tier only. If you qualify for GOAT, you stay in GOAT regardless of team count.</small></span></label>}
             </div>
@@ -185,8 +189,9 @@ export default function Register() {
         <aside className="preview" aria-label="Your team at a glance">
           <div className="preview-score">
             <div><p className="eyebrow">Your team at a glance</p><output aria-label="Combined UTR">{formatUtr(combined)}</output><span className="preview-unit">Combined UTR</span></div>
-            <p className="assignment" role="status">Assigned tier: <strong>{assignedLabel}</strong></p>
+            <p className="assignment" role="status">{selectedTier === 'higher' ? 'Automatic placement' : 'Selected preference outcome'}: <strong>{assignedLabel}</strong></p>
           </div>
+          <p className="eligibility-summary" role="status"><strong>UTR eligibility:</strong> {complete ? eligibleTiers.length ? eligibleTiers.map(t => t.name).join(' · ') : 'No active tier at this UTR' : 'Enter all three UTRs'}{goatShortfall > 0 && ` · GOAT needs ${formatUtr(goatShortfall)} more`}</p>
           <UtrMeter tiers={active} value={combined} />
           <ul className="preview-players">
             {PLAYERS.map(p => <li key={p.key} className={filled(p.key) ? 'done' : ''}><span>{p.title}</span><b>{players[p.key].name.trim() || '—'}</b><em>{rating(players[p.key], gap).averaged && <small>avg</small>}{formatUtr(rating(players[p.key], gap).value)}</em></li>)}
