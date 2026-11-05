@@ -103,6 +103,14 @@ export function publicRecord(team, settings = DEFAULT_SETTINGS) {
   return { teamId: team.teamId, captainFirstName: team.captain.firstName, captainUtr: team.captain.utr, ace1Utr: team.ace1.utr, ace2Utr: team.ace2.utr, ...(!settings.aceNameMaskingEnabled && team.rulesAccepted === true ? { ace1Name: team.ace1.fullName, ace2Name: team.ace2.fullName } : {}), combinedUtr: team.combinedUtr, assignedTier: team.assignedTier, registeredAt: team.registeredAt };
 }
 export function initialState() { return { settings: { ...DEFAULT_SETTINGS }, tierConfig: structuredClone(DEFAULT_TIERS), configRevision: 1, registrations: {}, tiers: {} }; }
+// First visitor may trigger this through the callable backend. Preserve any existing tournament
+// configuration or records; only an absent settings node is a fresh installation.
+export function bootstrapState(current) {
+  if (current?.settings) return { state: current, result: { created: false } };
+  assert(!Object.keys(current?.registrations || {}).length && !Object.values(current?.tiers || {}).some(tier => Object.keys(tier?.teams || {}).length), 'Existing team data needs an administrator review before initialization.');
+  const defaults = initialState();
+  return { state: { ...defaults, ...(current || {}), settings: defaults.settings, tierConfig: current?.tierConfig && Object.keys(current.tierConfig).length ? current.tierConfig : defaults.tierConfig, configRevision: current?.configRevision || 1 }, result: { created: true } };
+}
 export function publicState(state) { return { settings: state.settings, tierConfig: state.tierConfig || {}, configRevision: state.configRevision || 0, tiers: state.tiers || {}, fixtures: state.fixtures || {}, leagueRules: rulesOf(state), season: state.season || { name: DEFAULT_SEASON_NAME }, seasons: state.seasons || {}, schedules: state.schedules || {} }; }
 function canonical(value) { return JSON.stringify(value, (_, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).filter(key => item[key] !== null && item[key] !== undefined).sort().map(key => [key, item[key]])) : item); }
 export function applyRegistration(current, payload, uid, now = Date.now(), recoveryHash = null) {

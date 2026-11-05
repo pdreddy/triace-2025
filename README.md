@@ -112,7 +112,7 @@ npx firebase deploy --project multiclub-890ea --only database
 
 The supplied project’s previous rules, users, billing, functions and hosting have not been changed by this work. Before going live, execute the Firebase integration suite, verify the merged rules, test the real admin account and an authorized registration, and confirm public name visibility follows the saved masking setting.
 
-Once deployed, sign in and **Save configuration** in the admin dashboard to initialize a fresh tournament. Existing settings are not overwritten during deployment. Do not deploy over incompatible legacy data without a reviewed migration and backup.
+On first visit, the deployed `bootstrapTournament` callable initializes default registration settings and GOAT/Rising tiers if the tournament settings do not exist. Visitors do not need an admin to press Save. It preserves existing configuration and refuses to initialize over existing team data that needs review. Deploy the callable functions before the Netlify web build goes live; Netlify alone cannot initialize Firebase.
 
 ### Change admin credentials safely
 
@@ -198,6 +198,6 @@ The homepage shows the official rules as ten native flash cards (`src/rules/card
 
 Connect this repository to Netlify. `netlify.toml` builds with Node 22, publishes `dist`, supplies the public Firebase web configuration, and rewrites client routes to `index.html`. The exact uploaded `triace-rules.html` is included as a static file and cached for the installed PWA. Netlify serves existing static files before the SPA rewrite.
 
-Netlify hosts only the web app. Before live registration, deploy the Firebase callable functions and reviewed Realtime Database rules described above, enable Anonymous and Email/Password Authentication, add the Netlify hostname to Firebase Authentication authorized domains, and create the admin account with the admin claim. Set `VITE_ADMIN_EMAIL` in Netlify if the admin's actual Authentication email differs from the app default, then rebuild. Netlify environment variables are build-time values. Do not use `npm run demo` as the Netlify build command; demo data stays local.
+Netlify hosts only the web app. Before live registration, deploy the Firebase callable functions (including `bootstrapTournament`) and reviewed Realtime Database rules described above, enable Anonymous and Email/Password Authentication, and add the Netlify hostname to Firebase Authentication authorized domains. Create the admin account with the admin claim for later rule changes; initial GOAT/Rising setup happens automatically. Set `VITE_ADMIN_EMAIL` in Netlify if the admin's actual Authentication email differs from the app default, then rebuild. Netlify environment variables are build-time values. Do not use `npm run demo` as the Netlify build command; demo data stays local.
 
 The supplied HTML shows GOAT 17.50–22.00 and Rising 11.50–17.00 and says teams are always placed in the highest eligible tier. Current saved registration defaults are GOAT 17.00–22.00 and Rising 11.50–16.50, with an option to enter both. The uploaded document is preserved exactly, so these differences must be resolved by the tournament owner before publishing live enrollment. Admin tier changes do not edit the HTML file.

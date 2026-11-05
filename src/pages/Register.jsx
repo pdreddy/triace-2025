@@ -80,7 +80,7 @@ export default function Register() {
   const blockers = [
     !connected && 'Connecting to the tournament server…',
     connected && !data && (loadError ? `Tournament data could not be loaded: ${loadError}` : 'Loading tournament settings…'),
-    data && !settings && 'An admin must save the initial tournament configuration.',
+    data && !settings && 'Opening tournament registration…',
     settings && !settings.registrationEnabled && 'Registration is closed.',
     data && settings && !active.length && 'No tier is open for registration. An admin must activate a tier.',
     !user?.uid && 'Signing you in… (anonymous sign-in must be enabled in Firebase Authentication)'
@@ -136,7 +136,7 @@ export default function Register() {
           <fieldset disabled={busy}>
             <div className={`step-panel card${step === 0 ? ' on' : ''}`} role="group" aria-label="Choose your tier">
               <div className="card-head stacked"><h2>Choose your tier</h2><p className="small">Choose one list, both lists, or automatic placement. If you prefer GOAT, you can allow Rising as a fallback.</p></div>
-              {!active.length && <p className="small note">{data ? 'No active tiers are configured. Ask the admin to activate and save GOAT or Rising in Admin → Tiers.' : 'Loading tier settings…'}</p>}
+              {!active.length && <p className="small note">{settings ? 'Registration is currently closed because no tiers are active.' : 'Opening tournament registration…'}</p>}
               <div className="tier-options">
                 {active.map(t => (
                   <TierOption key={t.id} value={t.id} tone={tierTone(t.id)} title={t.id === 'goat' ? `${t.name} only` : t.id === 'rising' ? `${t.name} only` : t.name} art={['goat', 'rising'].includes(t.id) ? `/${t.id}-tier.webp` : null}

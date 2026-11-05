@@ -23,7 +23,7 @@ function Rally() {
 export default function Rules() {
   const { accepted, accept } = useRulesAccess();
   const { data } = useTournament();
-  const RULE_CARDS = useMemo(() => ruleCards(data?.tierConfig, data?.leagueRules), [data?.tierConfig, data?.leagueRules]);
+  const RULE_CARDS = useMemo(() => ruleCards(data?.settings ? data.tierConfig : undefined, data?.leagueRules), [data?.settings, data?.tierConfig, data?.leagueRules]);
   const COUNT = RULE_CARDS.length;
   const track = useRef(null);
   const [current, setCurrent] = useState(0), [seen, setSeen] = useState([0]), [checked, setChecked] = useState(false);

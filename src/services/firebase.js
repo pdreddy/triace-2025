@@ -30,7 +30,15 @@ export function createFirebaseService() {
     mode: env.VITE_USE_EMULATORS === 'true' ? 'Firebase Emulators' : 'Firebase',
     subscribePublic(callback, onError) {
       const state = {}, ready = new Set(), keys = ['settings', 'tierConfig', 'configRevision', 'tiers'];
-      const emit = () => { if (ready.size === keys.length) callback({ ...state, fixtures: state.fixtures || {}, leagueRules: rulesOf(state), season: state.season || { name: DEFAULT_SEASON_NAME }, seasons: state.seasons || {}, schedules: state.schedules || {} }); };
+      let bootstrapAttempted = false;
+      const emit = () => {
+        if (ready.size !== keys.length) return;
+        callback({ ...state, fixtures: state.fixtures || {}, leagueRules: rulesOf(state), season: state.season || { name: DEFAULT_SEASON_NAME }, seasons: state.seasons || {}, schedules: state.schedules || {} });
+        if (!state.settings && !bootstrapAttempted) {
+          bootstrapAttempted = true;
+          httpsCallable(functions, 'bootstrapTournament')({}).catch(error => onError(new Error(`Tournament setup could not finish: ${errorMessage(error)}`)));
+        }
+      };
       const off = keys.map(key => onValue(ref(database, `traice2_0/${key}`), snapshot => { state[key] = snapshot.val() ?? (key === 'configRevision' ? 0 : key === 'settings' ? null : {}); ready.add(key); emit(); }, error => onError(new Error(errorMessage(error)))));
       // League data loads on its own so a missing database rule for it never blocks the core tournament data.
       for (const key of ['fixtures', 'leagueRules', 'season', 'seasons', 'schedules']) off.push(onValue(ref(database, `traice2_0/${key}`), snapshot => { state[key] = snapshot.val() || undefined; emit(); }, () => { state[key] = undefined; emit(); }));

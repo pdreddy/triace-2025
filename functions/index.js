@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase-admin/app';
 import { getDatabase } from 'firebase-admin/database';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
-import { applyRegistration, applyConfiguration, applyRecalculation, applyLeagueRules, ValidationError } from './lib/tournament.js';
+import { applyRegistration, applyConfiguration, applyRecalculation, applyLeagueRules, bootstrapState, ValidationError } from './lib/tournament.js';
 import { applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult, applyManageSeason, applySetSchedule, applyMoveFixture, applyIssueChallenge, applyUpdateTeam, applyWithdrawTeam, applyClaimTeam, applyResetCaptainCode } from './lib/league.js';
 import { newCaptainCode, hashCaptainCode } from './lib/captainCode.js';
 initializeApp();
@@ -33,6 +33,10 @@ async function mutate(operation) {
   } finally { if (listener) root.off('value', listener); }
 }
 
+export const bootstrapTournament = onCall(options, async () => {
+  if ((await getDatabase().ref('traice2_0/settings').get()).exists()) return { created: false };
+  return mutate(bootstrapState);
+});
 export const registerTeam = onCall(options, async request => {
   requireAuth(request);
   const code = newCaptainCode(), result = await mutate(state => applyRegistration(state, request.data, request.auth.uid, Date.now(), hashCaptainCode(code)));
