@@ -4,7 +4,7 @@ import { useTournament } from '../hooks/useTournament';
 import { useRulesAccess } from '../hooks/useRulesAccess';
 import { Field, Message, UtrMeter, tierTone } from '../components/UI';
 import { Icon } from '../components/Icons';
-import { assignSelectedTier, assignTier, orderedTiers, parseUtr, formatUtr, validateRegistration, playerUtr, UTR_GAP_LIMIT } from '../../functions/lib/tournament.js';
+import { assignSelectedTier, assignTier, orderedTiers, parseUtr, formatUtr, validateRegistration, playerUtr, UTR_GAP_LIMIT, DEFAULT_TIERS } from '../../functions/lib/tournament.js';
 
 const PLAYERS = [
   { key: 'captain', title: 'Captain', note: 'First name public', label: 'Captain first name', placeholder: 'First name only', max: 40, autoComplete: 'given-name' },
@@ -25,7 +25,7 @@ function rating(player, gap = UTR_GAP_LIMIT) {
 function TierOption({ value, tone, title, detail, art, selected, disabled, onSelect }) {
   return (
     <label className={`tier-option ${tone}${selected ? ' selected' : ''}`}>
-      <input type="radio" name="tier" value={value} disabled={disabled} checked={selected} onChange={onSelect} />
+      <input type="checkbox" value={value} disabled={disabled} checked={selected} onChange={onSelect} />
       {art && <img className="tier-option-art" src={art} alt="" />}
       <span><strong>{title}</strong><small>{detail}</small></span>
     </label>
@@ -64,10 +64,10 @@ function Success({ result, config, onAgain }) {
 export default function Register() {
   const { data, service, user, connected, error: loadError } = useTournament();
   const { accepted } = useRulesAccess();
-  const [players, setPlayers] = useState(emptyPlayers), [selectedTier, setSelectedTier] = useState('higher'), [consent, setConsent] = useState(false);
+  const [players, setPlayers] = useState(emptyPlayers), [whatsappPhone, setWhatsappPhone] = useState(''), [selectedTier, setSelectedTier] = useState('higher'), [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [success, setSuccess] = useState(null), [step, setStep] = useState(0);
   const id = useRef(crypto.randomUUID()), form = useRef(null);
-  const config = data?.tierConfig || {}, active = orderedTiers(config, true), settings = data?.settings, gap = data?.leagueRules?.utrGapLimit ?? UTR_GAP_LIMIT;
+  const settings = data?.settings, config = settings ? data?.tierConfig || {} : DEFAULT_TIERS, active = orderedTiers(config, true), gap = data?.leagueRules?.utrGapLimit ?? UTR_GAP_LIMIT;
 
   let combined = 0, complete = true;
   for (const value of Object.values(players)) {
@@ -86,7 +86,7 @@ export default function Register() {
     !user?.uid && 'Signing you in… (anonymous sign-in must be enabled in Firebase Authentication)'
   ].filter(Boolean);
   const filled = key => !!players[key].name.trim() && !!players[key].singles;
-  const stepDone = [true, filled('captain'), filled('ace1'), filled('ace2'), consent];
+  const stepDone = [true, filled('captain') && !!whatsappPhone.trim(), filled('ace1'), filled('ace2'), consent];
   const utrLimits = { min: (settings?.minPlayerUtr || 1) / 100, max: (settings?.maxPlayerUtr || 1650) / 100 };
 
   function change(key, field, value) { setPlayers(old => ({ ...old, [key]: { ...old[key], [field]: value } })); setError(''); setSuccess(null); }
@@ -102,12 +102,12 @@ export default function Register() {
     if (!settings || !connected || !user?.uid) { setError('Registration is not connected. Please wait or contact the admin.'); return; }
     setError(''); setSuccess(null);
     try {
-      const payload = { teamId: id.current, selectedTier, consent, rulesAccepted: accepted };
+      const payload = { teamId: id.current, whatsappPhone, selectedTier, consent, rulesAccepted: accepted };
       for (const [key, value] of Object.entries(players)) payload[key] = { [key === 'captain' ? 'firstName' : 'fullName']: value.name.trim(), singlesUtr: parseUtr(value.singles), doublesUtr: value.doubles.trim() ? parseUtr(value.doubles) : null };
       validateRegistration(payload, settings, config, gap);
       setBusy(true);
       setSuccess(await service.register(payload));
-      setPlayers(emptyPlayers()); setConsent(false); setStep(0); id.current = crypto.randomUUID();
+      setPlayers(emptyPlayers()); setWhatsappPhone(''); setConsent(false); setStep(0); id.current = crypto.randomUUID();
     } catch (e) { setError(e.message); } finally { setBusy(false); }
   }
 
@@ -135,25 +135,26 @@ export default function Register() {
         <form ref={form} onSubmit={submit} aria-label="Team registration">
           <fieldset disabled={busy}>
             <div className={`step-panel card${step === 0 ? ' on' : ''}`} role="group" aria-label="Choose your tier">
-              <div className="card-head stacked"><h2>Choose your tier</h2><p className="small">Choose one list, both lists, or automatic placement. If you prefer GOAT, you can allow Rising as a fallback.</p></div>
+              <div className="card-head stacked"><h2>Choose your tier</h2><p className="small">Check one division preference. GOAT only requires a GOAT-qualifying UTR and will never move to Rising because of team count.</p></div>
               {!active.length && <p className="small note">{settings ? 'Registration is currently closed because no tiers are active.' : 'Opening tournament registration…'}</p>}
               <div className="tier-options">
                 {active.map(t => (
                   <TierOption key={t.id} value={t.id} tone={tierTone(t.id)} title={t.id === 'goat' ? `${t.name} only` : t.id === 'rising' ? `${t.name} only` : t.name} art={['goat', 'rising'].includes(t.id) ? `/${t.id}-tier.webp` : null}
-                    detail={`${formatUtr(t.minCombinedUtr)}–${formatUtr(t.maxCombinedUtr)} combined UTR${tierLocked(t) ? ` · Not available at ${formatUtr(combined)}` : ''}`}
+                    detail={`${formatUtr(t.minCombinedUtr)}–${formatUtr(t.maxCombinedUtr)} combined UTR${t.id === 'goat' ? ' · GOAT UTR required; never moved to Rising for low team count' : ''}${tierLocked(t) ? ` · Not available at ${formatUtr(combined)}` : ''}`}
                     selected={selectedTier === t.id || (t.id === 'goat' && goatFallback)} disabled={tierLocked(t) && !(t.id === 'goat' && goatFallback)} onSelect={() => setSelectedTier(t.id)} />
                 ))}
                 <TierOption value="both" tone="both" title="GOAT + Rising" detail={complete && highest !== 'goat' ? 'Only for teams that qualify for GOAT' : 'Enter both tiers when your team qualifies for GOAT'}
                   selected={selectedTier === 'both'} disabled={!config.goat?.active || !config.rising?.active || (complete && highest !== 'goat')} onSelect={() => setSelectedTier('both')} />
                 <TierOption value="higher" tone="higher" title="Interested in a higher UTR tier" detail="Place us in the highest eligible tier" selected={selectedTier === 'higher'} onSelect={() => setSelectedTier('higher')} />
               </div>
-              {config.goat?.active && config.rising?.active && <label className="tier-fallback checkbox"><input type="checkbox" checked={goatFallback} disabled={!fallbackAvailable} onChange={e => setSelectedTier(e.target.checked ? 'goat_fallback_rising' : highest === 'goat' || !complete ? 'goat' : 'rising')} /><span><strong>GOAT preferred; Rising is okay if we do not qualify for GOAT.</strong><small>This enters one tier only. If you qualify for GOAT, you stay in GOAT; otherwise, Rising is used when eligible.</small></span></label>}
+              {config.goat?.active && config.rising?.active && <label className="tier-fallback checkbox"><input type="checkbox" checked={goatFallback} disabled={!fallbackAvailable} onChange={e => setSelectedTier(e.target.checked ? 'goat_fallback_rising' : highest === 'goat' || !complete ? 'goat' : 'rising')} /><span><strong>GOAT preferred; Rising is okay if our UTR does not qualify for GOAT.</strong><small>This enters one tier only. If you qualify for GOAT, you stay in GOAT regardless of team count.</small></span></label>}
             </div>
 
             {PLAYERS.map((p, i) => (
               <section key={p.key} className={`step-panel card${step === i + 1 ? ' on' : ''}`}>
                 <div className="card-head"><h2><span className="player-num">0{i + 1}</span>{p.title}</h2><span className="pill">{p.note}</span></div>
                 <Field id={`${p.key}-name`} label={p.label} value={players[p.key].name} onChange={e => change(p.key, 'name', e.target.value)} required maxLength={p.max} autoComplete={p.autoComplete} placeholder={p.placeholder} />
+                {p.key === 'captain' && <Field id="captain-whatsapp" label="Captain WhatsApp number (private)" type="tel" inputMode="tel" autoComplete="tel" placeholder="+15551234567" hint="Include country code. This is visible to the team owner and admin, never on public pages." value={whatsappPhone} onChange={e => setWhatsappPhone(e.target.value)} required maxLength={25} />}
                 <div className="ratings">
                   <Field id={`${p.key}-utr`} label="UTR / singles UTR" value={players[p.key].singles} onChange={e => change(p.key, 'singles', e.target.value)} required type="number" inputMode="decimal" step="0.01" min={utrLimits.min} max={utrLimits.max} placeholder="e.g. 6.50" />
                   <Field id={`${p.key}-doubles`} label="Doubles UTR (optional)" value={players[p.key].doubles} onChange={e => change(p.key, 'doubles', e.target.value)} type="number" inputMode="decimal" step="0.01" min={utrLimits.min} max={utrLimits.max} placeholder="If applicable" />
@@ -166,7 +167,7 @@ export default function Register() {
               <p className="confirmed"><Icon name="check" size={16} /> Tournament rules accepted in this session. <Link to="/">Review rules</Link></p>
               <label className="checkbox">
                 <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} required />
-                <span>I have permission to register these players and publish the captain’s first name and all three UTR values. Ace names are public only when the admin turns masking off.</span>
+                <span>I have permission to register these players and publish the captain’s first name and all three UTR values. The captain’s WhatsApp number stays private to the team owner and admin. Ace names are public only when the admin turns masking off.</span>
               </label>
               <Message error>{error}</Message>
               <button className="button block" disabled={busy || !settings?.registrationEnabled || !connected || !user?.uid || !active.length}>{busy ? 'Saving registration…' : 'Register team ↗'}</button>

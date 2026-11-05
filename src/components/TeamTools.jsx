@@ -12,7 +12,7 @@ export function TeamEditForm({ registration, tierConfig, onSave, onCancel }) {
     captain: r.captain.firstName, captainSingles: utrText(r.captain.singlesUtr), captainDoubles: utrText(r.captain.doublesUtr),
     ace1: r.ace1.fullName, ace1Singles: utrText(r.ace1.singlesUtr), ace1Doubles: utrText(r.ace1.doublesUtr),
     ace2: r.ace2.fullName, ace2Singles: utrText(r.ace2.singlesUtr), ace2Doubles: utrText(r.ace2.doublesUtr),
-    selectedTier: r.selectedTier
+    selectedTier: r.selectedTier, whatsappPhone: r.whatsappPhone || ''
   });
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const set = key => e => setForm(old => ({ ...old, [key]: e.target.value }));
@@ -22,7 +22,7 @@ export function TeamEditForm({ registration, tierConfig, onSave, onCancel }) {
     setBusy(true); setError('');
     try {
       const player = (nameKey, key, nameField) => ({ [nameField]: form[nameKey].trim(), singlesUtr: parseUtr(form[`${key}Singles`]), doublesUtr: toUtr(form[`${key}Doubles`]) });
-      await onSave({ teamId: r.teamId, captain: player('captain', 'captain', 'firstName'), ace1: player('ace1', 'ace1', 'fullName'), ace2: player('ace2', 'ace2', 'fullName'), selectedTier: form.selectedTier });
+      await onSave({ teamId: r.teamId, captain: player('captain', 'captain', 'firstName'), ace1: player('ace1', 'ace1', 'fullName'), ace2: player('ace2', 'ace2', 'fullName'), selectedTier: form.selectedTier, ...(form.whatsappPhone.trim() ? { whatsappPhone: form.whatsappPhone } : {}) });
     } catch (e) { setError(e.message); setBusy(false); }
   }
   const rows = [['captain', 'Captain first name'], ['ace1', 'Ace 1 full name'], ['ace2', 'Ace 2 full name']];
@@ -36,6 +36,7 @@ export function TeamEditForm({ registration, tierConfig, onSave, onCancel }) {
             <Field id={id(`${key}-d`)} label="Doubles UTR" type="number" step="0.01" min="0.01" value={form[`${key}Doubles`]} onChange={set(`${key}Doubles`)} placeholder="Optional" />
           </div>
         ))}
+        <Field id={id('whatsapp')} label="Captain WhatsApp number (private)" type="tel" inputMode="tel" autoComplete="tel" placeholder="+15551234567" value={form.whatsappPhone} onChange={set('whatsappPhone')} />
         <div className="field">
           <label htmlFor={id('tier')}>Tier choice</label>
           <select id={id('tier')} value={form.selectedTier} onChange={set('selectedTier')}>

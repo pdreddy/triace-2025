@@ -118,7 +118,8 @@ export function ruleCards(tierConfig = DEFAULT_TIERS, rules = DEFAULT_LEAGUE_RUL
           <span className="rule-label">How teams are placed</span>
           <ul className="ticks">
             <li>Choose <strong>GOAT only</strong>, <strong>Rising only</strong>, <strong>both</strong>, or automatic placement in the highest eligible tier.</li>
-            <li>If you choose GOAT, check <strong>“Rising is okay”</strong> to use Rising only when your team does not qualify for GOAT. This enters one tier, not both.</li>
+            <li><strong>GOAT only</strong> requires a GOAT-qualifying UTR. A GOAT-only team stays in GOAT even if few teams register there.</li>
+            <li>If you prefer GOAT, check <strong>“Rising is okay”</strong> to use Rising only when your UTR does not qualify for GOAT. This enters one tier, not both.</li>
             <li>GOAT-qualified teams may choose Rising; Rising-qualified teams cannot enter GOAT.</li>
             <li>If tier ranges overlap, the admin’s tier order decides placement.</li>
             <li>A team whose combined UTR is outside every active tier can’t register.</li>

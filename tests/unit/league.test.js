@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { initialState, applyRegistration, applyRecalculation, applyLeagueRules, publicState, rulesOf, DEFAULT_LEAGUE_RULES } from '../../functions/lib/tournament.js';
 import { roundRobin, applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult, standings, playoffSpots, encounterWinner, deriveLineup, matchPlayers, playerRatings, playerId, gameShare, singlesEligibility, applyManageSeason } from '../../functions/lib/league.js';
 
-const team = (captain, id, values = [600, 600, 600]) => ({ teamId: id, captain: { firstName: captain, singlesUtr: values[0], doublesUtr: null }, ace1: { fullName: `${captain} Ace One`, singlesUtr: values[1], doublesUtr: null }, ace2: { fullName: `${captain} Ace Two`, singlesUtr: values[2], doublesUtr: null }, selectedTier: 'goat', consent: true, rulesAccepted: true });
+const team = (captain, id, values = [600, 600, 600]) => ({ teamId: id, whatsappPhone:'+15551234567', captain: { firstName: captain, singlesUtr: values[0], doublesUtr: null }, ace1: { fullName: `${captain} Ace One`, singlesUtr: values[1], doublesUtr: null }, ace2: { fullName: `${captain} Ace Two`, singlesUtr: values[2], doublesUtr: null }, selectedTier: 'goat', consent: true, rulesAccepted: true });
 const result = (...winners) => [{ key: 'd1', winner: winners[0], score: '6-4 6-4' }, { key: 'd2', winner: winners[1], score: '3-6 6-3 10-8' }, { key: 's', winner: winners[2], score: '6-2 6-1' }];
 function league(count = 4) {
   let state = initialState();
