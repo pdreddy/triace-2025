@@ -1075,16 +1075,30 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
 .champ-season header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-bottom: 14px; }
 .champ-season h2 { font-size: 28px; }
 .champ-season .text-link { margin-left: auto; }
-.podiums { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.podium { padding: 14px; border-radius: var(--r); border: 1px solid var(--line); background: #ffffff08; }
-.podium h3 { margin-bottom: 10px; font-size: 14px; letter-spacing: .12em; text-transform: uppercase; color: var(--lime); }
-.podium.rising h3 { color: var(--sky); }
-.podium dl { display: grid; gap: 10px; margin: 0; }
-.podium dt { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
-.podium dd { margin: 2px 0 0; font-family: var(--display); font-size: 24px; text-transform: uppercase; color: #fff; overflow-wrap: anywhere; }
-.podium .silver dd { font-size: 19px; color: #c9d4de; }
+.podiums { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.winner-card { --tint: #d9f24b; position: relative; overflow: hidden; padding: 20px 18px 18px; border-radius: 18px; border: 1px solid color-mix(in srgb, var(--tint) 35%, transparent); background:
+  radial-gradient(120% 70% at 50% 0%, color-mix(in srgb, var(--tint) 22%, transparent), transparent 70%),
+  linear-gradient(170deg, var(--surface-2), var(--surface)); text-align: center; }
+.winner-card.rising { --tint: #5cc8ff; }
+.winner-card::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .55;
+  background-image: radial-gradient(circle, var(--tint) 1.5px, transparent 2px), radial-gradient(circle, #fff 1px, transparent 1.6px), radial-gradient(circle, #f6c93b 1.5px, transparent 2px);
+  background-size: 74px 62px, 53px 71px, 97px 83px; background-position: 6px 8px, 31px 40px, 58px 14px;
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, transparent 58%); mask-image: linear-gradient(180deg, #000 0%, transparent 58%); }
+.winner-card > * { position: relative; }
+.winner-ribbon { display: inline-block; margin-bottom: 8px; padding: 5px 16px; border-radius: 999px; font-size: 12px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: var(--ink); background: var(--tint); }
+.winner-hero { display: grid; justify-items: center; gap: 2px; }
+.trophy-art { filter: drop-shadow(0 8px 18px color-mix(in srgb, var(--tint) 45%, transparent)); animation: trophy-float 4s ease-in-out infinite; }
+@keyframes trophy-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+@media (prefers-reduced-motion: reduce) { .trophy-art { animation: none; } }
+.winner-label { margin: 4px 0 0; font-size: 12px; font-weight: 800; letter-spacing: .24em; text-transform: uppercase; color: #f6c93b; }
+.winner-hero h3 { margin: 0; font-size: 34px; line-height: 1.05; text-transform: uppercase; color: #fff; }
+.winner-members { margin: 4px 0 0; font-size: 14px; color: var(--muted); }
+.runner-up { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 16px; padding: 12px 14px; border-radius: 14px; text-align: left; background: #ffffff0d; border: 1px solid var(--line); }
+.runner-up span { display: block; font-size: 11px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; color: #b9c6d2; }
+.runner-up b { display: block; font-family: var(--display); font-size: 21px; text-transform: uppercase; color: #fff; }
+.runner-up small { display: block; font-size: 12.5px; color: var(--muted); }
+.winner-empty { margin: 18px 0 8px; }
 .members { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--muted); }
-.podium .members { font-size: 13px; }
 .published .short { display: none; }
 .published .form-inline { display: none; }
 .subtabs button { border: 0; background: transparent; cursor: pointer; font-family: inherit; }
@@ -1109,7 +1123,7 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
 .six-card li i { padding: 2px 7px; border-radius: 6px; font-size: 11px; font-style: normal; font-weight: 700; text-transform: uppercase; color: var(--ink); background: var(--lime); }
 .six-card li span:last-child { text-align: right; }
 @media (max-width: 700px) {
-  .scoring-grid, .six-week-tiers, .super-six .podiums { grid-template-columns: 1fr; }
+  .scoring-grid, .six-week-tiers, .podiums { grid-template-columns: 1fr; }
   .published .long { display: none; }
   .published .form-inline { display: block; margin-top: 4px; }
   .published .form i { width: 16px; height: 16px; font-size: 10px; }
@@ -1120,8 +1134,5 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
   .published .num { font-size: 15px; }
   .published .strong { font-size: 17px; }
   .published .rank-cell { font-size: 16px; padding-right: 2px; }
-  .podiums { grid-template-columns: 1fr 1fr; gap: 8px; }
-  .podium { padding: 10px; }
-  .podium dd { font-size: 19px; }
-  .podium .silver dd { font-size: 16px; }
+  .winner-hero h3 { font-size: 28px; }
 }

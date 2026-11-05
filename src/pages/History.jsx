@@ -3,6 +3,7 @@ import { useTournament } from '../hooks/useTournament';
 import { EmptyState, Stat, tierTone } from '../components/UI';
 import { Icon } from '../components/Icons';
 import { Bracket, StandingsTable, teamName } from '../components/League';
+import { WinnerCard } from '../components/Winners';
 import { seasonList, seasonsOf, seasonTeams, seasonTable, seasonTiers, championTiers, tierResult } from '../data/seasons.js';
 
 const date = ms => (ms ? new Date(ms).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—');
@@ -31,21 +32,11 @@ function SuperSix({ season, teams }) {
   return (
     <div className="super-six">
       <div className="podiums">
-        {tierIds.map(id => {
-          const result = tierResult(season, id);
-          return (
-            <section key={id} className={`podium ${tierTone(id)}`}>
-              <h3>{tiers[id].name} · Super Six</h3>
-              {result ? (
-                <dl>
-                  <div className="gold"><dt><Icon name="trophy" size={16} /> Winner</dt><dd>{teamName(teams.get(result.winner))}</dd><Members team={teams.get(result.winner)} superSix /></div>
-                  <div className="silver"><dt>Runner-up</dt><dd>{teamName(teams.get(result.runnerUp))}</dd><Members team={teams.get(result.runnerUp)} superSix /></div>
-                </dl>
-              ) : <p className="muted">To be announced.</p>}
-              <ul className="six-teams">{tiers[id].teams.map(t => <li key={t}><b>{teamName(teams.get(t))}</b> <small>{squad(t)}</small></li>)}</ul>
-            </section>
-          );
-        })}
+        {tierIds.map(id => (
+          <WinnerCard key={id} tier={{ id, name: tiers[id].name }} result={tierResult(season, id)} teams={teams} members={team => (team?.superSixMembers || team?.members || '').split('/').map(n => n.trim()).join(' · ')} empty="To be announced.">
+            <ul className="six-teams">{tiers[id].teams.map(t => <li key={t}><b>{teamName(teams.get(t))}</b> <small>{squad(t)}</small></li>)}</ul>
+          </WinnerCard>
+        ))}
       </div>
       <section className="scoring-card">
         <h3 className="round-title">Scoring system &amp; ranking</h3>

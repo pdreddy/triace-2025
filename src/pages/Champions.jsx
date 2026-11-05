@@ -1,27 +1,15 @@
 import { Link } from 'react-router-dom';
 import { useTournament } from '../hooks/useTournament';
-import { EmptyState, tierTone } from '../components/UI';
+import { EmptyState } from '../components/UI';
 import { Icon } from '../components/Icons';
-import { teamName } from '../components/League';
-import { Members, PageTabs } from './History';
+import { PageTabs } from './History';
+import { WinnerCard } from '../components/Winners';
 import { seasonList, seasonTeams, championTiers, tierResult } from '../data/seasons.js';
 
 const year = ms => (ms ? new Date(ms).getFullYear() : '');
 const years = s => (year(s.startedAt) && year(s.startedAt) !== year(s.archivedAt) ? `${year(s.startedAt)}–${year(s.archivedAt)}` : String(year(s.archivedAt)));
 
-function Podium({ tier, result, teams, legacy }) {
-  return (
-    <div className={`podium ${tierTone(tier.id)}`}>
-      <h3>{tier.name}</h3>
-      {result ? (
-        <dl>
-          <div className="gold"><dt><Icon name="trophy" size={16} /> Winner</dt><dd>{teamName(teams.get(result.winner))}</dd><Members team={teams.get(result.winner)} superSix /></div>
-          <div className="silver"><dt>Runner-up</dt><dd>{teamName(teams.get(result.runnerUp))}</dd><Members team={teams.get(result.runnerUp)} superSix /></div>
-        </dl>
-      ) : <p className="muted">{legacy ? 'Winners to be announced.' : 'No champion recorded.'}</p>}
-    </div>
-  );
-}
+const squad = team => (team?.superSixMembers || team?.members || '').split('/').map(n => n.trim()).join(' · ');
 
 export default function Champions() {
   const { data } = useTournament();
@@ -45,7 +33,7 @@ export default function Champions() {
               <span className="muted">{years(season)}</span>
               <Link className="text-link" to={`/history/${season.id}`}>Full season <Icon name="arrow" size={14} /></Link>
             </header>
-            <div className="podiums">{tiers.map(t => <Podium key={t.id} tier={t} result={tierResult(season, t.id)} teams={teams} legacy={season.legacy} />)}</div>
+            <div className="podiums">{tiers.map(t => <WinnerCard key={t.id} tier={t} result={tierResult(season, t.id)} teams={teams} members={squad} empty={season.legacy ? 'Winners to be announced.' : 'No champion recorded.'} />)}</div>
           </article>
         );
       })}
