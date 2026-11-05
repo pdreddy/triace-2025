@@ -28,10 +28,10 @@ export function earlyBirdStatus(plan = DEFAULT_EARLY_BIRD, today = localDay()) {
   const steps = [
     { key: 'opens', date: plan.opens, title: 'Early bird opens', text: longDate(plan.opens) },
     { key: 'ends', date: plan.ends, title: 'Last early-bird day', text: longDate(plan.ends) },
-    { key: 'late', date: late, title: surcharge ? `Registration costs ${money} more` : 'Standard registration', text: `From ${longDate(late)}` }
+    { key: 'late', date: late, title: surcharge ? `Registration costs ${money} more per team` : 'Standard registration', text: `From ${longDate(late)}` }
   ];
-  const lateText = surcharge ? `From ${longDate(late)}, registration costs ${money} more.` : '';
-  const plus = surcharge ? ` · +${money} from ${longDate(late)}` : '';
+  const lateText = surcharge ? `From ${longDate(late)}, registration costs ${money} more per team.` : '';
+  const plus = surcharge ? ` · +${money} per team from ${longDate(late)}` : '';
   if (!plan.enabled) return { phase: 'off', label: '', countdown: '', short: '', headline: '', detail: '', steps, step: -1 };
   if (today < plan.opens) {
     const days = daysBetween(today, plan.opens);
@@ -41,5 +41,5 @@ export function earlyBirdStatus(plan = DEFAULT_EARLY_BIRD, today = localDay()) {
     const left = daysBetween(today, plan.ends) + 1;
     return { phase: 'open', label: 'Early bird open', countdown: left === 1 ? 'Last day!' : `${left} days left`, short: `Until ${longDate(plan.ends)}${plus}`, headline: `Early-bird registration is open until ${longDate(plan.ends)}`, detail: `Register by ${longDate(plan.ends)} for the early-bird price. ${lateText}`.trim(), steps, step: left === 1 ? 1 : 0 };
   }
-  return { phase: 'late', label: 'Early bird ended', countdown: '', short: `Ended ${longDate(plan.ends)}${surcharge ? ` · registration now costs ${money} more` : ''}`, headline: `Early-bird registration ended ${longDate(plan.ends)}`, detail: surcharge ? `Registration now costs ${money} more than the early-bird price.` : 'Standard registration applies.', steps, step: 2 };
+  return { phase: 'late', label: 'Early bird ended', countdown: '', short: `Ended ${longDate(plan.ends)}${surcharge ? ` · registration now costs ${money} more per team` : ''}`, headline: `Early-bird registration ended ${longDate(plan.ends)}`, detail: surcharge ? `Registration now costs ${money} more per team than the early-bird price.` : 'Standard registration applies.', steps, step: 2 };
 }

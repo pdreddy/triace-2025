@@ -23,7 +23,8 @@ test('status follows the calendar day, with a countdown', () => {
   assert.equal(day('2026-11-13').phase, 'open');                       // last early-bird day
   assert.equal(day('2026-11-13').countdown, 'Last day!');
   assert.equal(day('2026-11-14').phase, 'late');                       // from the 14th: $10 more
-  assert.match(day('2026-11-10').detail, /From Nov 14, registration costs \$10 more/);
+  assert.match(day('2026-11-10').detail, /From Nov 14, registration costs \$10 more per team/);
+  assert.match(day('2026-11-10').short, /\+\$10 per team from Nov 14/);
   assert.match(day('2026-12-01').detail, /\$10 more/);
   assert.deepEqual(day('2026-11-10').steps.map(s => s.text), ['Nov 6', 'Nov 13', 'From Nov 14']);
   assert.equal(day('2026-11-10').step, 0);

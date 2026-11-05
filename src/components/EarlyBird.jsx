@@ -36,7 +36,8 @@ export function EarlyBirdCard() {
           </li>
         ))}
       </ol>
-      {plan.surchargeUsd > 0 && <p className="early-note">Register before <b>{bird.steps[2].text.replace('From ', '')}</b> to avoid the <b>${plan.surchargeUsd}</b> late fee.</p>}
+      {plan.surchargeUsd > 0 && bird.phase !== 'late' && <p className="early-note">Register before <b>{bird.steps[2].text.replace('From ', '')}</b> to avoid the <b>${plan.surchargeUsd} per team</b> late fee.</p>}
+      {(bird.phase === 'open' || bird.phase === 'upcoming') && <p className="early-why">Early registration lets us plan courts and the match schedule, and avoids a last-minute rush. Please register by <b>{bird.steps[1].text}</b>.</p>}
     </section>
   );
 }

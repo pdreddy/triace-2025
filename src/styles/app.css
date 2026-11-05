@@ -1348,3 +1348,6 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
   .auth-intro { display: none; }
   .auth-head { margin-bottom: 10px; }
 }
+
+.early-why { font-size: 13.5px; color: var(--muted) !important; }
+.early-why b { color: #fff; }
