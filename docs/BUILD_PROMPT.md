@@ -70,7 +70,7 @@ before Register unlocks.
 ## 3. Registration
 Step-by-step form (Tier → each player → Confirm) with a live preview: each player's counted
 UTR ("AVG" tag when averaged), combined UTR, SVG tier meter, assigned tier, and the exact
-reason when registration is unavailable. On success show the captain's generated username and passphrase once (copy, download, print;
+reason when registration is unavailable. On success show the captain's generated username and 8-character password once (copy, download, print;
 the captain confirms it is saved) and links to the team page.
 
 ## 4. Captains and teams

@@ -1,12 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { WORDS, newUsername, newPassword, newLogin, captainUid, loginEmail, isCaptainEmail, usernameFrom, LOGIN_DOMAIN } from '../../functions/lib/captainLogin.js';
-
-test('the word list is 256 distinct, easy-to-type words', () => {
-  assert.equal(WORDS.length, 256);
-  assert.equal(new Set(WORDS).size, 256);
-  assert.ok(WORDS.every(w => /^[a-z]{3,8}$/.test(w)), WORDS.filter(w => !/^[a-z]{3,8}$/.test(w)).join(','));
-});
+import { ALPHABET, PASSWORD_LENGTH, newUsername, newPassword, newLogin, captainUid, loginEmail, isCaptainEmail, usernameFrom, normalizePassword, isCaptainPassword, LOGIN_DOMAIN } from '../../functions/lib/captainLogin.js';
 
 test('usernames come from the captain’s name and a short random suffix', () => {
   assert.match(newUsername('Arjun'), /^arjun-[a-z2-9]{4}$/);
@@ -17,14 +11,30 @@ test('usernames come from the captain’s name and a short random suffix', () =>
   assert.equal(/[ilo01]/.test(newUsername('x').split('-')[1]), false, 'no look-alike characters');
 });
 
-test('passwords are three words and three digits', () => {
-  for (let i = 0; i < 50; i++) assert.match(newPassword(), /^[a-z]+-[a-z]+-[a-z]+-\d{3}$/);
-  assert.ok(new Set(Array.from({ length: 200 }, () => newPassword())).size > 195, 'passwords do not repeat');
+test('passwords are exactly 8 characters from an alphabet without look-alikes', () => {
+  assert.equal(PASSWORD_LENGTH, 8);
+  assert.equal(ALPHABET.length, 31);
+  assert.equal(/[ilo01]/.test(ALPHABET), false);
+  for (let i = 0; i < 200; i++) { const password = newPassword(); assert.equal(password.length, 8); assert.match(password, /^[a-z2-9]{8}$/); assert.ok(isCaptainPassword(password)); }
+  assert.ok(new Set(Array.from({ length: 300 }, () => newPassword())).size > 295, 'passwords do not repeat');
+  assert.ok(newPassword().length >= 6, 'long enough for Firebase Authentication (minimum 6)');
+});
+
+test('the password check rejects anything that is not 8 look-alike-free characters', () => {
+  for (const bad of ['', 'short', 'toolongpassword', 'k7q2m9x', 'k7q2m9xpp', 'K7Q2M9XP', 'k7q2-m9x', 'k7q2m9x0', 'k7q2m9xl', null, undefined]) assert.equal(isCaptainPassword(bad), false, String(bad));
+  assert.equal(isCaptainPassword('k7q2m9xp'), true);
+});
+
+test('typing is forgiven: capitals, spaces and hyphens do not matter', () => {
+  assert.equal(normalizePassword('K7q2 M9xp'), 'k7q2m9xp');          // a phone capitalises the first letter
+  assert.equal(normalizePassword(' k7q2-m9xp '), 'k7q2m9xp');
+  assert.equal(normalizePassword(undefined), '');
+  assert.ok(isCaptainPassword(normalizePassword('K7Q2 M9XP')));
 });
 
 test('a login is derived deterministically from the team and the username', () => {
   const { username, password } = newLogin('Arjun');
-  assert.ok(username && password);
+  assert.ok(username && password.length === 8);
   assert.equal(captainUid('team_abcdefghijklmnop'), 'cap_team_abcdefghijklmnop');
   assert.equal(loginEmail(' Arjun-K7Q2 '), `arjun-k7q2@${LOGIN_DOMAIN}`);
   assert.equal(usernameFrom(loginEmail('arjun-k7q2')), 'arjun-k7q2');
@@ -33,8 +43,8 @@ test('a login is derived deterministically from the team and the username', () =
   assert.equal(isCaptainEmail(undefined), false);
 });
 
-test('a fixed random source gives a fixed login (so the generator is the only source of randomness)', () => {
+test('a fixed random source gives a fixed login (the generator is the only source of randomness)', () => {
   const rand = max => max - 1;
   assert.equal(newUsername('Bob', rand), 'bob-9999');
-  assert.equal(newPassword(rand), `${WORDS[255]}-${WORDS[255]}-${WORDS[255]}-999`);
+  assert.equal(newPassword(rand), '99999999');
 });

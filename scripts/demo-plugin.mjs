@@ -3,11 +3,11 @@ import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
 import path from 'node:path';
 import { initialState, publicState, applyRegistration, applyConfiguration, applyRecalculation, applyLeagueRules, isOwner, ValidationError } from '../functions/lib/tournament.js';
 import { applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult, applyManageSeason, applySetSchedule, applyMoveFixture, applyIssueChallenge, applyUpdateTeam, applyWithdrawTeam, applySetCaptainLogin } from '../functions/lib/league.js';
-import { newLogin, newPassword, captainUid, loginEmail } from '../functions/lib/captainLogin.js';
+import { newLogin, newPassword, captainUid, loginEmail, normalizePassword } from '../functions/lib/captainLogin.js';
 import { validateLegacySeason } from '../functions/lib/legacy.js';
 const digest = value => createHash('sha256').update(value).digest();
 // Demo captain logins are kept in the demo state with a salted hash (never the password).
-const hashPassword = (password, salt = randomBytes(16).toString('hex')) => ({ salt, hash: scryptSync(String(password), salt, 32).toString('hex') });
+const hashPassword = (password, salt = randomBytes(16).toString('hex')) => ({ salt, hash: scryptSync(normalizePassword(password), salt, 32).toString('hex') });
 const passwordMatches = (login, password) => !!login && timingSafeEqual(Buffer.from(hashPassword(password, login.salt).hash, 'hex'), Buffer.from(login.hash, 'hex'));
 export function demoPlugin(env) {
   // An unset password no longer stops the demo: a random one is made for this run and printed once.

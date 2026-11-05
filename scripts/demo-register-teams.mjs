@@ -44,7 +44,7 @@ const logins = new Map();
 for (const team of TEAMS) {
   const result = await visitor.call('register', team.payload);
   const { assignedTier, login } = result.json;
-  check(`${team.captain}’s team registered in ${team.tier.toUpperCase()} with a login`, result.ok && assignedTier === team.tier && /^[a-z0-9]+-[a-z2-9]{4}$/.test(login?.username || '') && /^[a-z]+-[a-z]+-[a-z]+-\d{3}$/.test(login?.password || ''), `${result.status} ${result.text.slice(0, 120)}`);
+  check(`${team.captain}’s team registered in ${team.tier.toUpperCase()} with a login`, result.ok && assignedTier === team.tier && /^[a-z0-9]+-[a-z2-9]{4}$/.test(login?.username || '') && /^[a-z2-9]{8}$/.test(login?.password || ''), `${result.status} ${result.text.slice(0, 120)}`);
   logins.set(team.payload.teamId, login);
 }
 
@@ -76,7 +76,7 @@ check('anonymous visitors cannot read private registrations', anonPrivate.status
 
 console.log('\nCaptain logins');
 const [first] = TEAMS, firstLogin = logins.get(first.payload.teamId);
-const wrong = await new Client().call('captain-login', { username: firstLogin.username, password: 'wrong-wrong-wrong-000' });
+const wrong = await new Client().call('captain-login', { username: firstLogin.username, password: 'wrongpwd' });
 check('a wrong password is refused', wrong.status === 401, `${wrong.status}`);
 const captain = new Client(); await captain.call('session');
 const signedIn = await captain.call('captain-login', { username: firstLogin.username, password: firstLogin.password });

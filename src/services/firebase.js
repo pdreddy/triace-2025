@@ -4,7 +4,7 @@ import { getDatabase, ref, onValue, get, connectDatabaseEmulator } from 'firebas
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/functions';
 import { rulesOf, DEFAULT_SEASON_NAME } from '../../functions/lib/tournament.js';
 import { dbPaths } from '../config/dbPaths.js';
-import { isCaptainEmail, loginEmail } from '../../functions/lib/captainAccount.js';
+import { isCaptainEmail, loginEmail, normalizePassword } from '../../functions/lib/captainAccount.js';
 const env = import.meta.env;
 function rulesHint(error, root) {
   const message = errorMessage(error);
@@ -98,7 +98,7 @@ export function createFirebaseService() {
     withdrawTeam: withError(async payload => (await httpsCallable(functions, 'withdrawTeam')(payload)).data),
     resetCaptainLogin: withError(async payload => (await httpsCallable(functions, 'resetCaptainLogin')(payload)).data),
     async captainLogin(username, password) {
-      try { await signInWithEmailAndPassword(auth, loginEmail(username), password); }
+      try { await signInWithEmailAndPassword(auth, loginEmail(username), normalizePassword(password)); }
       catch (error) { throw new Error(['auth/invalid-credential', 'auth/wrong-password', 'auth/user-not-found', 'auth/invalid-email'].includes(error?.code) ? 'Wrong username or password.' : error?.code === 'auth/too-many-requests' ? 'Too many attempts. Wait a few minutes, then try again.' : errorMessage(error)); }
     },
     importSeason1: withError(async season => (await httpsCallable(functions, 'importSeason1')({ season })).data),

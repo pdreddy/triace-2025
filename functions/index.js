@@ -61,7 +61,7 @@ async function createCaptainAccount(uid, firstName, password = newPassword()) {
   }
   throw new HttpsError('aborted', 'Could not create a login. Please retry.');
 }
-// Registering also creates the captain's login (username + passphrase), returned once for the captain to save.
+// Registering also creates the captain's login (username + 8-character password), returned once for the captain to save.
 export const registerTeam = onCall(options, async request => {
   requireAuth(request);
   const teamId = request.data?.teamId;

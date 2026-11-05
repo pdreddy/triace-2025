@@ -1271,3 +1271,5 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
   .topbar-actions .chip-button span { display: none; }
   .topbar-inner { gap: 12px; }
 }
+
+.login-card output.password { font-size: 28px; letter-spacing: .22em; }

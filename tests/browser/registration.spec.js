@@ -24,7 +24,7 @@ test('rules cards must all be read and agreed before registration; public maskin
 test('captain login: save it, sign in on a second device, manage the team, then withdraw',async({browser})=>{
  const first=await (await browser.newContext()).newPage();await register(first,'CodeCap');await first.getByRole('button',{name:'Register team ↗'}).click();
  const username=(await first.getByLabel('Username',{exact:true}).textContent()).trim(),password=(await first.getByLabel('Password',{exact:true}).textContent()).trim();
- expect(username).toMatch(/^codecap-[a-z2-9]{4}$/);expect(password).toMatch(/^[a-z]+-[a-z]+-[a-z]+-\d{3}$/);
+ expect(username).toMatch(/^codecap-[a-z2-9]{4}$/);expect(password).toMatch(/^[a-z2-9]{8}$/);
  await expect(first.getByRole('link',{name:/Open my team/})).toHaveAttribute('aria-disabled','true');   // must confirm it is saved first
  await first.getByLabel('I’ve saved my username and password').check();
  await first.getByRole('link',{name:/Open my team/}).click();await expect(first.getByRole('heading',{name:'CodeCap’s team'})).toBeVisible();const url=first.url();
@@ -32,8 +32,8 @@ test('captain login: save it, sign in on a second device, manage the team, then 
  await expect(first.getByRole('heading',{name:'CodeCapX’s team'})).toBeVisible();
  const second=await (await browser.newContext()).newPage();await second.goto(url);await expect(second.getByText('Captain of this team?')).toBeVisible();await expect(second.getByRole('button',{name:'Edit players'})).toHaveCount(0);
  await second.locator('main').getByRole('link',{name:/Captain sign in/}).click();await expect(second).toHaveURL(/\/captain$/);
- await second.getByLabel('Username').fill(username);await second.getByLabel('Password').fill('wrong-wrong-wrong-000');await second.getByRole('button',{name:/Sign in/}).click();await expect(second.getByText('Wrong username or password.')).toBeVisible();
- await second.getByLabel('Password').fill(password);await second.getByRole('button',{name:/Sign in/}).click();await expect(second).toHaveURL(/\/league$/);
+ await second.getByLabel('Username').fill(username);await second.getByLabel('Password').fill('wrongpwd');await second.getByRole('button',{name:/Sign in/}).click();await expect(second.getByText('Wrong username or password.')).toBeVisible();
+ await second.getByLabel('Password').fill(password.slice(0,4).toUpperCase()+' '+password.slice(4));await second.getByRole('button',{name:/Sign in/}).click();await expect(second).toHaveURL(/\/league$/);   // capitals and a space (phone auto-correct) still work
  await second.goto(url);await expect(second.getByRole('heading',{name:'Manage your team'})).toBeVisible();
  second.on('dialog',d=>d.accept());await second.getByRole('button',{name:'Withdraw team'}).click();await expect(second).toHaveURL(/\/tiers$/);
  await first.goto(url);await expect(first.getByText('Team not found.')).toBeVisible();
@@ -47,7 +47,7 @@ test('admin sees the captain username and can reset the login; the old password 
  admin.on('dialog',d=>d.accept());await card.getByRole('button',{name:'Reset login'}).click();
  const issued=admin.locator('.issued-login');await expect(issued).toBeVisible();
  const next=(await issued.getByLabel('Password',{exact:true}).textContent()).trim();expect((await issued.getByLabel('Username',{exact:true}).textContent()).trim()).toBe(username);
- expect(next).toMatch(/^[a-z]+-[a-z]+-[a-z]+-\d{3}$/);expect(next).not.toBe(password);
+ expect(next).toMatch(/^[a-z2-9]{8}$/);expect(next).not.toBe(password);
  const signIn=async(pw)=>{const page=await (await browser.newContext()).newPage();await page.goto('/captain');await page.getByLabel('Username').fill(username);await page.getByLabel('Password').fill(pw);await page.getByRole('button',{name:/Sign in/}).click();return page;};
  await expect((await signIn(password)).getByText('Wrong username or password.')).toBeVisible();   // old password no longer works
  await expect(await signIn(next)).toHaveURL(/\/league$/);                                         // new one does
