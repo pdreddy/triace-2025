@@ -36,13 +36,13 @@
       "season": {
         ".read": true
       },
-      "season1": {
-        ".read": true
-      },
       "seasons": {
         ".read": true
       },
       "schedules": {
+        ".read": true
+      },
+      "season1": {
         ".read": true
       }
     }

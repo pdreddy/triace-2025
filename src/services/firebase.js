@@ -5,6 +5,12 @@ import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/
 import { rulesOf, DEFAULT_SEASON_NAME } from '../../functions/lib/tournament.js';
 import { dbPaths } from '../config/dbPaths.js';
 const env = import.meta.env;
+function rulesHint(error, root) {
+  const message = errorMessage(error);
+  return /permission[_ ]denied/i.test(`${error?.code} ${message}`)
+    ? `The database rules do not allow reading “${root}”. After changing a database path, run npm run rules:deploy to publish matching rules.`
+    : message;
+}
 function errorMessage(error) { return error?.message?.replace(/^Firebase:\s*/, '').replace(/\s*\(auth\/[^)]+\)\.?$/, '') || 'The operation failed. Please retry.'; }
 // Sign-in failures worth telling the admin apart (Firebase reports wrong password and unknown user the same way).
 const LOGIN_ERRORS = {
@@ -48,7 +54,7 @@ export function createFirebaseService() {
           });
         }
       };
-      const off = keys.map(key => onValue(ref(database, `${ROOT}/${key}`), snapshot => { state[key] = snapshot.val() ?? (key === 'configRevision' ? 0 : key === 'settings' ? null : {}); ready.add(key); emit(); }, error => onError(new Error(errorMessage(error)))));
+      const off = keys.map(key => onValue(ref(database, `${ROOT}/${key}`), snapshot => { state[key] = snapshot.val() ?? (key === 'configRevision' ? 0 : key === 'settings' ? null : {}); ready.add(key); emit(); }, error => onError(new Error(rulesHint(error, ROOT)))));
       // League data loads on its own so a missing database rule for it never blocks the core tournament data.
       for (const key of ['fixtures', 'leagueRules', 'season', 'seasons', 'schedules']) off.push(onValue(ref(database, `${ROOT}/${key}`), snapshot => { state[key] = snapshot.val() || undefined; emit(); }, () => { state[key] = undefined; emit(); }));
       // Season 1 (legacy) lives in the same database at its own configurable path.

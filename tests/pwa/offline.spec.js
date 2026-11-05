@@ -9,7 +9,11 @@ const PAGES = [
   ['/champions', /./],
   ['/history', /./],
   ['/history/s1', /./],
-  ['/admin/login', /./]
+  ['/team/any-team', /./],
+  ['/player/any-team/captain', /./],
+  ['/admin/login', /./],
+  ['/admin', /./],
+  ['/no-such-page', /./]
 ];
 
 test('installs once, then every page opens offline from the cache', async ({ page, context }) => {

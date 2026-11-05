@@ -3,6 +3,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { execSync, spawnSync } from 'node:child_process';
 import { resolveDbPaths } from '../functions/lib/paths.js';
+import { buildRules } from '../functions/lib/rules.js';
 
 let failed = 0, warned = 0;
 const ok = (name) => console.log(`  ✓ ${name}`);
@@ -28,12 +29,19 @@ console.log(`    project: ${dotenv.VITE_FIREBASE_PROJECT_ID || '—'}`);
 console.log('\nDatabase paths');
 const fnEnv = parseEnv(read('functions/.env'));
 let paths, fnPaths;
-try { paths = resolveDbPaths({ root: dotenv.VITE_DB_ROOT, season1: dotenv.VITE_DB_SEASON1_PATH }); ok(`web app paths valid (${paths.root}, ${paths.season1})`); } catch (e) { bad('web app paths', e.message); }
-try { fnPaths = resolveDbPaths({ root: fnEnv.TRAICE_DB_ROOT, season1: fnEnv.TRAICE_DB_SEASON1_PATH }); ok(`functions paths valid (${fnPaths.root}, ${fnPaths.season1})`); } catch (e) { bad('functions paths', e.message); }
+const webEnv = { ...dotenv, ...parseEnv(read('.env.local')), ...process.env };   // same precedence Vite uses
+try { paths = resolveDbPaths({ root: webEnv.VITE_DB_ROOT, season1: webEnv.VITE_DB_SEASON1_PATH }); ok(`web app paths valid (${paths.root}, ${paths.season1})`); } catch (e) { bad('web app paths', e.message); }
+try { fnPaths = resolveDbPaths({ root: process.env.TRAICE_DB_ROOT || fnEnv.TRAICE_DB_ROOT, season1: process.env.TRAICE_DB_SEASON1_PATH || fnEnv.TRAICE_DB_SEASON1_PATH }); ok(`functions paths valid (${fnPaths.root}, ${fnPaths.season1})`); } catch (e) { bad('functions paths', e.message); }
 if (paths && fnPaths) check('web app and functions use the same paths', paths.root === fnPaths.root && paths.season1 === fnPaths.season1, `web ${paths.root} | ${paths.season1} vs functions ${fnPaths.root} | ${fnPaths.season1}`);
 if (!existsSync('functions/.env')) warn('functions/.env is missing', 'defaults are used (traice2_0). Copy functions/.env.example if you changed the web paths.');
 
 console.log('\nDatabase rules');
+if (paths) {
+  try {
+    const wanted = `${JSON.stringify(buildRules(JSON.parse(read('database.rules.template.json')), paths), null, 2)}\n`;
+    check('database.rules.json is generated for these paths (not edited by hand)', read('database.rules.json') === wanted, 'run npm run rules:generate, then npm run rules:deploy');
+  } catch (e) { bad('rules template', e.message); }
+}
 let rules;
 try { rules = JSON.parse(read('database.rules.json')).rules; ok('database.rules.json is valid JSON'); } catch (e) { bad('database.rules.json is valid JSON', e.message); }
 if (rules && paths) {

@@ -36,7 +36,7 @@ export default function FirebasePanel({ service, data }) {
       </div>
       <Message error>{error}</Message>
       <Message>{message}</Message>
-      {!info.demo && info.season1Path && !info.season1Path.startsWith(`${info.root}/`) && <p className="small">Season 1 sits outside the Season 2 root, so add a public read rule for <code>{info.season1Path}</code> to <code>database.rules.json</code> (see the README).</p>}
+      {!info.demo && <p className="small">Changed a path? Run <code>npm run rules:generate</code> then <code>npm run rules:deploy</code> so the database rules cover it, and keep the web and functions values equal. The Season 1 import only ever replaces a previous Season 1 import, never other data.</p>}
     </section>
   );
 }

@@ -20,7 +20,10 @@
     "demo:register": "node scripts/demo-register-teams.mjs",
     "check:pwa": "node scripts/check-pwa.mjs",
     "test:pwa": "playwright test -c playwright.pwa.config.js",
-    "preflight": "node scripts/preflight.mjs"
+    "preflight": "node scripts/preflight.mjs",
+    "rules:generate": "node scripts/generate-rules.mjs",
+    "rules:check": "node scripts/generate-rules.mjs --check",
+    "rules:deploy": "node scripts/generate-rules.mjs && firebase deploy --only database"
   },
   "dependencies": {
     "firebase": "^13.1.0",

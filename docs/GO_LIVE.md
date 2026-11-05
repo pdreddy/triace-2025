@@ -17,7 +17,7 @@ npm run check         # everything: unit, build, PWA, browser tests
 - [ ] Realtime Database enabled; Authentication → **Email/Password** and **Anonymous** enabled.
 - [ ] Authentication → Settings → **Authorized domains**: add your live hostname (Netlify or Firebase Hosting).
 - [ ] Billing plan that allows Cloud Functions (Blaze).
-- [ ] Decide the database paths. Defaults are fine (`traice2_0`, `traice2_0/season1`). If you change them, set `VITE_DB_*` for the web app and `TRAICE_DB_*` in `functions/.env` to the same values and run `TRAICE_DB_ROOT=… node scripts/generate-rules.mjs`.
+- [ ] Decide the database paths. Defaults are fine (`traice2_0`, `traice2_0/season1`). If you change them, set `VITE_DB_*` for the web app and `TRAICE_DB_*` in `functions/.env` to the same values, run `npm run rules:generate`, and deploy the rules (`npm run rules:deploy`). The Season 1 path may not overlap the root or any tournament node; preflight and the functions refuse it.
 
 ## 2. Admin account (needs your Firebase account)
 

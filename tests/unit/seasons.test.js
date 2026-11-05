@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { seasonsOf, seasonTiers, tierResult, seasonTeams, bundledSeason1, season1Source } from '../../src/data/seasons.js';
 import { resolveDbPaths } from '../../functions/lib/paths.js';
 import { validateLegacySeason } from '../../functions/lib/legacy.js';
+import { buildRules } from '../../functions/lib/rules.js';
+import { readFileSync as readFile } from 'node:fs';
 
 const season1 = seasonsOf({}).s1;
 
@@ -83,4 +85,40 @@ test('Season 1 import validation', () => {
   assert.doesNotThrow(() => validateLegacySeason(bundledSeason1()));
   assert.throws(() => validateLegacySeason({}), /not the Season 1 data/);
   assert.throws(() => validateLegacySeason({ ...bundledSeason1(), fixtures: null }), /missing “fixtures”/);
+});
+
+test('Season 1 can never be pointed at live tournament data', () => {
+  const refuse = (paths, pattern) => assert.throws(() => resolveDbPaths(paths), pattern, JSON.stringify(paths));
+  refuse({ season1: 'traice2_0' }, /cannot be the database root/);
+  refuse({ season1: 'traice2_0/' }, /cannot be the database root/);
+  refuse({ root: 'clubs/triace', season1: 'clubs' }, /contains the database root/);
+  refuse({ root: 'clubs/triace', season1: 'clubs/triace' }, /cannot be the database root/);
+  for (const node of ['settings', 'tierConfig', 'tiers', 'registrations', 'teamsByOwner', 'fixtures', 'leagueRules', 'season', 'seasons', 'schedules', 'archive', 'configRevision']) {
+    refuse({ season1: `traice2_0/${node}` }, /inside/);
+    refuse({ season1: `traice2_0/${node}/s1` }, /inside/);
+  }
+  assert.doesNotThrow(() => resolveDbPaths({ season1: 'traice2_0/legacy/season1' }));
+  assert.doesNotThrow(() => resolveDbPaths({ root: 'clubs/triace', season1: 'clubs/legacy' }));   // a sibling, not an ancestor
+  assert.doesNotThrow(() => resolveDbPaths({ season1: 'traice2_0/season10' }));                  // similar name, different node
+});
+
+const template = JSON.parse(readFile(new URL('../../database.rules.template.json', import.meta.url), 'utf8'));
+test('database.rules.json is exactly what the template generates for the default paths', () => {
+  const committed = JSON.parse(readFile(new URL('../../database.rules.json', import.meta.url), 'utf8'));
+  assert.deepEqual(buildRules(template, {}), committed);
+  assert.equal(committed.rules.traice2_0.season1['.read'], true);
+  assert.equal(committed.rules['.write'], false);
+});
+
+test('rules follow a custom root and Season 1 path', () => {
+  const custom = buildRules(template, { root: 'clubs/triace', season1: 'clubs/triace/legacy/s1' }).rules;
+  assert.equal(custom.traice2_0, undefined);                                             // nothing left at the old root
+  assert.equal(custom.clubs.triace.registrations['.read'].includes('admin'), true);      // private data stays private
+  assert.equal(custom.clubs.triace.legacy.s1['.read'], true);
+  const outside = buildRules(template, { root: 'live', season1: 'archive/season1' }).rules;
+  assert.equal(outside.live.settings['.read'], true);
+  assert.equal(outside.archive.season1['.read'], true);                                  // outside the root: its own rule
+  assert.equal(outside.live.season1, undefined);
+  for (const rules of [custom, outside]) assert.equal(JSON.stringify(rules).includes('"\\.write": true'), false);
+  assert.throws(() => buildRules(template, { season1: 'traice2_0/registrations' }), /inside/);
 });

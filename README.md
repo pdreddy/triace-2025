@@ -131,7 +131,8 @@ Season 2 (the live tournament and its closed seasons) and Season 1 (the imported
 | `VITE_DB_SEASON1_PATH` | `TRAICE_DB_SEASON1_PATH` | `<root>/season1` |
 
 - Keep the web and functions values equal, then rebuild and redeploy. Paths use letters, numbers, `-` and `_`, separated by `/`.
-- A custom root needs matching rules: `TRAICE_DB_ROOT=your/root node scripts/generate-rules.mjs`, then merge `database.rules.json` into the shared project's rules. A Season 1 path outside the root needs its own public read rule.
+- **Season 1 can never overlap live data.** The import replaces everything at its path, so the app, the functions and `npm run preflight` all refuse a Season 1 path that is the root, contains the root, or sits inside a tournament node (`settings`, `tierConfig`, `configRevision`, `tiers`, `registrations`, `teamsByOwner`, `fixtures`, `leagueRules`, `season`, `seasons`, `schedules`, `archive`). The function also refuses to overwrite anything at the path that is not a previous Season 1 import.
+- **Rules follow the paths.** `database.rules.json` is generated from `database.rules.template.json`; do not edit it by hand. After changing a path run `npm run rules:generate` (it reads `VITE_DB_*` from `.env`, `.env.local` and the shell), merge the result into the shared project's rules, then `npm run rules:deploy`. `npm run rules:check` and `npm run preflight` fail if the committed rules do not match the configured paths, and the app shows a clear message if the database rejects reads on its root.
 - **Admin → Firebase & data paths** shows the project, both paths and where Season 1 is loaded from. Until it is copied into Firebase, Season 1 uses the snapshot bundled with the app; **Copy Season 1 into Firebase** (admin only, calls `importSeason1`) writes it to the Season 1 path, after which the live copy is used.
 - Redeploy functions (`firebase deploy --only functions,database`) to get `importSeason1` and the `season1` read rule.
 

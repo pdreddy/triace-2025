@@ -44,7 +44,10 @@ export const bootstrapTournament = onCall(options, async () => {
 export const importSeason1 = onCall(options, async request => {
   requireAuth(request, true);
   try { validateLegacySeason(request.data?.season); } catch (error) { throw new HttpsError('failed-precondition', error.message); }
-  await getDatabase().ref(paths.season1).set(request.data.season);
+  const target = getDatabase().ref(paths.season1), existing = (await target.get()).val();
+  // Defence in depth: only ever replace a previous Season 1 import, never other data that happens to sit at the path.
+  if (existing != null && !(existing.id === 's1' && existing.legacy === true)) throw new HttpsError('failed-precondition', `The database already has other data at “${paths.season1}”. Choose a different Season 1 path.`);
+  await target.set(request.data.season);
   return { path: paths.season1 };
 });
 export const registerTeam = onCall(options, async request => {
