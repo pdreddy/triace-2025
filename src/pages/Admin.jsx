@@ -32,7 +32,7 @@ export default function Admin() {
   const { teams, loading, error: readError } = useRegistrations();
   const [draft, setDraft] = useState(() => draftFrom(data)), [dirty, setDirty] = useState(false), [busy, setBusy] = useState(false);
   const [error, setError] = useState(''), [message, setMessage] = useState(''), [summary, setSummary] = useState(null);
-  const [query, setQuery] = useState(''), [filter, setFilter] = useState('all'), [reveal, setReveal] = useState(true), [newId, setNewId] = useState(''), [tab, setTab] = useState('settings'), [editing, setEditing] = useState(null);
+  const [query, setQuery] = useState(''), [filter, setFilter] = useState('all'), [reveal, setReveal] = useState(true), [captainOnly, setCaptainOnlyState] = useState(() => localStorage.getItem('traice.admin.captainOnly') === '1'), [newId, setNewId] = useState(''), [tab, setTab] = useState('settings'), [editing, setEditing] = useState(null);
 
   useEffect(() => {
     if (data && !dirty && (data.configRevision || 0) >= draft.expectedRevision) setDraft(draftFrom(data));
@@ -56,6 +56,7 @@ export default function Admin() {
       setMessage('Rules saved. Public name visibility updates immediately; recalculate tiers if ranges changed.');
     });
   }
+  function setCaptainOnly(value) { setCaptainOnlyState(value); localStorage.setItem('traice.admin.captainOnly', value ? '1' : '0'); }
   function reload() { setDraft(draftFrom(data)); setDirty(false); setError(''); }
   function recalculate() {
     return action(async () => { setSummary(await service.recalculate()); setMessage('Tier recalculation completed.'); });
@@ -102,14 +103,14 @@ export default function Admin() {
     return action(async () => { await service.reviewResult({ tierId, fixtureId, approve }); setMessage(approve ? 'Result approved. Standings are updated.' : 'Submission rejected. The captains can submit again.'); });
   }
   function exportCsv() {
-    const blob = new Blob(['﻿' + registrationsCsv(teams, data?.tierConfig || {})], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['﻿' + registrationsCsv(teams, data?.tierConfig || {}, { captainOnly })], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob), link = document.createElement('a');
     link.href = url; link.download = `traice-registrations-${new Date().toISOString().slice(0, 10)}.csv`; link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   const q = query.toLowerCase().trim();
-  const filtered = Object.values(teams).filter(t => (filter === 'all' || listedIn(t).includes(filter)) && [t.teamId, t.captain.firstName, t.ace1.fullName, t.ace2.fullName].some(v => v.toLowerCase().includes(q)));
+  const filtered = Object.values(teams).filter(t => (filter === 'all' || listedIn(t).includes(filter)) && (captainOnly ? [t.teamId, t.captain.firstName] : [t.teamId, t.captain.firstName, t.ace1.fullName, t.ace2.fullName]).some(v => v.toLowerCase().includes(q)));
   const liveTiers = orderedTiers(data?.tierConfig || {});
   const groups = [...liveTiers.map(t => ({ id: t.id, name: t.name })), { id: 'unassigned', name: 'Unassigned' }];
   const tally = id => Object.values(teams).filter(t => listedIn(t).includes(id)).length;
@@ -215,8 +216,9 @@ export default function Admin() {
             </div>
             <button className="secondary" disabled={loading || !!readError} onClick={exportCsv}>Export private CSV ↓</button>
           </div>
-          <label className="checkbox pane pane-teams"><input type="checkbox" checked={reveal} onChange={e => setReveal(e.target.checked)} /><span>Reveal Ace names in admin cards</span></label>
-          <p className="small note pane pane-teams">{filtered.length} of {total} registrations. Exports include all registrations and private names, regardless of the current filter.</p>
+          <label className="checkbox pane pane-teams"><input type="checkbox" checked={captainOnly} onChange={e => setCaptainOnly(e.target.checked)} /><span>Captain only: hide the other players (cards, search and export)</span></label>
+          <label className="checkbox pane pane-teams"><input type="checkbox" checked={reveal} disabled={captainOnly} onChange={e => setReveal(e.target.checked)} /><span>Reveal Ace names in admin cards</span></label>
+          <p className="small note pane pane-teams">{filtered.length} of {total} registrations. Exports include all registrations{captainOnly ? ' (captains only)' : ' and private names'}, regardless of the current filter.</p>
           {loading && <Message>Loading private registrations…</Message>}
           {!loading && !filtered.length && <Message>No registrations match.</Message>}
           {groups.map(group => {
@@ -229,7 +231,7 @@ export default function Admin() {
                   ? <TeamEditForm key={team.teamId} registration={team} tierConfig={data?.tierConfig} onSave={saveTeam} onCancel={() => setEditing(null)} />
                   : (
                     <div className="team-admin" key={team.teamId}>
-                      <TeamCard team={team} tierName={group.name} tierId={group.id} privateView masked={masked} />
+                      <TeamCard team={team} tierName={group.name} tierId={group.id} privateView masked={masked} captainOnly={captainOnly} />
                       <div className="card-actions">
                         <button type="button" className="secondary small" disabled={busy} onClick={() => setEditing(team.teamId)}>Edit</button>
                         <button type="button" className="secondary small" disabled={busy} onClick={() => newCaptainCode(team)}>New captain code</button>

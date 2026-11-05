@@ -60,14 +60,13 @@ export function UtrMeter({ tiers, value = 0 }) {
   );
 }
 
-export function TeamCard({ team, tierName, tierId, rank, privateView = false, masked = true }) {
+export function TeamCard({ team, tierName, tierId, rank, privateView = false, masked = true, captainOnly = false }) {
   const captain = privateView ? team.captain.firstName : team.captainFirstName;
   const ace1 = privateView ? (masked ? 'Ace 1' : team.ace1.fullName) : team.ace1Name || 'Ace 1 (masked)';
   const ace2 = privateView ? (masked ? 'Ace 2' : team.ace2.fullName) : team.ace2Name || 'Ace 2 (masked)';
   const rows = [
     [`Captain · ${captain}`, privateView ? team.captain.utr : team.captainUtr],
-    [ace1, privateView ? team.ace1.utr : team.ace1Utr],
-    [ace2, privateView ? team.ace2.utr : team.ace2Utr]
+    ...(captainOnly ? [] : [[ace1, privateView ? team.ace1.utr : team.ace1Utr], [ace2, privateView ? team.ace2.utr : team.ace2Utr]])
   ];
   const detail = (label, player) => `${label}: ${player.firstName || player.fullName} · singles ${formatUtr(player.singlesUtr)}${player.doublesUtr ? ` · doubles ${formatUtr(player.doublesUtr)}` : ''}`;
   return (
@@ -78,7 +77,7 @@ export function TeamCard({ team, tierName, tierId, rank, privateView = false, ma
       </div>
       <h3>{privateView ? `${captain}’s team` : <Link to={`/team/${team.teamId}`}>{captain}’s team</Link>}</h3>
       <div className="team-name-row" aria-label="Team players">
-        <span>{captain}</span><span>{ace1}</span><span>{ace2}</span>
+        <span>{captain}</span>{!captainOnly && <><span>{ace1}</span><span>{ace2}</span></>}
       </div>
       <dl>
         {rows.map(([label, utr]) => <div key={label}><dt>{label}</dt><dd>{formatUtr(utr)}</dd></div>)}
@@ -88,12 +87,11 @@ export function TeamCard({ team, tierName, tierId, rank, privateView = false, ma
         <>
           <p className="small">Registration {team.teamId}<br />{new Date(team.registeredAt).toLocaleString()}</p>
           <p className="small">Division choice: <strong>{({ goat: 'GOAT only', rising: 'Rising only', both: 'GOAT + Rising', higher: 'Automatic placement', goat_fallback_rising: 'GOAT preferred; Rising if UTR does not qualify' })[team.selectedTier] || team.selectedTier}</strong></p>
-          {[[team.whatsappPhone, 'Captain'], [team.ace1Phone, 'Ace 1'], [team.ace2Phone, 'Ace 2']].map(([phone, label]) => phone && <p key={label} className="small">{label} WhatsApp: <a href={`https://wa.me/${phone.slice(1)}`} target="_blank" rel="noopener noreferrer">{phone}</a></p>)}
+          {[[team.whatsappPhone, 'Captain'], ...(captainOnly ? [] : [[team.ace1Phone, 'Ace 1'], [team.ace2Phone, 'Ace 2']])].map(([phone, label]) => phone && <p key={label} className="small">{label} WhatsApp: <a href={`https://wa.me/${phone.slice(1)}`} target="_blank" rel="noopener noreferrer">{phone}</a></p>)}
           <details open>
-            <summary>Complete private registration</summary>
+            <summary>{captainOnly ? 'Captain registration' : 'Complete private registration'}</summary>
             <p>{detail('Captain', team.captain)}</p>
-            <p>{detail('Ace 1', team.ace1)}</p>
-            <p>{detail('Ace 2', team.ace2)}</p>
+            {!captainOnly && <><p>{detail('Ace 1', team.ace1)}</p><p>{detail('Ace 2', team.ace2)}</p></>}
           </details>
         </>
       )}

@@ -166,11 +166,13 @@ export function applyRecalculation(current) {
   }
   return { state, result: summary };
 }
-export function registrationsCsv(teams, tiers) {
+export function registrationsCsv(teams, tiers, { captainOnly = false } = {}) {
   const columns = ['Team ID', 'Captain first name', 'Captain WhatsApp', 'Captain UTR', 'Ace 1 full name', 'Ace 1 WhatsApp', 'Ace 1 UTR', 'Ace 2 full name', 'Ace 2 WhatsApp', 'Ace 2 UTR', 'Combined UTR', 'Selected tier', 'Assigned tier', 'Registered at'];
   const cell = value => { let text = String(value ?? ''); if (/^[\s]*[=+@-]/.test(text)) text = "'" + text; return '"' + text.replaceAll('"', '""') + '"'; };
   const rows = Object.values(teams || {}).map(t => [t.teamId, t.captain.firstName, t.whatsappPhone || '', formatUtr(t.captain.utr), t.ace1.fullName, t.ace1Phone || '', formatUtr(t.ace1.utr), t.ace2.fullName, t.ace2Phone || '', formatUtr(t.ace2.utr), formatUtr(t.combinedUtr), tiers[t.selectedTier]?.name || t.selectedTier, tiers[t.assignedTier]?.name || 'Unassigned', new Date(t.registeredAt).toISOString()]);
-  return [columns, ...rows].map(row => row.map(cell).join(',')).join('\r\n');
+  // Captain-only exports drop both Aces (name, WhatsApp, UTR): columns 4–9.
+  const keep = (row) => (captainOnly ? row.filter((_, i) => i < 4 || i > 9) : row);
+  return [columns, ...rows].map(row => keep(row).map(cell).join(',')).join('\r\n');
 }
 
 export function validateLeagueRules(value) {
