@@ -16,9 +16,10 @@ const Team = lazy(() => import('./pages/Team'));
 const Players = lazy(() => import('./pages/Players'));
 const Player = lazy(() => import('./pages/Player'));
 const History = lazy(() => import('./pages/History'));
+const Champions = lazy(() => import('./pages/Champions'));
 
 const FRIENDLY_ERROR = 'We can’t reach the tournament right now. Please check your connection and try again shortly.';
-const SCREENS = { '/': 'rules', '/register': 'register', '/tiers': 'tiers', '/league': 'league', '/players': 'players', '/admin/login': 'login', '/admin': 'admin' };
+const SCREENS = { '/': 'rules', '/register': 'register', '/tiers': 'tiers', '/league': 'league', '/players': 'players', '/champions': 'champions', '/admin/login': 'login', '/admin': 'admin' };
 
 function StatusPill({ mode, connected, online }) {
   const state = !online ? 'offline' : connected ? 'live' : 'connecting';
@@ -63,6 +64,7 @@ function Layout() {
             <NavLink to="/tiers"><Icon name="trophy" /><span>Tier list</span></NavLink>
             <NavLink to="/league"><Icon name="calendar" /><span>League</span></NavLink>
             <NavLink to="/players"><Icon name="users" /><span>Players</span></NavLink>
+            <NavLink to="/champions"><Icon name="trophy" /><span>Champions</span></NavLink>
             <NavLink className="admin-tab" to={user?.admin ? '/admin' : '/admin/login'}><Icon name="shield" /><span>Admin</span></NavLink>
           </nav>
           <div className="topbar-actions">
@@ -87,6 +89,7 @@ function Layout() {
             <Route path="/team/:teamId" element={<Team />} />
             <Route path="/players" element={<Players />} />
             <Route path="/player/:teamId/:role" element={<Player />} />
+            <Route path="/champions" element={<Champions />} />
             <Route path="/history" element={<History />} />
             <Route path="/history/:seasonId" element={<History />} />
             <Route path="/admin/login" element={<Login />} />
