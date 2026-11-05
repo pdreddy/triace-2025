@@ -24,6 +24,13 @@ if [ ! -d node_modules ]; then echo "Installing dependencies…"; npm ci --no-au
 PW="${TRAICE_ADMIN_PASSWORD:-}"
 if [ "${#PW}" -lt 8 ]; then export TRAICE_ADMIN_PASSWORD="demo-admin-1234"; fi
 
+# Port 3000 must be free. A leftover server there (often a non-demo `npm run dev`) shows Firebase errors.
+if command -v lsof >/dev/null && PIDS=$(lsof -ti tcp:3000 -sTCP:LISTEN 2>/dev/null) && [ -n "$PIDS" ]; then
+  echo "Port 3000 is already in use by:"; lsof -i tcp:3000 -sTCP:LISTEN | sed 's/^/  /'
+  read -r -p "Stop it and continue? [y/N] " ANSWER
+  if [[ "$ANSWER" =~ ^[Yy]$ ]]; then kill $PIDS; sleep 1; else echo "Stop it yourself (kill $PIDS) and run this again."; exit 1; fi
+fi
+
 if [ "$RUN_TESTS" = 1 ]; then npm test; fi
 
 URL="http://127.0.0.1:3000"
