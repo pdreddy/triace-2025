@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Field, Message } from './UI';
+import { Icon } from './Icons';
 import { formatUtr, orderedTiers, parseUtr } from '../../functions/lib/tournament.js';
 
 const utrText = value => (value == null ? '' : formatUtr(value));
@@ -56,23 +58,13 @@ export function TeamEditForm({ registration, tierConfig, onSave, onCancel }) {
   );
 }
 
-// A captain on a new phone or browser enters the captain code shown when the team registered.
-export function CaptainClaim({ teamId, service, onClaimed }) {
-  const [code, setCode] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState('');
-  async function submit(event) {
-    event.preventDefault();
-    setBusy(true); setError('');
-    try { await service.claimTeam({ teamId, code }); setCode(''); onClaimed?.(); } catch (e) { setError(e.message); } finally { setBusy(false); }
-  }
+// Shown to visitors who don't manage this team: captains sign in with their team login.
+export function CaptainSignIn() {
   return (
-    <details className="card claim">
-      <summary>Captain of this team on a new device?</summary>
-      <form onSubmit={submit} className="inline-form">
-        <Field id={`claim-${teamId}`} label="Captain code" placeholder="e.g. K7QM-4XPA" autoComplete="off" value={code} onChange={e => setCode(e.target.value)} required />
-        <button className="button small" disabled={busy || !code.trim()}>{busy ? 'Checking…' : 'Claim team'}</button>
-      </form>
-      <Message error>{error}</Message>
-      <p className="small">The captain code was shown once when the team registered. If it’s lost, ask the admin for a new one.</p>
-    </details>
+    <aside className="card claim">
+      <p><strong>Captain of this team?</strong> Sign in with your team login to edit the team or submit scores.</p>
+      <Link className="button small" to="/captain">Captain sign in <Icon name="arrow" size={16} /></Link>
+      <p className="small">Lost your login? Ask the tournament admin to reset it.</p>
+    </aside>
   );
 }

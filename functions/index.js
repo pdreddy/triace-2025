@@ -2,8 +2,9 @@ import { initializeApp } from 'firebase-admin/app';
 import { getDatabase } from 'firebase-admin/database';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { applyRegistration, applyConfiguration, applyRecalculation, applyLeagueRules, bootstrapState, ValidationError } from './lib/tournament.js';
-import { applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult, applyManageSeason, applySetSchedule, applyMoveFixture, applyIssueChallenge, applyUpdateTeam, applyWithdrawTeam, applyClaimTeam, applyResetCaptainCode } from './lib/league.js';
-import { newCaptainCode, hashCaptainCode } from './lib/captainCode.js';
+import { applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult, applyManageSeason, applySetSchedule, applyMoveFixture, applyIssueChallenge, applyUpdateTeam, applyWithdrawTeam, applySetCaptainLogin } from './lib/league.js';
+import { getAuth } from 'firebase-admin/auth';
+import { newLogin, newPassword, captainUid, loginEmail } from './lib/captainLogin.js';
 import { resolveDbPaths } from './lib/paths.js';
 import { validateLegacySeason } from './lib/legacy.js';
 initializeApp();
@@ -50,10 +51,30 @@ export const importSeason1 = onCall(options, async request => {
   await target.set(request.data.season);
   return { path: paths.season1 };
 });
+const TEAM_ID = /^[a-zA-Z0-9_-]{16,80}$/;
+// Creates the captain's Email/Password account (uid is derived from the team, so a retry finds it). Retries if the username is taken.
+async function createCaptainAccount(uid, firstName, password = newPassword()) {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { username } = newLogin(firstName);
+    try { await getAuth().createUser({ uid, email: loginEmail(username), password, displayName: `${username} (captain)` }); return { username, password }; }
+    catch (error) { if (error.code !== 'auth/email-already-exists') throw error; }
+  }
+  throw new HttpsError('aborted', 'Could not create a login. Please retry.');
+}
+// Registering also creates the captain's login (username + passphrase), returned once for the captain to save.
 export const registerTeam = onCall(options, async request => {
   requireAuth(request);
-  const code = newCaptainCode(), result = await mutate(state => applyRegistration(state, request.data, request.auth.uid, Date.now(), hashCaptainCode(code)));
-  return result.created ? { ...result, captainCode: code } : result;
+  const teamId = request.data?.teamId;
+  if (typeof teamId !== 'string' || !TEAM_ID.test(teamId)) throw new HttpsError('failed-precondition', 'Invalid registration identifier.');
+  const uid = captainUid(teamId);
+  let login = null;
+  try { login = await createCaptainAccount(uid, request.data?.captain?.firstName); }
+  catch (error) { if (error.code !== 'auth/uid-already-exists') { if (error instanceof HttpsError) throw error; console.error('Captain login failed', { code: error.code }); throw new HttpsError('internal', 'Could not create the team login. Please retry.'); } }   // already exists: a repeat of the same request
+  let result;
+  try { result = await mutate(state => applyRegistration(state, request.data, request.auth.uid, Date.now(), login && { uid, username: login.username })); }
+  catch (error) { if (login) await getAuth().deleteUser(uid).catch(() => {}); throw error; }   // registration refused: don't leave an orphan login
+  if (!result.created && login) await getAuth().deleteUser(uid).catch(() => {});
+  return result.created && login ? { ...result, login } : result;
 });
 export const saveConfiguration = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyConfiguration(state, request.data)); });
 export const recalculateTiers = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyRecalculation(state)); });
@@ -68,11 +89,29 @@ export const setSchedule = onCall(options, async request => { requireAuth(reques
 export const moveFixture = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyMoveFixture(state, request.data)); });
 export const issueChallenge = onCall(options, async request => { requireAuth(request); return mutate(state => applyIssueChallenge(state, request.data, request.auth.uid, isAdmin(request))); });
 export const updateTeam = onCall(options, async request => { requireAuth(request); return mutate(state => applyUpdateTeam(state, request.data, request.auth.uid, isAdmin(request))); });
-export const withdrawTeam = onCall(options, async request => { requireAuth(request); return mutate(state => applyWithdrawTeam(state, request.data, request.auth.uid, isAdmin(request))); });
-export const claimTeam = onCall(options, async request => { requireAuth(request); return mutate(state => applyClaimTeam(state, { teamId: request.data?.teamId, codeHash: hashCaptainCode(request.data?.code) }, request.auth.uid)); });
-export const resetCaptainCode = onCall(options, async request => {
+export const withdrawTeam = onCall(options, async request => {
+  requireAuth(request);
+  const result = await mutate(state => applyWithdrawTeam(state, request.data, request.auth.uid, isAdmin(request)));
+  await getAuth().deleteUser(captainUid(result.teamId)).catch(() => {});   // the team is gone, so is its login
+  return result;
+});
+// Admin: give a team's captain a new password (and sign out their old sessions). The password is returned once and never stored.
+export const resetCaptainLogin = onCall(options, async request => {
   requireAuth(request, true);
-  const code = newCaptainCode();
-  await mutate(state => applyResetCaptainCode(state, { teamId: request.data?.teamId, codeHash: hashCaptainCode(code) }));
-  return { teamId: request.data?.teamId, captainCode: code };
+  const teamId = request.data?.teamId;
+  if (typeof teamId !== 'string' || !TEAM_ID.test(teamId)) throw new HttpsError('invalid-argument', 'Choose a team.');
+  const record = (await getDatabase().ref(`${paths.root}/registrations/${teamId}`).get()).val();
+  if (!record) throw new HttpsError('not-found', 'That team no longer exists.');
+  const uid = captainUid(teamId), password = newPassword();
+  let username = record.captainUsername;
+  try {
+    if (username) await getAuth().updateUser(uid, { password });
+    else throw Object.assign(new Error('no login yet'), { code: 'auth/user-not-found' });
+    await getAuth().revokeRefreshTokens(uid);
+  } catch (error) {
+    if (error.code !== 'auth/user-not-found') { console.error('Captain login reset failed', { code: error.code }); throw new HttpsError('internal', 'Could not reset the login. Please retry.'); }
+    ({ username } = await createCaptainAccount(uid, record.captain?.firstName, password));   // the team has no login yet, or it was removed
+    await mutate(state => applySetCaptainLogin(state, { teamId, uid, username }));
+  }
+  return { teamId, username, password };
 });

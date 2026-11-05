@@ -17,9 +17,10 @@ const Players = lazy(() => import('./pages/Players'));
 const Player = lazy(() => import('./pages/Player'));
 const History = lazy(() => import('./pages/History'));
 const Champions = lazy(() => import('./pages/Champions'));
+const CaptainLogin = lazy(() => import('./pages/CaptainLogin'));
 
 const FRIENDLY_ERROR = 'We can’t reach the tournament right now. Please check your connection and try again shortly.';
-const SCREENS = { '/': 'rules', '/register': 'register', '/tiers': 'tiers', '/league': 'league', '/players': 'players', '/champions': 'champions', '/admin/login': 'login', '/admin': 'admin' };
+const SCREENS = { '/': 'rules', '/register': 'register', '/tiers': 'tiers', '/league': 'league', '/players': 'players', '/champions': 'champions', '/admin/login': 'login', '/captain': 'login', '/admin': 'admin' };
 
 function StatusPill({ mode, connected, online }) {
   const state = !online ? 'offline' : connected ? 'live' : 'connecting';
@@ -70,8 +71,9 @@ function Layout() {
           <div className="topbar-actions">
             <StatusPill mode={service.mode} connected={connected} online={online} />
             <NavLink className="chip-button admin-chip" to={user?.admin ? '/admin' : '/admin/login'} aria-label="Admin"><Icon name="shield" size={16} /></NavLink>
-            {canInstall && <button type="button" className="chip-button" onClick={install}><Icon name="download" size={16} /><span>Install app</span></button>}
-            {user?.admin && <button type="button" className="chip-button" disabled={loggingOut} onClick={logout}><Icon name="logout" size={16} /><span>{loggingOut ? 'Signing out…' : 'Sign out'}</span></button>}
+            {!user?.admin && <NavLink className="chip-button" to="/captain" aria-label={user?.captain ? 'My team' : 'Captain sign in'}><Icon name="user" size={16} /><span>{user?.captain ? 'My team' : 'Captain'}</span></NavLink>}
+            {canInstall && <button type="button" className="chip-button" aria-label="Install app" onClick={install}><Icon name="download" size={16} /><span>Install app</span></button>}
+            {(user?.admin || user?.captain) && <button type="button" className="chip-button" aria-label="Sign out" disabled={loggingOut} onClick={logout}><Icon name="logout" size={16} /><span>{loggingOut ? 'Signing out…' : 'Sign out'}</span></button>}
           </div>
         </div>
       </header>
@@ -90,6 +92,7 @@ function Layout() {
             <Route path="/team/:teamId" element={<Team />} />
             <Route path="/players" element={<Players />} />
             <Route path="/player/:teamId/:role" element={<Player />} />
+            <Route path="/captain" element={<CaptainLogin />} />
             <Route path="/champions" element={<Champions />} />
             <Route path="/history" element={<History />} />
             <Route path="/history/:seasonId" element={<History />} />

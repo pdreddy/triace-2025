@@ -5,6 +5,7 @@ import { useRulesAccess } from '../hooks/useRulesAccess';
 import { Field, Message, UtrMeter, tierTone } from '../components/UI';
 import { Icon } from '../components/Icons';
 import { earlyBirdStatus } from '../config/earlyBird.js';
+import LoginCard from '../components/LoginCard';
 import { assignSelectedTier, assignTier, orderedTiers, parseUtr, formatUtr, validateRegistration, playerUtr, UTR_GAP_LIMIT, DEFAULT_TIERS } from '../../functions/lib/tournament.js';
 
 const PLAYERS = [
@@ -34,6 +35,7 @@ function TierOption({ value, tone, title, detail, eligibility, art, selected, di
 }
 
 function Success({ result, config, onAgain }) {
+  const [saved, setSaved] = useState(!result.login);   // must confirm the login is saved before leaving
   const listed = result.listedTiers?.length > 1 ? 'GOAT and Rising' : config[result.assignedTier]?.name || result.assignedTier;
   return (
     <section className="page success-screen" role="status">
@@ -45,18 +47,12 @@ function Success({ result, config, onAgain }) {
         <div><dt>Combined UTR</dt><dd>{formatUtr(result.combinedUtr)}</dd></div>
         <div><dt>Registration ID</dt><dd className="mono">{result.teamId}</dd></div>
       </dl>
-      {result.captainCode && (
-        <div className="captain-code">
-          <p className="eyebrow">Your captain code</p>
-          <output className="mono" aria-label="Captain code">{result.captainCode}</output>
-          <p className="small">Save it now; it isn’t shown again. Use it to manage your team from another phone or browser (team page → “Captain of this team on a new device?”).</p>
-          <button type="button" className="secondary small" onClick={() => navigator.clipboard?.writeText(result.captainCode)}>Copy code</button>
-        </div>
-      )}
+      {result.login && <LoginCard login={result.login} teamLabel={`${result.captainName || 'your'}’s team`} />}
+      {result.login && <label className="checkbox saved-check"><input type="checkbox" checked={saved} onChange={e => setSaved(e.target.checked)} /><span>I’ve saved my username and password</span></label>}
       <div className="success-actions">
-        <Link className="button" to={`/team/${result.teamId}`}>Open my team <Icon name="arrow" size={18} /></Link>
-        <Link className="secondary" to="/tiers">View the lineup</Link>
-        <button type="button" className="secondary" onClick={onAgain}>Register another team</button>
+        <Link className="button" aria-disabled={!saved} tabIndex={saved ? undefined : -1} to={`/team/${result.teamId}`}>Open my team <Icon name="arrow" size={18} /></Link>
+        <Link className="secondary" to="/tiers" aria-disabled={!saved} tabIndex={saved ? undefined : -1}>View the lineup</Link>
+        <button type="button" className="secondary" disabled={!saved} onClick={onAgain}>Register another team</button>
       </div>
     </section>
   );
@@ -117,7 +113,7 @@ export default function Register() {
       for (const [key, value] of Object.entries(players)) payload[key] = { [key === 'captain' ? 'firstName' : 'fullName']: value.name.trim(), singlesUtr: parseUtr(value.singles), doublesUtr: value.doubles.trim() ? parseUtr(value.doubles) : null };
       validateRegistration(payload, settings, config, gap);
       setBusy(true);
-      setSuccess(await service.register(payload));
+      setSuccess({ ...(await service.register(payload)), captainName: payload.captain.firstName });
       setPlayers(emptyPlayers()); setWhatsappPhone(''); setConsent(false); setStep(0); id.current = crypto.randomUUID();
     } catch (e) { setError(e.message); } finally { setBusy(false); }
   }

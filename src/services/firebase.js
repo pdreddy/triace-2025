@@ -4,6 +4,7 @@ import { getDatabase, ref, onValue, get, connectDatabaseEmulator } from 'firebas
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/functions';
 import { rulesOf, DEFAULT_SEASON_NAME } from '../../functions/lib/tournament.js';
 import { dbPaths } from '../config/dbPaths.js';
+import { isCaptainEmail, loginEmail } from '../../functions/lib/captainAccount.js';
 const env = import.meta.env;
 function rulesHint(error, root) {
   const message = errorMessage(error);
@@ -70,7 +71,7 @@ export function createFirebaseService() {
           if (!anonymousPromise) anonymousPromise = signInAnonymously(auth).catch(error => { if (!stopped) onError(new Error(errorMessage(error))); }).finally(() => { anonymousPromise = null; });
           return;
         }
-        try { const token = await getIdTokenResult(user); if (!stopped && auth.currentUser?.uid === user.uid) callback({ uid: user.uid, email: user.email, admin: token.claims.admin === true, anonymous: user.isAnonymous }); }
+        try { const token = await getIdTokenResult(user); if (!stopped && auth.currentUser?.uid === user.uid) callback({ uid: user.uid, email: user.email, admin: token.claims.admin === true, anonymous: user.isAnonymous, captain: isCaptainEmail(user.email) }); }
         catch (error) { if (!stopped) onError(new Error(errorMessage(error))); }
       });
       return () => { stopped = true; unsubscribe(); };
@@ -95,8 +96,11 @@ export function createFirebaseService() {
     issueChallenge: withError(async payload => (await httpsCallable(functions, 'issueChallenge')(payload)).data),
     updateTeam: withError(async payload => (await httpsCallable(functions, 'updateTeam')(payload)).data),
     withdrawTeam: withError(async payload => (await httpsCallable(functions, 'withdrawTeam')(payload)).data),
-    claimTeam: withError(async payload => (await httpsCallable(functions, 'claimTeam')(payload)).data),
-    resetCaptainCode: withError(async payload => (await httpsCallable(functions, 'resetCaptainCode')(payload)).data),
+    resetCaptainLogin: withError(async payload => (await httpsCallable(functions, 'resetCaptainLogin')(payload)).data),
+    async captainLogin(username, password) {
+      try { await signInWithEmailAndPassword(auth, loginEmail(username), password); }
+      catch (error) { throw new Error(['auth/invalid-credential', 'auth/wrong-password', 'auth/user-not-found', 'auth/invalid-email'].includes(error?.code) ? 'Wrong username or password.' : error?.code === 'auth/too-many-requests' ? 'Too many attempts. Wait a few minutes, then try again.' : errorMessage(error)); }
+    },
     importSeason1: withError(async season => (await httpsCallable(functions, 'importSeason1')({ season })).data),
     manageSeason: withError(async payload => (await httpsCallable(functions, 'manageSeason')(payload)).data),
     submitResult: withError(async payload => (await httpsCallable(functions, 'submitResult')(payload)).data),

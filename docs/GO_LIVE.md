@@ -17,6 +17,7 @@ npm run check         # everything: unit, build, PWA, browser tests
 - [ ] Realtime Database enabled; Authentication → **Email/Password** and **Anonymous** enabled.
 - [ ] Authentication → Settings → **Authorized domains**: add your live hostname (Netlify or Firebase Hosting).
 - [ ] Billing plan that allows Cloud Functions (Blaze).
+- [ ] Captain logins are Email/Password accounts created by the `registerTeam` function, so Email/Password sign-in must be on and the functions' service account needs the default Firebase Auth admin access (it has it unless you changed IAM). Run `npm run test:rules` somewhere the emulators work to check the login tests.
 - [ ] Decide the database paths. Defaults are fine (`traice2_0`, `traice2_0/season1`). If you change them, set `VITE_DB_*` for the web app and `TRAICE_DB_*` in `functions/.env` to the same values, run `npm run rules:generate`, and deploy the rules (`npm run rules:deploy`). The Season 1 path may not overlap the root or any tournament node; preflight and the functions refuse it.
 
 ## 2. Admin account (needs your Firebase account)
@@ -47,7 +48,8 @@ Deploy the functions **before** the web app goes live: the first visit calls `bo
 
 ## 5. Smoke test on the live site (phone and laptop)
 
-- [ ] Rules page → agree → Register a test team → tier list shows it → withdraw it from Admin.
+- [ ] Rules page → agree → Register a test team → save the shown username and password → tier list shows the team.
+- [ ] On a second phone: **Captain** → sign in with that login → League shows the team's fixtures and score entry. In Admin, **Reset login** gives a new password and the old one stops working. Then withdraw the test team (its login is deleted with it).
 - [ ] Champions and Past seasons show Season 1 (and the Super Six).
 - [ ] Install the app (Android Chrome: menu → Install app; iPhone Safari: Share → Add to Home Screen). Switch to airplane mode: pages still open and show the "saved data" banner.
 - [ ] Admin → Teams → **Captain only** hides the other players and the CSV export.

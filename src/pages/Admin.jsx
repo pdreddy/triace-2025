@@ -7,6 +7,7 @@ import { FixtureCard, teamIndex } from '../components/League';
 import { LeagueRulesCard, PlayoffPlanner, ScheduleForm, SeasonCard } from '../components/AdminLeague';
 import { TeamEditForm } from '../components/TeamTools';
 import FirebasePanel from '../components/FirebasePanel';
+import LoginCard from '../components/LoginCard';
 import { DEFAULT_SETTINGS, DEFAULT_TIERS, orderedTiers, parseUtr, validateSettings, validateTierConfig, registrationsCsv } from '../../functions/lib/tournament.js';
 
 const SECTIONS = [
@@ -32,7 +33,7 @@ export default function Admin() {
   const { teams, loading, error: readError } = useRegistrations();
   const [draft, setDraft] = useState(() => draftFrom(data)), [dirty, setDirty] = useState(false), [busy, setBusy] = useState(false);
   const [error, setError] = useState(''), [message, setMessage] = useState(''), [summary, setSummary] = useState(null);
-  const [query, setQuery] = useState(''), [filter, setFilter] = useState('all'), [reveal, setReveal] = useState(true), [captainOnly, setCaptainOnlyState] = useState(() => localStorage.getItem('traice.admin.captainOnly') === '1'), [newId, setNewId] = useState(''), [tab, setTab] = useState('settings'), [editing, setEditing] = useState(null);
+  const [query, setQuery] = useState(''), [filter, setFilter] = useState('all'), [reveal, setReveal] = useState(true), [issued, setIssued] = useState(null), [captainOnly, setCaptainOnlyState] = useState(() => localStorage.getItem('traice.admin.captainOnly') === '1'), [newId, setNewId] = useState(''), [tab, setTab] = useState('settings'), [editing, setEditing] = useState(null);
 
   useEffect(() => {
     if (data && !dirty && (data.configRevision || 0) >= draft.expectedRevision) setDraft(draftFrom(data));
@@ -80,9 +81,9 @@ export default function Admin() {
     if (!window.confirm(`Withdraw ${team.captain.firstName}’s team? Its unplayed fixtures are removed and its results stop counting.`)) return;
     return action(async () => { const r = await service.withdrawTeam({ teamId: team.teamId }); setMessage(`${team.captain.firstName}’s team withdrawn${r.removedFixtures ? `; ${r.removedFixtures} unplayed fixtures removed` : ''}.`); });
   }
-  function newCaptainCode(team) {
-    if (!window.confirm(`Issue a new captain code for ${team.captain.firstName}’s team? The old code stops working; devices already linked keep access.`)) return;
-    return action(async () => { const r = await service.resetCaptainCode({ teamId: team.teamId }); setMessage(`New captain code for ${team.captain.firstName}’s team: ${r.captainCode}. Send it to the captain; it isn’t shown again.`); });
+  function resetLogin(team) {
+    if (!window.confirm(`Reset the login for ${team.captain.firstName}’s team? A new password is created, the old one stops working, and the captain is signed out on every device.`)) return;
+    return action(async () => { const r = await service.resetCaptainLogin({ teamId: team.teamId }); setIssued({ teamId: team.teamId, label: `${team.captain.firstName}’s team`, login: { username: r.username, password: r.password } }); });
   }
   function generateFixtures(tier) {
     const existing = Object.values(data?.fixtures?.[tier.id] || {});
@@ -145,6 +146,13 @@ export default function Admin() {
       </div>
       <Message error>{error || readError}</Message>
       <Message>{message}</Message>
+      {issued && (
+        <section className="card issued-login" aria-live="polite">
+          <LoginCard login={issued.login} teamLabel={issued.label} title={`New login for ${issued.label}`} />
+          <p className="small">Send this to the captain now. It is shown only once and is gone when you close it.</p>
+          <button type="button" className="secondary small" onClick={() => setIssued(null)}>Done, I’ve sent it</button>
+        </section>
+      )}
 
       <div className="admin-layout">
         <nav className="admin-nav" aria-label="Dashboard sections">
@@ -234,7 +242,7 @@ export default function Admin() {
                       <TeamCard team={team} tierName={group.name} tierId={group.id} privateView masked={masked} captainOnly={captainOnly} />
                       <div className="card-actions">
                         <button type="button" className="secondary small" disabled={busy} onClick={() => setEditing(team.teamId)}>Edit</button>
-                        <button type="button" className="secondary small" disabled={busy} onClick={() => newCaptainCode(team)}>New captain code</button>
+                        <button type="button" className="secondary small" disabled={busy} onClick={() => resetLogin(team)}>Reset login</button>
                         <button type="button" className="danger" disabled={busy} onClick={() => withdraw(team)}>Withdraw</button>
                       </div>
                     </div>

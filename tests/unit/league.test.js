@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { initialState, applyRegistration, applyRecalculation, applyLeagueRules, publicState, rulesOf, DEFAULT_LEAGUE_RULES } from '../../functions/lib/tournament.js';
+import { initialState, applyRegistration, applyRecalculation, applyLeagueRules, publicState, rulesOf, DEFAULT_LEAGUE_RULES, isOwner } from '../../functions/lib/tournament.js';
 import { roundRobin, applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult, standings, playoffSpots, encounterWinner, deriveLineup, matchPlayers, playerRatings, playerId, gameShare, singlesEligibility, applyManageSeason } from '../../functions/lib/league.js';
 
 const team = (captain, id, values = [600, 600, 600]) => ({ teamId: id, whatsappPhone:'+15551234567',ace1Phone:'+15551234568',ace2Phone:'+15551234569', captain: { firstName: captain, singlesUtr: values[0], doublesUtr: null }, ace1: { fullName: `${captain} Ace One`, singlesUtr: values[1], doublesUtr: null }, ace2: { fullName: `${captain} Ace Two`, singlesUtr: values[2], doublesUtr: null }, selectedTier: 'goat', consent: true, rulesAccepted: true });
@@ -10,6 +10,18 @@ function league(count = 4) {
   for (let i = 0; i < count; i++) state = applyRegistration(state, team(`Cap${i}`, `team_${String(i).padStart(16, '0')}`), `owner${i}`, 1000 + i).state;
   return applyGenerateFixtures(state, { tierId: 'goat' }).state;
 }
+
+test('a captain signed in with their team login can submit scores, and nobody else can', () => {
+  let state = initialState();
+  const ids = ['team_0000000000000000', 'team_0000000000000001'], logins = ids.map(id => ({ uid: `cap_${id}`, username: `cap-${id.slice(-1)}222` }));
+  ids.forEach((id, i) => { state = applyRegistration(state, team(`Cap${i}`, id), `anon${i}`, 1000 + i, logins[i]).state; });
+  state = applyGenerateFixtures(state, { tierId: 'goat' }).state;
+  const fixture = Object.values(state.fixtures.goat)[0], entry = { tierId: 'goat', fixtureId: fixture.id, matches: result('home', 'home', 'away') };
+  assert.throws(() => applySubmitResult(state, entry, 'a-stranger'), /Only the captains/);
+  const mine = state.registrations[fixture.home].captainUid;                 // the home captain's login, not the browser that registered
+  assert.notEqual(mine, state.registrations[fixture.home].ownerUid);
+  assert.equal(applySubmitResult(state, entry, mine).state.fixtures.goat[fixture.id].status, 'submitted');
+});
 
 test('round robin pairs every team exactly once, with byes for odd counts', () => {
   for (const n of [2, 3, 4, 5, 8]) {
@@ -212,7 +224,7 @@ test('closing a season archives it publicly and privately, then starts a clean s
 });
 
 // ---------- dates, challenges, team management ----------
-import { applySetSchedule, applyMoveFixture, addDays, deadlineEnd, isOverdue, onTime, challengeStatus, applyIssueChallenge, applyUpdateTeam, applyWithdrawTeam, applyClaimTeam, applyResetCaptainCode } from '../../functions/lib/league.js';
+import { applySetSchedule, applyMoveFixture, addDays, deadlineEnd, isOverdue, onTime, challengeStatus, applyIssueChallenge, applyUpdateTeam, applyWithdrawTeam, applySetCaptainLogin } from '../../functions/lib/league.js';
 const day = date => Date.parse(`${date}T12:00:00Z`);
 
 test('a schedule dates every round, deadlines last to the end of the day anywhere, and results record whether they were on time', () => {
@@ -295,15 +307,23 @@ test('captains and the admin can edit or withdraw teams within the limits', () =
 });
 function initialStateWith(state) { const copy = structuredClone(state); delete copy.fixtures; return copy; }
 
-test('a captain code lets a new device claim the team; the admin can issue a new code', () => {
-  let state = initialState();
-  state = applyRegistration(state, team('Claim', 'team_claim00000000000000'), 'phone-1', 1, 'a'.repeat(64)).state;
-  assert.equal(applyRegistration(state, team('Claim', 'team_claim00000000000000'), 'phone-1', 2, 'b'.repeat(64)).result.created, undefined, 'repeating a registration keeps the first code');
-  assert.throws(() => applyClaimTeam(state, { teamId: 'team_claim00000000000000', codeHash: 'b'.repeat(64) }, 'phone-2'), /doesn’t match/);
-  const claimed = applyClaimTeam(state, { teamId: 'team_claim00000000000000', codeHash: 'a'.repeat(64) }, 'phone-2').state;
-  assert.deepEqual(claimed.teamsByOwner['phone-2'], { team_claim00000000000000: true });
-  assert.deepEqual(applyRecalculation(claimed).state.teamsByOwner['phone-2'], { team_claim00000000000000: true }, 'recalculation keeps claimed devices');
-  const reset = applyResetCaptainCode(claimed, { teamId: 'team_claim00000000000000', codeHash: 'c'.repeat(64) }).state;
-  assert.throws(() => applyClaimTeam(reset, { teamId: 'team_claim00000000000000', codeHash: 'a'.repeat(64) }, 'phone-3'), /doesn’t match/);
-  assert.ok(applyClaimTeam(reset, { teamId: 'team_claim00000000000000', codeHash: 'c'.repeat(64) }, 'phone-3'));
+test('a captain login owns the team on any device, survives recalculation, and the admin can set one', () => {
+  const id = 'team_claim00000000000000', login = { uid: `cap_${id}`, username: 'claim-k7q2' };
+  const state = applyRegistration(initialState(), team('Claim', id), 'phone-1', 1, login).state, record = state.registrations[id];
+  assert.equal(record.captainUsername, 'claim-k7q2');
+  assert.equal(record.captainUid, login.uid);
+  assert.deepEqual(record.owners, { [login.uid]: true });
+  assert.deepEqual(state.teamsByOwner[login.uid], { [id]: true });
+  assert.ok(isOwner(record, login.uid) && isOwner(record, 'phone-1') && !isOwner(record, 'someone-else'));
+  assert.equal(applyRegistration(state, team('Claim', id), 'phone-1', 2, null).result.created, undefined, 'repeating a registration changes nothing');
+  assert.deepEqual(applyRecalculation(state).state.teamsByOwner[login.uid], { [id]: true }, 'recalculation keeps the login’s teams');
+  assert.equal(JSON.stringify(state.tiers).includes('claim-k7q2'), false, 'the username is not in public data');
+  // a team registered without a login (or whose login was removed) can be given one by the admin
+  const bare = applyRegistration(initialState(), team('Bare', 'team_bare000000000000000'), 'phone-1', 1).state;
+  assert.equal(bare.registrations.team_bare000000000000000.captainUsername, undefined);
+  const given = applySetCaptainLogin(bare, { teamId: 'team_bare000000000000000', uid: 'cap_x', username: 'bare-2222' }).state;
+  assert.ok(isOwner(given.registrations.team_bare000000000000000, 'cap_x'));
+  assert.deepEqual(given.teamsByOwner.cap_x, { team_bare000000000000000: true });
+  assert.throws(() => applySetCaptainLogin(bare, { teamId: 'team_gone0000000000000', uid: 'cap_y', username: 'gone-1' }), /no longer exists/);
+  assert.throws(() => applySetCaptainLogin(bare, { teamId: 'team_bare000000000000000', uid: '', username: '' }), /Invalid captain login/);
 });

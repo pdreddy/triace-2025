@@ -339,24 +339,17 @@ export function applyWithdrawTeam(current, payload, uid, isAdmin = false, now = 
   for (const tier of Object.values(state.fixtures || {})) for (const f of Object.values(tier || {})) if ((f.home === teamId || f.away === teamId) && f.status !== 'final' && !f.stage) delete tier[f.id];
   return { state, result: { teamId, removedFixtures: scheduled.filter(f => f.status !== 'final' && !f.stage).length } };
 }
-// A captain on a new device proves ownership with the captain code (hashed by the caller).
-export function applyClaimTeam(current, payload, uid) {
-  const record = current?.registrations?.[payload?.teamId];
-  assert(typeof uid === 'string' && uid, 'Sign in before claiming a team.');
-  assert(record && record.recoveryHash && typeof payload.codeHash === 'string' && payload.codeHash === record.recoveryHash, 'That captain code doesn’t match this team.');
-  const state = structuredClone(current), target = state.registrations[record.teamId];
-  target.owners ||= {}; target.owners[uid] = true;
-  state.teamsByOwner ||= {}; state.teamsByOwner[uid] ||= {}; state.teamsByOwner[uid][record.teamId] = true;
-  return { state, result: { teamId: record.teamId } };
-}
-// The admin issues a fresh captain code (the caller generates it and passes its hash).
-export function applyResetCaptainCode(current, payload) {
+// Records a team's captain login (its account uid and username) and makes the account an owner of the team.
+// Used when the admin resets a login for a team that has none yet; new teams get it from applyRegistration.
+export function applySetCaptainLogin(current, payload) {
   const record = current?.registrations?.[payload?.teamId];
   assert(record, 'That team no longer exists.');
-  assert(typeof payload.codeHash === 'string' && /^[a-f0-9]{64}$/.test(payload.codeHash), 'Invalid captain code.');
-  const state = structuredClone(current);
-  state.registrations[record.teamId].recoveryHash = payload.codeHash;
-  return { state, result: { teamId: record.teamId } };
+  assert(typeof payload.uid === 'string' && payload.uid && typeof payload.username === 'string' && payload.username, 'Invalid captain login.');
+  const state = structuredClone(current), target = state.registrations[record.teamId];
+  target.captainUid = payload.uid; target.captainUsername = payload.username;
+  target.owners ||= {}; target.owners[payload.uid] = true;
+  state.teamsByOwner ||= {}; state.teamsByOwner[payload.uid] ||= {}; state.teamsByOwner[payload.uid][record.teamId] = true;
+  return { state, result: { teamId: record.teamId, username: payload.username } };
 }
 export const playoffSpots = (teamCount, rules = DEFAULT_LEAGUE_RULES) => Math.min(teamCount, teamCount > rules.playoffThreshold ? rules.playoffSpotsLarge : rules.playoffSpotsSmall);
 

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useTournament, useMyTeams } from '../hooks/useTournament';
 import { EmptyState, Message, Stat, tierTone } from '../components/UI';
-import { CaptainClaim, TeamEditForm } from '../components/TeamTools';
+import { CaptainSignIn, TeamEditForm } from '../components/TeamTools';
 import { FixtureCard, teamIndex, teamName, playerName } from '../components/League';
 import { Icon } from '../components/Icons';
 import { orderedTiers, formatUtr } from '../../functions/lib/tournament.js';
@@ -58,7 +58,7 @@ export default function Team() {
               : <div className="card-actions"><button type="button" className="secondary small" onClick={startEdit}>Edit players</button><button type="button" className="danger" onClick={withdraw}>Withdraw team</button></div>}
         </section>
       )}
-      {!owned && !user?.admin && <CaptainClaim teamId={teamId} service={service} onClaimed={() => setNote('This device is now linked to your team. You can submit scores and manage the team here.')} />}
+      {!owned && !user?.admin && <CaptainSignIn />}
       <div className="stat-row">
         <Stat value={`${total.won}–${total.lost}`} label="Win–loss" tone="accent" />
         {records.map(r => <Stat key={r.tier.id} value={r.row ? `#${r.row.position}` : '—'} label={`${r.tier.name} position`} />)}

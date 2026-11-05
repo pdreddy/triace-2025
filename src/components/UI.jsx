@@ -85,7 +85,7 @@ export function TeamCard({ team, tierName, tierId, rank, privateView = false, ma
       </dl>
       {privateView && (
         <>
-          <p className="small">Registration {team.teamId}<br />{new Date(team.registeredAt).toLocaleString()}</p>
+          <p className="small">Registration {team.teamId}<br />{team.captainUsername && <>Captain login: <strong className="mono">{team.captainUsername}</strong><br /></>}{new Date(team.registeredAt).toLocaleString()}</p>
           <p className="small">Division choice: <strong>{({ goat: 'GOAT only', rising: 'Rising only', both: 'GOAT + Rising', higher: 'Automatic placement', goat_fallback_rising: 'GOAT preferred; Rising if UTR does not qualify' })[team.selectedTier] || team.selectedTier}</strong></p>
           {[[team.whatsappPhone, 'Captain'], ...(captainOnly ? [] : [[team.ace1Phone, 'Ace 1'], [team.ace2Phone, 'Ace 2']])].map(([phone, label]) => phone && <p key={label} className="small">{label} WhatsApp: <a href={`https://wa.me/${phone.slice(1)}`} target="_blank" rel="noopener noreferrer">{phone}</a></p>)}
           <details open>

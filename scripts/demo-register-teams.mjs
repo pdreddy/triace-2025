@@ -40,12 +40,12 @@ const session = await visitor.call('session').catch(() => null);
 if (!session?.ok) { console.error('Cannot reach the demo. Start it first with ./run-local.sh, then run this again.'); process.exit(2); }
 
 console.log('\nRegistering 5 teams');
-const codes = new Map();
+const logins = new Map();
 for (const team of TEAMS) {
   const result = await visitor.call('register', team.payload);
-  const { assignedTier, captainCode } = result.json;
-  check(`${team.captain}’s team registered in ${team.tier.toUpperCase()}`, result.ok && assignedTier === team.tier && !!captainCode, `${result.status} ${result.text.slice(0, 120)}`);
-  codes.set(team.payload.teamId, captainCode);
+  const { assignedTier, login } = result.json;
+  check(`${team.captain}’s team registered in ${team.tier.toUpperCase()} with a login`, result.ok && assignedTier === team.tier && /^[a-z0-9]+-[a-z2-9]{4}$/.test(login?.username || '') && /^[a-z]+-[a-z]+-[a-z]+-\d{3}$/.test(login?.password || ''), `${result.status} ${result.text.slice(0, 120)}`);
+  logins.set(team.payload.teamId, login);
 }
 
 console.log('\nRules that must reject');
@@ -74,6 +74,21 @@ check('public data contains no ace names or phone numbers', leaked.length === 0,
 const anonPrivate = await visitor.call('registrations');
 check('anonymous visitors cannot read private registrations', anonPrivate.status === 403);
 
+console.log('\nCaptain logins');
+const [first] = TEAMS, firstLogin = logins.get(first.payload.teamId);
+const wrong = await new Client().call('captain-login', { username: firstLogin.username, password: 'wrong-wrong-wrong-000' });
+check('a wrong password is refused', wrong.status === 401, `${wrong.status}`);
+const captain = new Client(); await captain.call('session');
+const signedIn = await captain.call('captain-login', { username: firstLogin.username, password: firstLogin.password });
+check('the captain signs in with the generated login', signedIn.ok && signedIn.json.captain === true && signedIn.json.admin === false, `${signedIn.status} ${signedIn.text.slice(0, 100)}`);
+const mine = await captain.call('my-teams');
+check('the captain sees only their own team', Object.keys(mine.json).length === 1 && mine.json[first.payload.teamId] === true, JSON.stringify(mine.json));
+const privateRead = await captain.call('registrations');
+check('a captain cannot read all private registrations', privateRead.status === 403);
+const other = TEAMS[1].payload.teamId;
+const stolen = await captain.call('update-team', { ...TEAMS[1].payload, teamId: other, captain: { firstName: 'Hacker', singlesUtr: 600, doublesUtr: null } });
+check('a captain cannot edit another team', !stolen.ok, `${stolen.status} ${stolen.text.slice(0, 100)}`);
+
 console.log('\nAdmin view');
 const admin = new Client(); await admin.call('session');
 const login = await admin.call('login', { username: adminUser, password: adminPassword });
@@ -84,6 +99,15 @@ if (login.ok) {
     const reg = regs[team.payload.teamId];
     check(`${team.captain}’s private record has names and phones`, reg?.ace1?.fullName === team.a1 && reg.whatsappPhone === team.payload.whatsappPhone && reg.combinedUtr === team.utr.reduce((a, b) => a + b, 0));
   }
+  check('the admin sees each captain username but never a password', TEAMS.every(t => regs[t.payload.teamId].captainUsername === logins.get(t.payload.teamId).username) && !JSON.stringify(regs).includes(firstLogin.password));
+  const reset = await admin.call('reset-captain-login', { teamId: first.payload.teamId });
+  check('the admin can reset a login (same username, new password)', reset.ok && reset.json.username === firstLogin.username && reset.json.password && reset.json.password !== firstLogin.password, `${reset.status} ${reset.text.slice(0, 100)}`);
+  const oldPassword = await new Client().call('captain-login', { username: firstLogin.username, password: firstLogin.password });
+  check('the old password stops working after a reset', oldPassword.status === 401);
+  const newPassword = await new Client().call('captain-login', { username: firstLogin.username, password: reset.json.password });
+  check('the new password works', newPassword.ok);
+  const notAdmin = await visitor.call('reset-captain-login', { teamId: first.payload.teamId });
+  check('only the admin can reset a login', notAdmin.status === 403, `${notAdmin.status}`);
   if (withFixtures) {
     console.log('\nFixtures');
     const result = await admin.call('generate-fixtures', { tierId: 'goat' });

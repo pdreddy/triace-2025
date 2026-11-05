@@ -19,7 +19,7 @@ export const DEFAULT_LEAGUE_RULES = {
   // before the last challengeCutoffRounds rounds; a challenger win swaps the two places in the table.
   challengeEnabled: true, challengerFrom: 5, challengerTo: 6, targetFrom: 2, targetTo: 4, challengeCutoffRounds: 3
 };
-// A registration belongs to the browser that created it and to any device that claimed it with the captain code.
+// A registration belongs to the browser that created it and to the captain's login account (owners).
 export const isOwner = (registration, uid) => !!registration && !!uid && (registration.ownerUid === uid || registration.owners?.[uid] === true);
 export const rulesOf = state => ({ ...DEFAULT_LEAGUE_RULES, ...(state?.leagueRules || {}) });
 export const DEFAULT_SEASON_NAME = `${new Date().getFullYear()} season`;
@@ -119,20 +119,22 @@ export function bootstrapState(current) {
 }
 export function publicState(state) { return { settings: state.settings, tierConfig: state.tierConfig || {}, configRevision: state.configRevision || 0, tiers: state.tiers || {}, fixtures: state.fixtures || {}, leagueRules: rulesOf(state), season: state.season || { name: DEFAULT_SEASON_NAME }, seasons: state.seasons || {}, schedules: state.schedules || {} }; }
 function canonical(value) { return JSON.stringify(value, (_, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).filter(key => item[key] !== null && item[key] !== undefined).sort().map(key => [key, item[key]])) : item); }
-export function applyRegistration(current, payload, uid, now = Date.now(), recoveryHash = null) {
+// `login` is the captain's new login account ({ uid, username }); it is added as an owner so signing in on any device manages the team.
+export function applyRegistration(current, payload, uid, now = Date.now(), login = null) {
   assert(typeof uid === 'string' && uid.length > 0, 'Sign in before registering.');
   assert(current?.settings, 'The admin must initialize tournament settings first.');
   for (const [key, label] of [['whatsappPhone', 'captain'], ['ace1Phone', 'Ace 1'], ['ace2Phone', 'Ace 2']]) assert(Object.hasOwn(payload || {}, key), `Enter ${label}’s WhatsApp number to register.`);
   const team = validateRegistration(payload, current.settings, current.tierConfig || {}, rulesOf(current).utrGapLimit);
   const state = structuredClone(current), previous = state.registrations?.[team.teamId];
   if (previous) {
-    const { ownerUid, registeredAt, recoveryHash: savedHash, owners, ...saved } = previous;
+    const { ownerUid, registeredAt, owners, captainUid, captainUsername, ...saved } = previous;
     assert(ownerUid === uid && canonical(saved) === canonical(team), 'This registration identifier is already in use.');
     return { state, result: { teamId: previous.teamId, assignedTier: previous.assignedTier, combinedUtr: previous.combinedUtr, listedTiers: previous.listedTiers || [previous.assignedTier] } };
   }
-  const record = { ...team, ownerUid: uid, registeredAt: now, ...(recoveryHash ? { recoveryHash } : {}) };
+  const record = { ...team, ownerUid: uid, registeredAt: now, ...(login ? { captainUid: login.uid, captainUsername: login.username, owners: { [login.uid]: true } } : {}) };
   state.registrations ||= {}; state.registrations[team.teamId] = record;
   state.teamsByOwner ||= {}; state.teamsByOwner[uid] ||= {}; state.teamsByOwner[uid][team.teamId] = true;
+  if (login) { state.teamsByOwner[login.uid] ||= {}; state.teamsByOwner[login.uid][team.teamId] = true; }
   state.tiers ||= {};
   for (const tierId of team.listedTiers) { state.tiers[tierId] ||= { teams: {} }; state.tiers[tierId].teams ||= {}; state.tiers[tierId].teams[team.teamId] = publicRecord(record, state.settings); }
   return { state, result: { teamId: record.teamId, assignedTier: record.assignedTier, combinedUtr: record.combinedUtr, listedTiers: record.listedTiers, created: true } };
