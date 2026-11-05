@@ -55,6 +55,8 @@ function Match({ title, seeds, final = false }) {
 // league settings. Ratings are in hundredths of a UTR.
 export function ruleCards(tierConfig = DEFAULT_TIERS, rules = DEFAULT_LEAGUE_RULES) {
   const tiers = orderedTiers(tierConfig, true).sort((a, b) => a.minCombinedUtr - b.minCombinedUtr);
+  const rising = tiers.find(t => t.id === 'rising'), goat = tiers.find(t => t.id === 'goat');
+  const sharedBoundary = rising && goat && rising.maxCombinedUtr === goat.minCombinedUtr;
   const gap = formatUtr(rules.utrGapLimit), pct = rules.singlesMinPercent;
   const exampleDoubles = 500 + rules.utrGapLimit + 25, exampleAverage = Math.round((500 + exampleDoubles) / 2);
   const exampleNeed = Math.floor((8 * pct) / 100);
@@ -69,9 +71,15 @@ export function ruleCards(tierConfig = DEFAULT_TIERS, rules = DEFAULT_LEAGUE_RUL
         <p className="rule-lead">Three players per team. Three on court each week.</p>
         <div className="rule-stats">
           <div><b>3</b><span>players per team</span></div>
-          <div><b>2</b><span>tiers: GOAT &amp; Rising</span></div>
+          <div><b>{tiers.length}</b><span>active {tiers.length === 1 ? 'tier' : 'tiers'}</span></div>
           <div><b>{pct}%</b><span>singles days per player</span></div>
-          <div><b>Bo5</b><span>playoff encounters</span></div>
+          <div><b>Bo5</b><span>Best of 5 playoff matches. First to win 3 advances.</span></div>
+        </div>
+        <div className="hero-tier-meter">
+          <strong className="rule-label">Find your team’s tier</strong>
+          <UtrMeter tiers={tiers} />
+          {sharedBoundary && <p className="rule-text">Rising covers up to {formatUtr(rising.maxCombinedUtr)}. At exactly {formatUtr(goat.minCombinedUtr)}, GOAT has priority; above it, GOAT continues through {formatUtr(goat.maxCombinedUtr)}.</p>}
+          {!sharedBoundary && <p className="rule-text">Your three players’ combined UTR determines which active tier you qualify for. Where ranges overlap, the higher-priority tier wins.</p>}
         </div>
         <p className="rule-hint">Swipe or tap Next to flip through every rule <Icon name="arrow" size={16} /></p>
       </>

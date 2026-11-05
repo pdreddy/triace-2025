@@ -381,6 +381,14 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
 .rule-stats b, .rule-big, .qualify-num { display: block; font-family: var(--display); font-weight: 700; line-height: 1; text-transform: uppercase; }
 .rule-stats b { font-size: 38px; text-transform: none; color: var(--lime); }
 .rule-stats span { display: block; margin-top: 4px; font-size: 13px; color: var(--soft); }
+.hero-tier-meter { padding: 14px 18px; border: 1px solid var(--line-2); border-radius: var(--r); background: #0b172499; }
+.hero-tier-meter .meter { margin: 8px 0 0; }
+.hero-tier-meter .meter-bar { height: 25px; }
+.hero-tier-meter .meter-band { transform-box: fill-box; transform-origin: left center; animation: tier-reveal 1.1s cubic-bezier(.2,.8,.2,1) both; }
+.hero-tier-meter .meter-band.goat { animation-delay: .35s; }
+.hero-tier-meter .rule-text { margin-top: 10px; color: var(--soft); font-size: 13px; }
+@keyframes tier-reveal { from { transform: scaleX(0); opacity: .3; } to { transform: scaleX(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .hero-tier-meter .meter-band { animation: none; } }
 .rule-grid { display: grid; gap: 14px; }
 .rule-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .rule-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -868,6 +876,10 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
   .racquet { width: 46px; height: 108px; }
   .deck { gap: 6px; }
   .rule-card-body { gap: 10px; padding: 16px 14px 12px; border-radius: var(--r); }
+  .rule-card.hero .rule-stats { order: 1; }
+  .rule-card.hero .rule-hint { order: 2; }
+  .hero-tier-meter { padding: 11px 12px; }
+  .hero-tier-meter .meter-legend { font-size: 11px; }
   .rule-title { font-size: 56px; }
   .rule-head h2 { font-size: 24px; }
   .rule-num { min-width: 38px; height: 30px; font-size: 17px; }
