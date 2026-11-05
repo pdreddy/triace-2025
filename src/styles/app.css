@@ -1252,10 +1252,6 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
 
 /* Top bar: with seven tabs plus the account chips, keep it on one line on laptops */
 .tabs a, .nav-locked { white-space: nowrap; }
-@media (min-width: 761px) and (max-width: 1400px) {
-  .topbar-actions .chip-button span { display: none; }
-  .topbar-inner { gap: 12px; }
-}
 
 .credential-card output.password { font-size: 28px; letter-spacing: .22em; }
 
@@ -1407,12 +1403,6 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
 /* Partner board: keep the filters inside the page; make room in the top bar for the extra tab */
 .partner-filters .field input, .partner-filters .field select { width: 100%; min-width: 0; }
 .partner-filters .field:last-child { width: 140px; }
-@media (min-width: 761px) and (max-width: 1500px) {
-  .tabs a svg, .nav-locked svg { display: none; }
-  .tabs a, .nav-locked { padding: 6px 12px; }
-  .status-pill { padding: 6px 8px; font-size: 0; gap: 0; }
-  .status-pill i { margin: 0; }
-}
 @media (max-width: 760px) {
   .partners-screen .segmented { width: 100%; }
   .partners-screen .segmented button { flex: 1; padding-inline: 6px; }
@@ -1435,3 +1425,27 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
   .brand { font-size: 24px; gap: 8px; }
   .brand img { width: 32px; height: 32px; }
 }
+
+/* Top bar: the brand and the account buttons never move off screen; if the tabs do not fit they scroll inside their pill */
+.topbar-inner > .brand, .topbar-actions { flex: none; }
+.tabs { min-width: 0; flex: 0 1 auto; overflow-x: auto; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+
+/* Top bar, desktop: compact in steps by the width the bar really has (page margins grow on big screens, so the window width is not enough).
+   Worst case is an admin with the install button showing: logo + 8 tabs + status + two buttons. */
+@media (min-width: 761px) { .topbar-inner { container-type: inline-size; container-name: topbar; } }
+@container topbar (max-width: 1500px) {
+  .topbar-actions .chip-button span { display: none; }
+  .status-pill { padding: 6px 8px; font-size: 0; gap: 0; }
+  .status-pill i { margin: 0; }
+}
+@container topbar (max-width: 1260px) {
+  .tabs a svg, .nav-locked svg { display: none; }
+  .tabs a, .nav-locked { padding: 6px 10px; }
+}
+@container topbar (max-width: 1180px) {
+  .tabs .tab-long { display: none; }
+  .tabs .tab-short { display: inline; }
+}
+@container topbar (max-width: 1050px) { .topbar-inner { gap: 12px; } }
+@media (min-width: 761px) and (max-width: 900px) { .brand b { display: none; } }
