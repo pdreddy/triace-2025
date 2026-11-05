@@ -45,6 +45,19 @@
       },
       "earlyBird": {
         ".read": true
+      },
+      "partnerPosts": {
+        ".read": true
+      },
+      "partnerPrivate": {
+        "$postId": {
+          ".read": "auth != null && (data.child('ownerUid').val() === auth.uid || auth.token.admin === true)"
+        }
+      },
+      "partnerByOwner": {
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid"
+        }
       }
     }
   }

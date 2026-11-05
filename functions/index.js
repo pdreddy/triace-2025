@@ -1,6 +1,8 @@
 import { initializeApp } from 'firebase-admin/app';
 import { getDatabase } from 'firebase-admin/database';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { randomUUID } from 'node:crypto';
+import { applyCreatePost, applyExpressInterest, applyClosePost } from './lib/partners.js';
 import { applyRegistration, applyEarlyBird, applyConfiguration, applyRecalculation, applyLeagueRules, bootstrapState, ValidationError } from './lib/tournament.js';
 import { applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult, applyManageSeason, applySetSchedule, applyMoveFixture, applyIssueChallenge, applyUpdateTeam, applyWithdrawTeam, applySetCaptainLogin } from './lib/league.js';
 import { getAuth } from 'firebase-admin/auth';
@@ -82,6 +84,11 @@ export const generateFixtures = onCall(options, async request => { requireAuth(r
 export const submitResult = onCall(options, async request => { requireAuth(request); return mutate(state => applySubmitResult(state, request.data, request.auth.uid, request.auth.token.admin === true)); });
 export const reviewResult = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyReviewResult(state, request.data)); });
 export const generatePlayoffs = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyGeneratePlayoffs(state, request.data)); });
+// Find a partner: public posts, private contact details, and a swap of WhatsApp numbers when someone replies.
+const newId = () => randomUUID().replaceAll('-', '').slice(0, 20);
+export const createPartnerPost = onCall(options, async request => { requireAuth(request); return mutate(state => applyCreatePost(state, request.data, request.auth.uid, Date.now(), newId())); });
+export const expressInterest = onCall(options, async request => { requireAuth(request); return mutate(state => applyExpressInterest(state, request.data, request.auth.uid, Date.now(), newId())); });
+export const closePartnerPost = onCall(options, async request => { requireAuth(request); return mutate(state => applyClosePost(state, request.data, request.auth.uid, request.auth?.token?.admin === true)); });
 export const saveEarlyBird = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyEarlyBird(state, request.data)); });
 export const saveLeagueRules = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyLeagueRules(state, request.data)); });
 export const manageSeason = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyManageSeason(state, request.data)); });

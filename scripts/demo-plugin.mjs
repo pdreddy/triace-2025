@@ -5,6 +5,7 @@ import { initialState, publicState, applyRegistration, applyConfiguration, apply
 import { applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult, applyManageSeason, applySetSchedule, applyMoveFixture, applyIssueChallenge, applyUpdateTeam, applyWithdrawTeam, applySetCaptainLogin } from '../functions/lib/league.js';
 import { newLogin, newPassword, captainUid, loginEmail, normalizePassword } from '../functions/lib/captainLogin.js';
 import { validateLegacySeason } from '../functions/lib/legacy.js';
+import { applyCreatePost, applyExpressInterest, applyClosePost } from '../functions/lib/partners.js';
 const digest = value => createHash('sha256').update(value).digest();
 // Demo captain logins are kept in the demo state with a salted hash (never the password).
 const hashPassword = (password, salt = randomBytes(16).toString('hex')) => ({ salt, hash: scryptSync(normalizePassword(password), salt, 32).toString('hex') });
@@ -54,6 +55,7 @@ export function demoPlugin(env) {
           if (endpoint === '/session') return send(200, safeUser());
           if (endpoint === '/public') return send(200, { ...publicState(state), ...(state.season1 ? { legacySeasons: { s1: state.season1 } } : {}) });
           if (endpoint === '/my-registration') { const reg = state.registrations?.[url.searchParams.get('teamId')]; return reg && session && (session.admin || isOwner(reg, session.uid)) ? send(200, reg) : send(403, { error: 'Only this team’s captain can read it.' }); }
+          if (endpoint === '/partner-mine') return send(200, session ? Object.fromEntries(Object.entries(state.partnerPrivate || {}).filter(([, secret]) => secret.ownerUid === session.uid)) : {});
           if (endpoint === '/my-teams') return send(200, session ? state.teamsByOwner?.[session.uid] || {} : {});
           if (endpoint === '/registrations') return session?.admin ? send(200, state.registrations || {}) : send(403, { error: 'Administrator access is required.' });
           return send(404, { error: 'Unknown endpoint.' });
@@ -96,6 +98,10 @@ export function demoPlugin(env) {
           validateLegacySeason(payload.season);
           return send(200, await mutate(current => ({ state: { ...current, season1: payload.season }, result: { path: 'demo state' } })));
         }
+        const newId = () => randomBytes(10).toString('hex');
+        if (endpoint === '/partner-post') return signedIn ? send(200, await mutate(current => applyCreatePost(current, payload, session.uid, Date.now(), newId()))) : send(401, { error: 'Open the page again, then retry.' });
+        if (endpoint === '/partner-interest') return signedIn ? send(200, await mutate(current => applyExpressInterest(current, payload, session.uid, Date.now(), newId()))) : send(401, { error: 'Open the page again, then retry.' });
+        if (endpoint === '/partner-close') return signedIn ? send(200, await mutate(current => applyClosePost(current, payload, session.uid, admin))) : send(401, { error: 'Open the page again, then retry.' });
         if (endpoint === '/issue-challenge') return signedIn ? send(200, await mutate(current => applyIssueChallenge(current, payload, session.uid, admin))) : send(401, { error: 'Sign in first.' });
         if (endpoint === '/update-team') return signedIn ? send(200, await mutate(current => applyUpdateTeam(current, payload, session.uid, admin))) : send(401, { error: 'Sign in first.' });
         if (endpoint === '/withdraw-team') {

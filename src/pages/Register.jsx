@@ -132,6 +132,7 @@ export default function Register() {
         <p className="eyebrow">Three players. One team.</p>
         <h1>Build your <em>trio.</em></h1>
         <p>Pick your tier, add your three players, and see where your team lands as you type.</p>
+        <p className="small">Don’t have three players yet? <Link to="/partners">Find a partner</Link>.</p>
       </header>
 
       <EarlyBirdCard />

@@ -57,7 +57,7 @@ export function createFirebaseService() {
       };
       const off = keys.map(key => onValue(ref(database, `${ROOT}/${key}`), snapshot => { state[key] = snapshot.val() ?? (key === 'configRevision' ? 0 : key === 'settings' ? null : {}); ready.add(key); emit(); }, error => onError(new Error(rulesHint(error, ROOT)))));
       // League data loads on its own so a missing database rule for it never blocks the core tournament data.
-      for (const key of ['fixtures', 'leagueRules', 'season', 'seasons', 'schedules', 'earlyBird']) off.push(onValue(ref(database, `${ROOT}/${key}`), snapshot => { state[key] = snapshot.val() || undefined; emit(); }, () => { state[key] = undefined; emit(); }));
+      for (const key of ['fixtures', 'leagueRules', 'season', 'seasons', 'schedules', 'earlyBird', 'partnerPosts']) off.push(onValue(ref(database, `${ROOT}/${key}`), snapshot => { state[key] = snapshot.val() || undefined; emit(); }, () => { state[key] = undefined; emit(); }));
       // Season 1 (legacy) lives in the same database at its own configurable path.
       off.push(onValue(ref(database, paths.season1), snapshot => { state.legacySeasons = snapshot.exists() ? { s1: snapshot.val() } : undefined; emit(); }, () => { state.legacySeasons = undefined; emit(); }));
       return () => off.forEach(unsubscribe => unsubscribe());
@@ -90,6 +90,21 @@ export function createFirebaseService() {
     recalculate: withError(async () => (await httpsCallable(functions, 'recalculateTiers')({})).data),
     generateFixtures: withError(async payload => (await httpsCallable(functions, 'generateFixtures')(payload)).data),
     generatePlayoffs: withError(async payload => (await httpsCallable(functions, 'generatePlayoffs')(payload)).data),
+    createPartnerPost: withError(async payload => (await httpsCallable(functions, 'createPartnerPost')(payload)).data),
+    expressInterest: withError(async payload => (await httpsCallable(functions, 'expressInterest')(payload)).data),
+    closePartnerPost: withError(async payload => (await httpsCallable(functions, 'closePartnerPost')(payload)).data),
+    // The poster's private side of their own posts: who replied. Ids come from partnerByOwner, then each post is read on its own.
+    subscribeMyPartnerPosts(uid, callback) {
+      const posts = {}, offs = new Map();
+      const push = () => callback({ ...posts });
+      const off = onValue(ref(database, `${ROOT}/partnerByOwner/${uid}`), snapshot => {
+        const ids = Object.keys(snapshot.val() || {});
+        for (const id of [...offs.keys()]) if (!ids.includes(id)) { offs.get(id)(); offs.delete(id); delete posts[id]; }
+        for (const id of ids) if (!offs.has(id)) offs.set(id, onValue(ref(database, `${ROOT}/partnerPrivate/${id}`), s => { if (s.exists()) posts[id] = s.val(); else delete posts[id]; push(); }, () => {}));
+        push();
+      }, () => callback({}));
+      return () => { off(); offs.forEach(stop => stop()); };
+    },
     saveEarlyBird: withError(async payload => (await httpsCallable(functions, 'saveEarlyBird')(payload)).data),
     saveLeagueRules: withError(async payload => (await httpsCallable(functions, 'saveLeagueRules')(payload)).data),
     setSchedule: withError(async payload => (await httpsCallable(functions, 'setSchedule')(payload)).data),

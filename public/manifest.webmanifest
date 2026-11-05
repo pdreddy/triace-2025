@@ -68,6 +68,10 @@
   {
    "name": "Past seasons",
    "url": "/history"
+  },
+  {
+   "name": "Find a partner",
+   "url": "/partners"
   }
  ],
  "prefer_related_applications": false

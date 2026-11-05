@@ -36,10 +36,13 @@ All of this is in the browser, on the **Admin** page (sign in at `/admin/login`)
 | A captain lost their login | Admin → **Private registrations** → the team's card → **Reset login** (shown once; send it to the captain) |
 | League rules (points, playoff spots, challenge rule), season name, schedule dates, create fixtures, approve scores, playoffs, close a season | Admin → **League & results** |
 | Scores | Captains: **Captain** sign-in, then **League → Fixtures**. Admin: enter or approve in **League & results** |
+| **Partner board** (players looking for a team, teams needing a player) | The public **Partners** page. The admin signed in sees a **Remove (admin)** button on every post. Posts disappear on their own after 30 days. Poster and replier numbers are private (only the poster and the admin can read them) |
 | Season 1 history in the database | Admin → **Firebase & data paths** → **Copy Season 1 into Firebase** (once) |
 | Season 1 winners, squads, Super Six details | `src/data/season1-table.json`, then deploy (these are code files) |
 | Firebase project, database paths | `.env` / `functions/.env` (see README), then deploy |
 | The admin password | Firebase Console → Authentication → Users |
+
+> **After adding the partner board you must redeploy the backend and the rules:** `./deploy.sh --no-hosting` (new functions `createPartnerPost`, `expressInterest`, `closePartnerPost`) and publish the updated rules (`./deploy.sh --no-hosting --rules` after merging them into the live rules). New nodes: `partnerPosts` (public read), `partnerPrivate` and `partnerByOwner` (owner or admin only).
 
 ## 1. Firebase project (needs your Firebase account)
 

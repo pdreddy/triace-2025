@@ -7,6 +7,7 @@ const PAGES = [
   ['/league', /./],
   ['/players', /./],
   ['/champions', /./],
+  ['/partners', /./],
   ['/history', /./],
   ['/history/s1', /./],
   ['/team/any-team', /./],

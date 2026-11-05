@@ -118,7 +118,7 @@ export function bootstrapState(current) {
   const defaults = initialState();
   return { state: { ...defaults, ...(current || {}), settings: defaults.settings, tierConfig: current?.tierConfig && Object.keys(current.tierConfig).length ? current.tierConfig : defaults.tierConfig, configRevision: current?.configRevision || 1 }, result: { created: true } };
 }
-export function publicState(state) { return { earlyBird: state.earlyBird, settings: state.settings, tierConfig: state.tierConfig || {}, configRevision: state.configRevision || 0, tiers: state.tiers || {}, fixtures: state.fixtures || {}, leagueRules: rulesOf(state), season: state.season || { name: DEFAULT_SEASON_NAME }, seasons: state.seasons || {}, schedules: state.schedules || {} }; }
+export function publicState(state) { return { partnerPosts: state.partnerPosts || {}, earlyBird: state.earlyBird, settings: state.settings, tierConfig: state.tierConfig || {}, configRevision: state.configRevision || 0, tiers: state.tiers || {}, fixtures: state.fixtures || {}, leagueRules: rulesOf(state), season: state.season || { name: DEFAULT_SEASON_NAME }, seasons: state.seasons || {}, schedules: state.schedules || {} }; }
 function canonical(value) { return JSON.stringify(value, (_, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).filter(key => item[key] !== null && item[key] !== undefined).sort().map(key => [key, item[key]])) : item); }
 // `login` is the captain's new login account ({ uid, username }); it is added as an owner so signing in on any device manages the team.
 export function applyRegistration(current, payload, uid, now = Date.now(), login = null) {
