@@ -89,3 +89,10 @@ test('admin accounts: names, sign-in identifier, passwords and removal rules', (
   assert.throws(() => checkRemoval(admins, 'q', 'a'), /not an administrator/);
   assert.doesNotThrow(() => checkRemoval(admins, 'b', 'a'));
 });
+
+test('the text backup lists every team with phones, grouped by tier', async () => {
+  const { registrationsText } = await import('../../functions/lib/backupText.js');
+  const txt = registrationsText({ t1: { teamId: 't1', registeredAt: 1, assignedTier: 'x', captain: { firstName: 'Arjun', lastName: 'Rana', utr: 600 }, whatsappPhone: '+15550000001', ace1: { fullName: 'Ace One', utr: 600 }, ace1Phone: '+15550000002', ace2: { fullName: 'Ace Two', utr: 600 }, ace2Phone: '+15550000003', combinedUtr: 1800, captainUsername: 'arjuace' } }, { x: { name: 'GOAT Tier' } }, { when: new Date('2026-11-06T00:00:00Z') });
+  for (const part of ['1 team', '== GOAT Tier (1) ==', 'Arjun Rana', '+15550000001', '+15550000003', 'Login username: arjuace', 'Team ID: t1']) assert.ok(txt.includes(part), part);
+  assert.ok(registrationsText({}).includes('0 teams'));
+});

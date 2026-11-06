@@ -26,6 +26,10 @@ async function main() {
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   const out = path.join(dir, `traice-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
   fs.writeFileSync(out, JSON.stringify({ backedUpAt: new Date().toISOString(), project, databaseURL, rootPath: root, season1Path: season1, ...data }, null, 2), { mode: 0o600 });
+  const { registrationsText } = await import('../functions/lib/backupText.js');
+  const txt = out.replace(/\.json$/, '.txt');
+  fs.writeFileSync(txt, registrationsText(data.root.registrations, data.root.tierConfig), { mode: 0o600 });
+  console.log(`Text copy saved: ${txt}`);
   console.log(`Backup saved: ${out}\n  ${teams} registrations, ${Object.keys(data.root.fixtures || {}).length} tiers with fixtures.\n  It contains private phone numbers: keep it safe and do not commit it.`);
 }
 main().catch(error => { console.error(error.message); process.exitCode = 1; });

@@ -108,6 +108,7 @@ Deploy the functions **before** the web app goes live: the first visit calls `bo
 
 ## Backups
 
+- **Admin → Teams → Save as text file**: a readable `.txt` list of every team with phone numbers, grouped by tier (open it in Notes or print it). `npm run backup` writes the same `.txt` next to the JSON.
 - **Admin → Teams → Download full backup**: one JSON file with every registration (private details), fixtures, results, calendar and rules, saved on the device you are using. Do this before and after registration closes, and before every deploy.
 - **From your Mac (complete copy, including Season 1 and the partner board)**: `npm run backup` (after `gcloud auth application-default login`). It writes `backups/traice-backup-<time>.json`; the folder is git-ignored because it holds phone numbers. Keep a copy somewhere private (iCloud, Drive).
 - Also turn on Firebase's own safety net: Console → Realtime Database → Backups (daily, needs the Blaze plan).
