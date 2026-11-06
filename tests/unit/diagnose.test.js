@@ -13,3 +13,19 @@ test('common live-site errors point at the right fix', () => {
   assert.match(diagnose('something odd'), /console/);
   assert.match(diagnose(undefined), /console/);
 });
+
+import { classifyCallable, classifyPasswordProbe } from '../../src/services/diagnose.js';
+test('the setup check reads the answers of functions and of sign-in correctly', () => {
+  for (const code of ['functions/unauthenticated', 'functions/permission-denied', 'functions/failed-precondition', 'functions/invalid-argument']) assert.equal(classifyCallable(code).status, 'ok', code);
+  assert.equal(classifyCallable('functions/not-found').status, 'fail');
+  assert.match(classifyCallable('functions/not-found').fix, /Deploy the functions/);
+  assert.equal(classifyCallable('functions/internal').status, 'fail');
+  assert.equal(classifyCallable('functions/unavailable').status, 'fail');
+  assert.equal(classifyCallable('').status, 'ok');
+  assert.equal(classifyPasswordProbe('auth/invalid-credential').status, 'ok');
+  assert.equal(classifyPasswordProbe('auth/user-not-found').status, 'ok');
+  assert.equal(classifyPasswordProbe('auth/operation-not-allowed').status, 'fail');
+  assert.match(classifyPasswordProbe('auth/operation-not-allowed').fix, /Email\/Password/);
+  assert.equal(classifyPasswordProbe('auth/too-many-requests').status, 'warn');
+  assert.equal(classifyPasswordProbe('auth/network-request-failed').status, 'warn');
+});

@@ -157,3 +157,13 @@ test('early bird: the admin cannot save an impossible plan', async ({ page }) =>
   await expect(page.getByText('cannot end before it opens')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Save early-bird settings' })).toBeDisabled();
 });
+
+test('setup check page: in the demo it says there is no Firebase to check, and offers the report', async ({ page }) => {
+  await page.goto('/status');
+  await expect(page.getByRole('heading', { name: /Setup\s+check/i })).toBeVisible();
+  await expect(page.getByText('Everything checked is working')).toBeVisible();
+  await expect(page.getByText('there is no Firebase to check')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Copy report' })).toBeEnabled();
+  await page.goto('/admin/login');
+  await expect(page.getByRole('link', { name: 'Setup check' })).toBeVisible();
+});

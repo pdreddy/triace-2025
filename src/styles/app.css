@@ -1464,3 +1464,17 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
 .pick-form .field { margin: 0; }
 
 @media (max-width: 760px) { .partners-screen .segmented button { font-size: 13px; letter-spacing: .02em; padding-inline: 4px; white-space: nowrap; } }
+
+/* Setup check */
+.status-summary { margin: 0 0 14px; padding: 12px 16px; border-radius: var(--r); font-weight: 800; letter-spacing: .04em; text-transform: uppercase; border: 1px solid var(--line-2); background: #ffffff0a; }
+.status-summary.ok { color: var(--good); border-color: #7ee08a77; }
+.status-summary.warn { color: #f6c93b; border-color: #f6c93b77; }
+.status-summary.fail { color: #ff8a6b; border-color: #ff8a6b88; }
+.status-list { display: grid; gap: 8px; margin: 0 0 18px; padding: 0; list-style: none; }
+.status-list li { display: flex; gap: 12px; padding: 10px 14px; border-radius: var(--r); border: 1px solid var(--line); background: #ffffff08; }
+.status-list li b { flex: none; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; font-size: 14px; color: var(--ink); background: var(--muted); }
+.status-list li.ok b { background: var(--good); } .status-list li.warn b { background: #f6c93b; } .status-list li.fail b { background: #ff8a6b; }
+.status-list li div { display: grid; gap: 2px; min-width: 0; }
+.status-list li span { color: var(--soft); font-size: 13.5px; overflow-wrap: anywhere; }
+.status-list li em { font-style: normal; font-size: 13.5px; color: #f6c93b; overflow-wrap: anywhere; }
+.status-list li.fail em { color: #ffb4a0; }

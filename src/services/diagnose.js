@@ -8,3 +8,21 @@ export function diagnose(message = '') {
   if (/network|offline|failed to fetch|ERR_|timeout/i.test(text)) return 'The browser could not reach Firebase. Check the connection, a blocker or firewall, and that the database URL in the build is correct.';
   return 'Open the browser console (F12 → Console) for the full error.';
 }
+
+// ---- Live setup check (the /status page) ----
+// What a callable function's answer to an empty request says about whether it is deployed.
+export function classifyCallable(code = '') {
+  const c = String(code).replace(/^functions\//, '');
+  if (!c) return { status: 'ok', detail: 'answers' };
+  if (['unauthenticated', 'permission-denied', 'failed-precondition', 'invalid-argument', 'already-exists', 'aborted'].includes(c)) return { status: 'ok', detail: 'deployed (it refused the empty test request, as it should)' };
+  if (c === 'not-found') return { status: 'fail', detail: 'not deployed', fix: 'Deploy the functions: ./deploy.sh --no-hosting' };
+  return { status: 'fail', detail: `error: ${c}`, fix: 'The function exists but failed. Open Firebase Console → Functions → Logs and look at the latest error. Check the project is on the Blaze plan.' };
+}
+// What the answer to a sign-in with an account that does not exist says about the Email/Password provider.
+export function classifyPasswordProbe(code = '') {
+  if (['auth/invalid-credential', 'auth/user-not-found', 'auth/wrong-password', 'auth/invalid-email'].includes(code)) return { status: 'ok', detail: 'Email/Password sign-in is on' };
+  if (code === 'auth/operation-not-allowed') return { status: 'fail', detail: 'Email/Password sign-in is off', fix: 'Firebase Console → Authentication → Sign-in method → turn on Email/Password. Admin and captain sign-in need it.' };
+  if (code === 'auth/too-many-requests') return { status: 'warn', detail: 'Firebase is limiting sign-in attempts from this network right now', fix: 'Wait a few minutes and run the check again.' };
+  return { status: 'warn', detail: `unexpected answer: ${code || 'none'}` };
+}
+export const STATUS_ICON = { ok: '✓', fail: '✗', warn: '!', running: '…' };

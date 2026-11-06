@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Message } from './UI';
 import { bundledSeason1, season1Source } from '../data/seasons.js';
 
@@ -31,6 +32,7 @@ export default function FirebasePanel({ service, data }) {
         <Row label="Season 1 path"><code>{info.season1Path || '—'}</code></Row>
         <Row label="Season 1 source">{source === 'firebase' ? `Firebase · ${matches(live)} matches` : `Bundled snapshot · ${matches(bundledSeason1())} matches (not in Firebase yet)`}</Row>
       </dl>
+      <p className="small"><Link to="/status">Run the live setup check →</Link> (database rules, sign-in methods, deployed functions)</p>
       <div className="card-actions">
         <button className="secondary" type="button" disabled={busy} onClick={importSeason1}>{busy ? 'Saving…' : source === 'firebase' ? 'Replace Season 1 in Firebase' : 'Copy Season 1 into Firebase'}</button>
       </div>

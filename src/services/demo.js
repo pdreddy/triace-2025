@@ -14,6 +14,7 @@ export function createDemoService() {
     mode: 'Local demo',
     info: { projectId: 'local demo (no Firebase)', root: 'in-memory demo state', season1Path: 'in-memory demo state', emulators: false, demo: true },
     subscribePublic: (callback, error) => poll('public', callback, error),
+    async runChecks(report) { report({ id: 'demo', label: 'Demo mode', status: 'ok', detail: 'This is the local demo: there is no Firebase to check. Open this page on the live site.' }); },
     subscribeConnection(callback) { callback(true); return () => {}; },
     subscribeAuth(callback, error) { authListeners.add(callback); refreshAuth().catch(error); return () => authListeners.delete(callback); },
     subscribePrivate: (callback, error) => poll('registrations', callback, error),

@@ -46,6 +46,8 @@ All of this is in the browser, on the **Admin** page (sign in at `/admin/login`)
 
 > **Registration safeguards:** one browser can register at most 3 teams (ask the admin for more). If a captain login cannot be created (for example Email/Password is switched off), the team is still registered with a "login pending" note and the admin creates the login later with **Reset login** on the team card. Teams without a login show "not created yet" there.
 
+> **Quickest way to see what is wrong on the live site:** open `/status` (also linked from the admin sign-in page and from Admin → Firebase & data paths). It checks the database rules, Anonymous and Email/Password sign-in, every function, and the account in this browser, and shows the fix for anything that fails. **Copy report** gives you text to paste.
+
 ## 1. Firebase project (needs your Firebase account)
 
 - [ ] Realtime Database enabled; Authentication → **Email/Password** and **Anonymous** enabled.

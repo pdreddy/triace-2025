@@ -8,6 +8,7 @@ const PAGES = [
   ['/players', /./],
   ['/champions', /./],
   ['/partners', /./],
+  ['/status', /./],
   ['/history', /./],
   ['/history/s1', /./],
   ['/team/any-team', /./],

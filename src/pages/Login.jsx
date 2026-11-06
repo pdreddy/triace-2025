@@ -19,7 +19,7 @@ export default function Login() {
   }
 
   return (
-    <AuthCard eyebrow="Admin" title="Sign in" intro="Manage registrations, tiers and the league." footer={<>Captain of a team? <Link to="/captain">Captain sign in</Link></>}>
+    <AuthCard eyebrow="Admin" title="Sign in" intro="Manage registrations, tiers and the league." footer={<>Captain of a team? <Link to="/captain">Captain sign in</Link> · Trouble signing in? <Link to="/status">Setup check</Link></>}>
       <form className="auth-form" onSubmit={submit} aria-label="Admin sign in">
         <Field id="username" name="username" label="Username or email" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck="false" value={username} onChange={e => setUsername(e.target.value)} required />
         <Field id="password" name="password" label="Password" type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} required />

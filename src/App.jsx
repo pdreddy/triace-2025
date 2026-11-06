@@ -21,6 +21,7 @@ const History = lazy(() => import('./pages/History'));
 const Champions = lazy(() => import('./pages/Champions'));
 const CaptainLogin = lazy(() => import('./pages/CaptainLogin'));
 const Partners = lazy(() => import('./pages/Partners'));
+const Status = lazy(() => import('./pages/Status'));
 
 const FRIENDLY_ERROR = 'We can’t reach the tournament right now. Please check your connection and try again shortly.';
 const SCREENS = { '/': 'rules', '/register': 'register', '/tiers': 'tiers', '/league': 'league', '/players': 'players', '/champions': 'champions', '/partners': 'partners', '/admin/login': 'login', '/captain': 'login', '/admin': 'admin' };
@@ -93,6 +94,7 @@ function Layout() {
             <summary>Technical details (for the tournament admin)</summary>
             <p><code>{error}</code></p>
             <p><strong>Likely fix:</strong> {diagnose(error)}</p>
+            <p><Link to="/status">Run the full setup check →</Link></p>
           </details>
         )}
         <Suspense fallback={<div className="page-loading" aria-busy="true"><span className="spinner" /> Loading…</div>}>
@@ -105,6 +107,7 @@ function Layout() {
             <Route path="/players" element={<Players />} />
             <Route path="/player/:teamId/:role" element={<Player />} />
             <Route path="/partners" element={<Partners />} />
+            <Route path="/status" element={<Status />} />
             <Route path="/captain" element={<CaptainLogin />} />
             <Route path="/champions" element={<Champions />} />
             <Route path="/history" element={<History />} />
