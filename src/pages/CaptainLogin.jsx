@@ -32,8 +32,8 @@ export default function CaptainLogin() {
   return (
     <AuthCard eyebrow="Captains" title="Team sign in" intro="Use the username and password you saved when your team registered." footer={<>Lost your login? Ask the tournament admin to reset it. Admin? <Link to="/admin/login">Admin sign in</Link></>}>
       <form className="auth-form" onSubmit={submit} aria-label="Captain sign in">
-        <Field id="captain-username" name="username" label="Username" placeholder="e.g. arjun-k7q2" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck="false" value={username} onChange={e => setUsername(e.target.value)} required />
-        <Field id="captain-password" name="password" label="Password (8 characters)" type="password" placeholder="e.g. k7q2m9xp" maxLength={16} autoComplete="current-password" autoCapitalize="none" autoCorrect="off" spellCheck="false" value={password} onChange={e => setPassword(e.target.value)} required />
+        <Field id="captain-username" name="username" label="Username" placeholder="e.g. arjuraj" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck="false" value={username} onChange={e => setUsername(e.target.value)} required />
+        <Field id="captain-password" name="password" label="Password" type="password" placeholder="e.g. ranarj4172" maxLength={16} autoComplete="current-password" autoCapitalize="none" autoCorrect="off" spellCheck="false" value={password} onChange={e => setPassword(e.target.value)} required />
         <Message error>{error}</Message>
         <button className="button block" disabled={busy || !username.trim() || !password.trim()}>{busy ? 'Signing in…' : 'Sign in'} <Icon name="arrow" size={18} /></button>
       </form>

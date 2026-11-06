@@ -3,10 +3,10 @@
 // Dependencies are passed in so the flow can be tested without Firebase.
 import { captainUid } from './captainAccount.js';
 
-export async function runRegistration({ teamId, firstName, createAccount, deleteAccount, register, log = () => {} }) {
+export async function runRegistration({ teamId, names, createAccount, deleteAccount, register, log = () => {} }) {
   const uid = captainUid(teamId);
   let login = null, loginFailed = false;
-  try { login = await createAccount(uid, firstName); }
+  try { login = await createAccount(uid, names); }
   catch (error) {
     if (error?.code !== 'auth/uid-already-exists') { loginFailed = true; log(error); }   // already exists = a repeat of the same request
   }

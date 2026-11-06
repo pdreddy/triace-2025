@@ -87,14 +87,21 @@ export function listedTiers(combinedUtr, config, selectedTier) {
   return assigned ? selectedTier === 'both' ? ['goat', 'rising'] : [assigned] : [];
 }
 function player(value, captain, settings, gapLimit) {
-  exact(value, [captain ? 'firstName' : 'fullName', 'singlesUtr', 'doublesUtr'], 'Invalid player fields.');
+  // The captain may also give a last name (private; used to build the captain's login). It is optional so older pages keep working.
+  const withLastName = captain && value && typeof value === 'object' && Object.hasOwn(value, 'lastName');
+  exact(value, [captain ? 'firstName' : 'fullName', 'singlesUtr', 'doublesUtr', ...(withLastName ? ['lastName'] : [])], 'Invalid player fields.');
   const key = captain ? 'firstName' : 'fullName';
   const label = captain ? 'Captain first name' : 'Ace full name';
   const clean = name(value[key], label, captain ? 40 : 80);
   if (captain) assert(!/\s/.test(clean), 'Enter only the captain’s first name, without a surname.');
   assert(integer(value.singlesUtr, settings.minPlayerUtr, settings.maxPlayerUtr), `${label}: UTR must be ${formatUtr(settings.minPlayerUtr)}–${formatUtr(settings.maxPlayerUtr)}.`);
   assert(value.doublesUtr === null || integer(value.doublesUtr, settings.minPlayerUtr, settings.maxPlayerUtr), `${label}: optional doubles UTR must be within the individual limits.`);
-  return { [key]: clean, singlesUtr: value.singlesUtr, doublesUtr: value.doublesUtr, utr: playerUtr(value.singlesUtr, value.doublesUtr, gapLimit) };
+  let lastName;
+  if (withLastName) {
+    lastName = name(value.lastName, 'Captain last name', 40);
+    assert(/^[\p{L}][\p{L} .'’-]*$/u.test(lastName), 'Use letters only for the captain’s last name.');
+  }
+  return { [key]: clean, ...(lastName ? { lastName } : {}), singlesUtr: value.singlesUtr, doublesUtr: value.doublesUtr, utr: playerUtr(value.singlesUtr, value.doublesUtr, gapLimit) };
 }
 export function validateRegistration(payload, settings, tiers, gapLimit = UTR_GAP_LIMIT) {
   validateSettings(settings); validateTierConfig(tiers);
@@ -182,9 +189,9 @@ export function applyRecalculation(current) {
   return { state, result: summary };
 }
 export function registrationsCsv(teams, tiers, { captainOnly = false } = {}) {
-  const columns = ['Team ID', 'Captain first name', 'Captain WhatsApp', 'Captain UTR', 'Ace 1 full name', 'Ace 1 WhatsApp', 'Ace 1 UTR', 'Ace 2 full name', 'Ace 2 WhatsApp', 'Ace 2 UTR', 'Combined UTR', 'Selected tier', 'Assigned tier', 'Registered at'];
+  const columns = ['Team ID', 'Captain first name', 'Captain WhatsApp', 'Captain UTR', 'Ace 1 full name', 'Ace 1 WhatsApp', 'Ace 1 UTR', 'Ace 2 full name', 'Ace 2 WhatsApp', 'Ace 2 UTR', 'Combined UTR', 'Selected tier', 'Assigned tier', 'Registered at', 'Captain last name'];
   const cell = value => { let text = String(value ?? ''); if (/^[\s]*[=+@-]/.test(text)) text = "'" + text; return '"' + text.replaceAll('"', '""') + '"'; };
-  const rows = Object.values(teams || {}).map(t => [t.teamId, t.captain.firstName, t.whatsappPhone || '', formatUtr(t.captain.utr), t.ace1.fullName, t.ace1Phone || '', formatUtr(t.ace1.utr), t.ace2.fullName, t.ace2Phone || '', formatUtr(t.ace2.utr), formatUtr(t.combinedUtr), tiers[t.selectedTier]?.name || t.selectedTier, tiers[t.assignedTier]?.name || 'Unassigned', new Date(t.registeredAt).toISOString()]);
+  const rows = Object.values(teams || {}).map(t => [t.teamId, t.captain.firstName, t.whatsappPhone || '', formatUtr(t.captain.utr), t.ace1.fullName, t.ace1Phone || '', formatUtr(t.ace1.utr), t.ace2.fullName, t.ace2Phone || '', formatUtr(t.ace2.utr), formatUtr(t.combinedUtr), tiers[t.selectedTier]?.name || t.selectedTier, tiers[t.assignedTier]?.name || 'Unassigned', new Date(t.registeredAt).toISOString(), t.captain.lastName || '']);
   // Captain-only exports drop both Aces (name, WhatsApp, UTR): columns 4–9.
   const keep = (row) => (captainOnly ? row.filter((_, i) => i < 4 || i > 9) : row);
   return [columns, ...rows].map(row => keep(row).map(cell).join(',')).join('\r\n');

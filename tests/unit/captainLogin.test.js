@@ -1,50 +1,82 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ALPHABET, PASSWORD_LENGTH, newUsername, newPassword, newLogin, captainUid, loginEmail, isCaptainEmail, usernameFrom, normalizePassword, isCaptainPassword, LOGIN_DOMAIN } from '../../functions/lib/captainLogin.js';
+import { letters, usernameBase, usernameAttempt, newPassword, newLogin, loginNames, captainUid, loginEmail, isCaptainEmail, usernameFrom, normalizePassword, isCaptainPassword, PASSWORD_LENGTH, LOGIN_DOMAIN } from '../../functions/lib/captainLogin.js';
+import { validateRegistration, DEFAULT_SETTINGS, DEFAULT_TIERS } from '../../functions/lib/tournament.js';
 
-test('usernames come from the captain’s name and a short random suffix', () => {
-  assert.match(newUsername('Arjun'), /^arjun-[a-z2-9]{4}$/);
-  assert.match(newUsername('José R.'), /^joser-[a-z2-9]{4}$/);       // accents and punctuation dropped
-  assert.match(newUsername('   '), /^captain-[a-z2-9]{4}$/);
-  assert.match(newUsername(null), /^captain-[a-z2-9]{4}$/);
-  assert.match(newUsername('A'.repeat(40)), /^a{12}-[a-z2-9]{4}$/);
-  assert.equal(/[ilo01]/.test(newUsername('x').split('-')[1]), false, 'no look-alike characters');
+const arjun = { firstName: 'Arjun', lastName: 'Rana', ace2Name: 'Raj Mehta' };
+
+test('the username is the first 4 letters of the captain’s first name plus the first 3 letters of Ace 2', () => {
+  assert.equal(usernameBase(arjun), 'arjuraj');
+  assert.equal(usernameBase({ firstName: 'Bala', ace2Name: 'Chetan Iyer' }), 'balache');
+  assert.equal(usernameBase({ firstName: 'Anna-Marie', ace2Name: 'Sam' }), 'annasam');       // punctuation dropped
+  assert.equal(usernameBase({ firstName: 'José', ace2Name: 'Zoë Kim' }), 'josezoe');          // accents folded
 });
 
-test('passwords are exactly 8 characters from an alphabet without look-alikes', () => {
-  assert.equal(PASSWORD_LENGTH, 8);
-  assert.equal(ALPHABET.length, 31);
-  assert.equal(/[ilo01]/.test(ALPHABET), false);
-  for (let i = 0; i < 200; i++) { const password = newPassword(); assert.equal(password.length, 8); assert.match(password, /^[a-z2-9]{8}$/); assert.ok(isCaptainPassword(password)); }
-  assert.ok(new Set(Array.from({ length: 300 }, () => newPassword())).size > 295, 'passwords do not repeat');
-  assert.ok(newPassword().length >= 6, 'long enough for Firebase Authentication (minimum 6)');
+test('short or missing names are padded so a username always exists', () => {
+  assert.equal(usernameBase({ firstName: 'Al', ace2Name: 'Bo' }), 'alxxbox');
+  assert.equal(usernameBase({ firstName: '', ace2Name: '' }), 'xxxxxxx');
+  assert.equal(usernameBase({}), 'xxxxxxx');
+  assert.equal(usernameBase(undefined), 'xxxxxxx');
+  assert.equal(letters('  O’Neil ', 3), 'one');
+  assert.equal(letters('李', 3), 'xxx');
 });
 
-test('the password check rejects anything that is not 8 look-alike-free characters', () => {
-  for (const bad of ['', 'short', 'toolongpassword', 'k7q2m9x', 'k7q2m9xpp', 'K7Q2M9XP', 'k7q2-m9x', 'k7q2m9x0', 'k7q2m9xl', null, undefined]) assert.equal(isCaptainPassword(bad), false, String(bad));
-  assert.equal(isCaptainPassword('k7q2m9xp'), true);
+test('a taken username gets a number', () => {
+  assert.deepEqual([0, 1, 2, 3].map(attempt => usernameAttempt(arjun, attempt)), ['arjuraj', 'arjuraj2', 'arjuraj3', 'arjuraj4']);
 });
 
-test('typing is forgiven: capitals, spaces and hyphens do not matter', () => {
-  assert.equal(normalizePassword('K7q2 M9xp'), 'k7q2m9xp');          // a phone capitalises the first letter
-  assert.equal(normalizePassword(' k7q2-m9xp '), 'k7q2m9xp');
+test('the password is the first 3 letters of the last name, the first 3 of the first name, and 4 random digits', () => {
+  assert.equal(PASSWORD_LENGTH, 10);
+  for (let i = 0; i < 100; i++) { const password = newPassword(arjun); assert.match(password, /^ranarj\d{4}$/); assert.ok(isCaptainPassword(password)); }
+  assert.equal(newPassword(arjun, () => 4), 'ranarj4444');
+  assert.equal(newPassword({ firstName: 'José', lastName: 'Núñez' }, () => 7), 'nunjos7777');
+  assert.equal(newPassword({ firstName: 'Al', lastName: 'Li' }, () => 0), 'lixalx0000');         // padded
+  assert.equal(newPassword({ firstName: 'Arjun' }, () => 1), 'triarj1111', 'no last name given (an older page): a fixed prefix');
+  const digits = new Set(Array.from({ length: 300 }, () => newPassword(arjun).slice(6)));
+  assert.ok(digits.size > 250, 'the digits are random');
+});
+
+test('the password check accepts only the pattern: 6 letters then 4 digits', () => {
+  for (const good of ['ranarj4172', 'abcdef0000']) assert.equal(isCaptainPassword(good), true, good);
+  for (const bad of ['', 'ranarj417', 'ranarj41722', 'RANARJ4172', 'ranar4172', 'ranarj#4172', 'ranarj41a2', null, undefined]) assert.equal(isCaptainPassword(bad), false, String(bad));
+});
+
+test('typing is forgiven: capitals, spaces, hyphens and a #', () => {
+  assert.equal(normalizePassword('Ranarj4172'), 'ranarj4172');          // a phone capitalises the first letter
+  assert.equal(normalizePassword(' ranarj #4172 '), 'ranarj4172');
+  assert.equal(normalizePassword('RAN-ARJ-4172'), 'ranarj4172');
   assert.equal(normalizePassword(undefined), '');
-  assert.ok(isCaptainPassword(normalizePassword('K7Q2 M9XP')));
+  assert.ok(isCaptainPassword(normalizePassword('Ran Arj 4172')));
 });
 
 test('a login is derived deterministically from the team and the username', () => {
-  const { username, password } = newLogin('Arjun');
-  assert.ok(username && password.length === 8);
+  const { username, password } = newLogin(arjun);
+  assert.equal(username, 'arjuraj');
+  assert.match(password, /^ranarj\d{4}$/);
+  assert.equal(newLogin(arjun, undefined, 1).username, 'arjuraj2');
   assert.equal(captainUid('team_abcdefghijklmnop'), 'cap_team_abcdefghijklmnop');
-  assert.equal(loginEmail(' Arjun-K7Q2 '), `arjun-k7q2@${LOGIN_DOMAIN}`);
-  assert.equal(usernameFrom(loginEmail('arjun-k7q2')), 'arjun-k7q2');
+  assert.equal(loginEmail(' ArjuRaj '), `arjuraj@${LOGIN_DOMAIN}`);
+  assert.equal(usernameFrom(loginEmail('arjuraj')), 'arjuraj');
   assert.ok(isCaptainEmail(loginEmail('x')));
   assert.equal(isCaptainEmail('reddi2026@traice.local'), false, 'the admin address is not a captain');
   assert.equal(isCaptainEmail(undefined), false);
 });
 
-test('a fixed random source gives a fixed login (the generator is the only source of randomness)', () => {
-  const rand = max => max - 1;
-  assert.equal(newUsername('Bob', rand), 'bob-9999');
-  assert.equal(newPassword(rand), '99999999');
+test('the names come from a registration payload or a saved registration', () => {
+  assert.deepEqual(loginNames({ captain: { firstName: 'Arjun', lastName: 'Rana' }, ace2: { fullName: 'Raj Mehta' } }), arjun);
+  assert.deepEqual(loginNames({ captain: { firstName: 'Arjun' } }), { firstName: 'Arjun', lastName: undefined, ace2Name: undefined });
+  assert.deepEqual(loginNames(undefined), { firstName: undefined, lastName: undefined, ace2Name: undefined });
+});
+
+const payload = captain => ({ teamId: 'team_abcdefghijklmnop', whatsappPhone: '+15550000001', ace1Phone: '+15550000002', ace2Phone: '+15550000003',
+  captain, ace1: { fullName: 'Ace One', singlesUtr: 600, doublesUtr: null }, ace2: { fullName: 'Raj Mehta', singlesUtr: 600, doublesUtr: null }, selectedTier: 'higher', consent: true, rulesAccepted: true });
+const check = captain => validateRegistration(payload(captain), DEFAULT_SETTINGS, DEFAULT_TIERS);
+
+test('registration takes an optional private captain last name', () => {
+  const withLast = check({ firstName: 'Arjun', lastName: ' Rana ', singlesUtr: 600, doublesUtr: null });
+  assert.equal(withLast.captain.lastName, 'Rana');
+  assert.equal(check({ firstName: 'Arjun', singlesUtr: 600, doublesUtr: null }).captain.lastName, undefined, 'older pages that send no last name still register');
+  assert.equal(check({ firstName: 'Arjun', lastName: "O'Neil-Smith", singlesUtr: 600, doublesUtr: null }).captain.lastName, "O'Neil-Smith");
+  for (const bad of ['', '   ', 'R4na', '<b>', 'x'.repeat(41), 5]) assert.throws(() => check({ firstName: 'Arjun', lastName: bad, singlesUtr: 600, doublesUtr: null }), /last name/i, String(bad));
+  assert.throws(() => check({ firstName: 'Arjun', surname: 'Rana', singlesUtr: 600, doublesUtr: null }), /Invalid player fields/);
 });

@@ -68,7 +68,7 @@ export function TeamCard({ team, tierName, tierId, rank, privateView = false, ma
     [`Captain · ${captain}`, privateView ? team.captain.utr : team.captainUtr],
     ...(captainOnly ? [] : [[ace1, privateView ? team.ace1.utr : team.ace1Utr], [ace2, privateView ? team.ace2.utr : team.ace2Utr]])
   ];
-  const detail = (label, player) => `${label}: ${player.firstName || player.fullName} · singles ${formatUtr(player.singlesUtr)}${player.doublesUtr ? ` · doubles ${formatUtr(player.doublesUtr)}` : ''}`;
+  const detail = (label, player) => `${label}: ${player.firstName || player.fullName}${player.lastName ? ` ${player.lastName}` : ''} · singles ${formatUtr(player.singlesUtr)}${player.doublesUtr ? ` · doubles ${formatUtr(player.doublesUtr)}` : ''}`;
   return (
     <article className={`team-card ${tierTone(tierId)}`}>
       <div className="team-card-top">

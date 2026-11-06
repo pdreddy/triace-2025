@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
 import path from 'node:path';
 import { initialState, publicState, applyRegistration, applyConfiguration, applyEarlyBird, applyRecalculation, applyLeagueRules, isOwner, ValidationError } from '../functions/lib/tournament.js';
 import { applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult, applyManageSeason, applySetSchedule, applyMoveFixture, applyIssueChallenge, applyUpdateTeam, applyWithdrawTeam, applySetCaptainLogin } from '../functions/lib/league.js';
-import { newLogin, newPassword, captainUid, loginEmail, normalizePassword } from '../functions/lib/captainLogin.js';
+import { newPassword, usernameAttempt, loginNames, captainUid, loginEmail, normalizePassword } from '../functions/lib/captainLogin.js';
 import { validateLegacySeason } from '../functions/lib/legacy.js';
 import { applyCreatePost, applyExpressInterest, applyClosePost } from '../functions/lib/partners.js';
 const digest = value => createHash('sha256').update(value).digest();
@@ -76,7 +76,9 @@ export function demoPlugin(env) {
         if (endpoint === '/logout') { session = newSession(); return send(200, safeUser()); }
         if (endpoint === '/register' && !session) return send(401, { error: 'Open the registration page before submitting.' });
         if (endpoint === '/register') {
-          const login = newLogin(payload?.captain?.firstName), uid = typeof payload?.teamId === 'string' ? captainUid(payload.teamId) : null;
+          const names = loginNames(payload), uid = typeof payload?.teamId === 'string' ? captainUid(payload.teamId) : null;
+          let attempt = 0; while (state.demoLogins?.[usernameAttempt(names, attempt)]) attempt++;   // arjuraj, arjuraj2 ...
+          const login = { username: usernameAttempt(names, attempt), password: newPassword(names) };
           const result = await mutate(current => {
             const outcome = applyRegistration(current, payload, session.uid, Date.now(), uid && { uid, username: login.username });
             if (outcome.result.created) outcome.state.demoLogins = { ...(outcome.state.demoLogins || {}), [login.username]: { uid, teamId: payload.teamId, ...hashPassword(login.password) } };
@@ -118,8 +120,9 @@ export function demoPlugin(env) {
         if (endpoint === '/reset-captain-login') {
           const record = state.registrations?.[payload.teamId];
           if (!record) return send(400, { error: 'That team no longer exists.' });
-          const password = newPassword(), uid = captainUid(record.teamId);
-          const username = record.captainUsername && state.demoLogins?.[record.captainUsername] ? record.captainUsername : newLogin(record.captain?.firstName).username;
+          const names = loginNames(record), password = newPassword(names), uid = captainUid(record.teamId);
+          let attempt = 0; while (state.demoLogins?.[usernameAttempt(names, attempt)]) attempt++;
+          const username = record.captainUsername && state.demoLogins?.[record.captainUsername] ? record.captainUsername : usernameAttempt(names, attempt);
           await mutate(current => {
             const outcome = record.captainUsername === username ? { state: structuredClone(current), result: {} } : applySetCaptainLogin(current, { teamId: record.teamId, uid, username });
             outcome.state.demoLogins = { ...(outcome.state.demoLogins || {}), [username]: { uid, teamId: record.teamId, ...hashPassword(password) } };

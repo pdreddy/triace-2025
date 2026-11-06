@@ -28,7 +28,7 @@ const TEAMS = [
   { captain: 'Esha', a1: 'Esha Alpha Menon', a2: 'Esha Beta Menon', utr: [500, 450, 500], tier: 'rising' }
 ].map((t, i) => ({ ...t, payload: {
   teamId: `demo-${randomUUID()}`, whatsappPhone: `+1555000${1000 + i}`, ace1Phone: `+1555000${2000 + i}`, ace2Phone: `+1555000${3000 + i}`,
-  captain: { firstName: t.captain, singlesUtr: t.utr[0], doublesUtr: null }, ace1: { fullName: t.a1, singlesUtr: t.utr[1], doublesUtr: null }, ace2: { fullName: t.a2, singlesUtr: t.utr[2], doublesUtr: null },
+  captain: { firstName: t.captain, lastName: `${t.captain}son`, singlesUtr: t.utr[0], doublesUtr: null }, ace1: { fullName: t.a1, singlesUtr: t.utr[1], doublesUtr: null }, ace2: { fullName: t.a2, singlesUtr: t.utr[2], doublesUtr: null },
   selectedTier: 'higher', consent: true, rulesAccepted: true } }));
 
 let failed = 0;
@@ -45,7 +45,7 @@ for (const team of TEAMS) {
   const browser = new Client(); await browser.call('session');                 // each team from its own browser: one browser may register only a few
   const result = await browser.call('register', team.payload);
   const { assignedTier, login } = result.json;
-  check(`${team.captain}’s team registered in ${team.tier.toUpperCase()} with a login`, result.ok && assignedTier === team.tier && /^[a-z0-9]+-[a-z2-9]{4}$/.test(login?.username || '') && /^[a-z2-9]{8}$/.test(login?.password || ''), `${result.status} ${result.text.slice(0, 120)}`);
+  check(`${team.captain}’s team registered in ${team.tier.toUpperCase()} with a login`, result.ok && assignedTier === team.tier && /^[a-z]{7}\d?$/.test(login?.username || '') && /^[a-z]{6}\d{4}$/.test(login?.password || ''), `${result.status} ${result.text.slice(0, 120)}`);
   logins.set(team.payload.teamId, login);
 }
 

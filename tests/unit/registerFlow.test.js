@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { runRegistration } from '../../functions/lib/registerFlow.js';
 import { initialState, applyRegistration, MAX_TEAMS_PER_BROWSER } from '../../functions/lib/tournament.js';
 
-const base = { teamId: 'team_abcdefghijklmnop', firstName: 'Arjun' };
+const base = { teamId: 'team_abcdefghijklmnop', names: { firstName: 'Arjun', lastName: 'Rana', ace2Name: 'Raj Mehta' } };
 const fakes = (over = {}) => {
   const calls = { created: [], deleted: [], logged: [] };
   return { calls, deps: {

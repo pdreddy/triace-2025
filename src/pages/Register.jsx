@@ -15,7 +15,7 @@ const PLAYERS = [
   { key: 'ace2', title: 'Ace 2', note: 'Full name private', label: 'Ace 2 full name', placeholder: 'Full name', max: 80, autoComplete: 'off' }
 ];
 const STEPS = ['Tier', 'Captain', 'Ace 1', 'Ace 2', 'Confirm'];
-const emptyPlayers = () => Object.fromEntries(PLAYERS.map(p => [p.key, { name: '', phone: '', singles: '', doubles: '' }]));
+const emptyPlayers = () => Object.fromEntries(PLAYERS.map(p => [p.key, { name: '', lastName: '', phone: '', singles: '', doubles: '' }]));
 // Counted rating for the live preview, using the same gap rule as the server (playerUtr).
 function rating(player, gap = UTR_GAP_LIMIT) {
   try {
@@ -98,7 +98,7 @@ export default function Register() {
     data && settings && !active.length && 'No tier is open for registration. An admin must activate a tier.',
     !user?.uid && 'Signing you in… (anonymous sign-in must be enabled in Firebase Authentication)'
   ].filter(Boolean);
-  const filled = key => !!players[key].name.trim() && !!players[key].singles;
+  const filled = key => !!players[key].name.trim() && !!players[key].singles && (key !== 'captain' || !!players.captain.lastName.trim());
   const stepDone = [true, filled('captain') && !!whatsappPhone.trim(), filled('ace1') && !!players.ace1.phone.trim(), filled('ace2') && !!players.ace2.phone.trim(), consent];
   const utrLimits = { min: (settings?.minPlayerUtr || 1) / 100, max: (settings?.maxPlayerUtr || 1650) / 100 };
 
@@ -116,7 +116,7 @@ export default function Register() {
     setError(''); setSuccess(null);
     try {
       const payload = { teamId: id.current, whatsappPhone, ace1Phone: players.ace1.phone, ace2Phone: players.ace2.phone, selectedTier, consent, rulesAccepted: accepted };
-      for (const [key, value] of Object.entries(players)) payload[key] = { [key === 'captain' ? 'firstName' : 'fullName']: value.name.trim(), singlesUtr: parseUtr(value.singles), doublesUtr: value.doubles.trim() ? parseUtr(value.doubles) : null };
+      for (const [key, value] of Object.entries(players)) payload[key] = { [key === 'captain' ? 'firstName' : 'fullName']: value.name.trim(), ...(key === 'captain' ? { lastName: value.lastName.trim() } : {}), singlesUtr: parseUtr(value.singles), doublesUtr: value.doubles.trim() ? parseUtr(value.doubles) : null };
       validateRegistration(payload, settings, config, gap);
       setBusy(true);
       setSuccess({ ...(await service.register(payload)), captainName: payload.captain.firstName });
@@ -172,6 +172,7 @@ export default function Register() {
               <section key={p.key} className={`step-panel card${step === i + 1 ? ' on' : ''}`}>
                 <div className="card-head"><h2><span className="player-num">0{i + 1}</span>{p.title}</h2><span className="pill">{p.note}</span></div>
                 <Field id={`${p.key}-name`} label={p.label} value={players[p.key].name} onChange={e => change(p.key, 'name', e.target.value)} required maxLength={p.max} autoComplete={p.autoComplete} placeholder={p.placeholder} />
+                {p.key === 'captain' && <Field id="captain-lastname" label="Captain last name (private)" value={players.captain.lastName} onChange={e => change('captain', 'lastName', e.target.value)} required maxLength={40} autoComplete="family-name" placeholder="Last name" hint="Never shown publicly. It is used to create your team login." />}
                 {p.key === 'captain' && <Field id="captain-whatsapp" label="Captain WhatsApp number (private)" type="tel" inputMode="tel" autoComplete="tel" placeholder="+15551234567" hint="Include country code. This is visible to the team owner and admin, never on public pages." value={whatsappPhone} onChange={e => setWhatsappPhone(e.target.value)} required maxLength={25} />}
                 {p.key !== 'captain' && <Field id={`${p.key}-whatsapp`} label={`${p.title} WhatsApp number (private)`} type="tel" inputMode="tel" autoComplete="off" placeholder="+15551234567" hint="Include country code. This is visible to the team owner and admin, never on public pages." value={players[p.key].phone} onChange={e => change(p.key, 'phone', e.target.value)} required maxLength={25} />}
                 <div className="ratings">

@@ -1449,3 +1449,7 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
 }
 @container topbar (max-width: 1050px) { .topbar-inner { gap: 12px; } }
 @media (min-width: 761px) and (max-width: 900px) { .brand b { display: none; } }
+
+.credential-card .pattern-note { margin: 0; color: var(--soft); }
+.credential-card .pattern-note b { color: #fff; }
+.credential-card output.password { letter-spacing: .12em; }

@@ -20,12 +20,13 @@ export default function LoginCard({ login, teamLabel, title = 'Your team login' 
         <div><dt>Username</dt><dd><output className="mono" aria-label="Username">{login.username}</output><button type="button" className="secondary small" onClick={() => copy('Username copied', login.username)}>Copy</button></dd></div>
         <div><dt>Password</dt><dd><output className="mono password" aria-label="Password">{login.password}</output><button type="button" className="secondary small" onClick={() => copy('Password copied', login.password)}>Copy</button></dd></div>
       </dl>
+      <p className="small pattern-note"><b>How it’s built:</b> username = first 4 letters of your first name + first 3 letters of Ace 2’s name. Password = first 3 letters of your last name + first 3 letters of your first name + 4 digits.</p>
       <div className="credential-actions">
         <button type="button" className="secondary small" onClick={() => copy('Username and password copied', loginText(login, teamLabel))}><Icon name="copy" size={16} /> Copy both</button>
         <button type="button" className="secondary small" onClick={download}><Icon name="download" size={16} /> Download</button>
         <button type="button" className="secondary small" onClick={() => window.print()}>Print</button>
       </div>
-      <p className="small" role="status">{copied || 'Save it now: the password (8 characters) is shown only once and can’t be looked up later. If it’s lost, the admin can reset it.'}</p>
+      <p className="small" role="status">{copied || 'Save it now. If it’s lost, the admin can reset it.'}</p>
     </div>
   );
 }
