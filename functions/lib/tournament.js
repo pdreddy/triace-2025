@@ -15,14 +15,17 @@ export function playerUtr(singlesUtr, doublesUtr = null, gapLimit = UTR_GAP_LIMI
 }
 // League rules the admin can change. Missing values (older saved data) fall back to these defaults.
 export const DEFAULT_LEAGUE_RULES = {
-  utrGapLimit: 175, pointsPerWin: 2, playoffThreshold: 7, playoffSpotsLarge: 4, playoffSpotsSmall: 3, singlesMinPercent: 40,
+  utrGapLimit: 175, pointsPerWin: 2, playoffThreshold: 7, playoffSpotsLarge: 4, playoffSpotsSmall: 3, singlesMinPercent: 25,
   // Challenge rule (provisional): a team in challengerFrom–challengerTo may challenge one in targetFrom–targetTo once,
   // before the last challengeCutoffRounds rounds; a challenger win swaps the two places in the table.
   challengeEnabled: true, challengerFrom: 5, challengerTo: 6, targetFrom: 2, targetTo: 4, challengeCutoffRounds: 3
 };
 // A registration belongs to the browser that created it and to the captain's login account (owners).
 export const isOwner = (registration, uid) => !!registration && !!uid && (registration.ownerUid === uid || registration.owners?.[uid] === true);
-export const rulesOf = state => ({ ...DEFAULT_LEAGUE_RULES, ...(state?.leagueRules || {}) });
+// Each encounter has ONE singles match and a team has three players, so they share the singles days: every player can reach
+// at most a third of them. A higher minimum cannot be met by every player, so it is never allowed (and never applied if one was saved earlier).
+export const MAX_SINGLES_PERCENT = 33;
+export const rulesOf = state => { const rules = { ...DEFAULT_LEAGUE_RULES, ...(state?.leagueRules || {}) }; return { ...rules, singlesMinPercent: Math.min(rules.singlesMinPercent, MAX_SINGLES_PERCENT) }; };
 export const DEFAULT_SEASON_NAME = `${new Date().getFullYear()} season`;
 export function parseUtr(value) {
   const text = String(value ?? '').trim();
@@ -189,7 +192,7 @@ export function validateLeagueRules(value) {
   assert(integer(value.pointsPerWin, 1, 10), 'Points per encounter win must be 1–10.');
   assert(integer(value.playoffThreshold, 2, 64), 'The playoff team threshold must be 2–64.');
   assert(integer(value.playoffSpotsSmall, 2, 4) && integer(value.playoffSpotsLarge, 2, 4), 'Playoff spots must be 2, 3 or 4.');
-  assert(integer(value.singlesMinPercent, 0, 100), 'The singles minimum must be 0–100%.');
+  assert(integer(value.singlesMinPercent, 0, MAX_SINGLES_PERCENT), `The singles minimum must be 0–${MAX_SINGLES_PERCENT}%. Every encounter has one singles match shared by three players, so a higher minimum cannot work for everyone (25% is recommended).`);
   assert(typeof value.challengeEnabled === 'boolean', 'Turn the challenge rule on or off.');
   for (const key of ['challengerFrom', 'challengerTo', 'targetFrom', 'targetTo']) assert(integer(value[key], 1, 64), 'Challenge positions must be 1–64.');
   assert(value.challengerFrom <= value.challengerTo && value.targetFrom <= value.targetTo && value.targetTo < value.challengerFrom, 'Challengers must sit below the teams they can challenge.');

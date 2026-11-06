@@ -5,7 +5,7 @@ import { EmptyState, Message, Stat, tierTone } from '../components/UI';
 import { CaptainSignIn, TeamEditForm } from '../components/TeamTools';
 import { FixtureCard, teamIndex, teamName, playerName } from '../components/League';
 import { Icon } from '../components/Icons';
-import { orderedTiers, formatUtr } from '../../functions/lib/tournament.js';
+import { orderedTiers, formatUtr, DEFAULT_LEAGUE_RULES } from '../../functions/lib/tournament.js';
 import { standings, playerId, singlesEligibility, ROLES } from '../../functions/lib/league.js';
 import { useRatings } from './Players';
 
@@ -79,7 +79,7 @@ export default function Team() {
           <div className="tier-head"><div><h2>{tier.name} fixtures</h2>{row && <span>Form {row.form.join(' ') || '—'} · {row.matchesWon}–{row.matchesLost} matches</span>}</div></div>
           {!fixtures.length && <EmptyState icon="calendar" title="No fixtures yet." />}
           {fixtures.length > 0 && (() => {
-            const check = singlesEligibility(teamId, data.fixtures?.[tier.id], data.leagueRules), pct = data.leagueRules?.singlesMinPercent ?? 40;
+            const check = singlesEligibility(teamId, data.fixtures?.[tier.id], data.leagueRules), pct = data.leagueRules?.singlesMinPercent ?? DEFAULT_LEAGUE_RULES.singlesMinPercent;
             return (
               <div className="singles-check">
                 <p className="small">Singles minimum: {pct}% of {check.matchDays} match days = <strong>{check.required}</strong> singles days each{check.left ? ` · ${check.left} match days left` : ''}.</p>

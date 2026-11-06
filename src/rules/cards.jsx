@@ -157,7 +157,7 @@ export function ruleCards(tierConfig = DEFAULT_TIERS, rules = DEFAULT_LEAGUE_RUL
         <div className="rule-grid two">
           <div className="rule-box center">
             <Ring percent={pct} label="singles days" />
-            <p className="rule-text">Every player must play <strong>singles</strong> on at least {pct}% of the team’s scheduled match days, <strong>rounded down</strong>.</p>
+            <p className="rule-text">Every player must play <strong>singles</strong> on at least {pct}% of the team’s scheduled match days, <strong>rounded down</strong>. Each encounter has one singles match, so the three players share them.</p>
             <div className="calc"><span><b>8</b>match days</span><Icon name="arrow" size={16} /><span><b>{((8 * pct) / 100).toFixed(1)}</b>{pct}%</span><Icon name="arrow" size={16} /><span className="win"><b>{exampleNeed}</b>singles days</span></div>
           </div>
           <div className="rule-box">

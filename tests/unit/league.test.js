@@ -197,7 +197,7 @@ test('singles minimum counts singles days against the share of scheduled match d
   assert.equal(mine.length, 5);
   for (const f of mine.slice(0, 3)) state = applySubmitResult(state, { tierId: 'goat', fixtureId: f.id, matches: result('home', 'home', 'home'), lineups: { home: { d1: ['ace1', 'ace2'], d2Partner: 'ace2' }, away: { d1: ['ace1', 'ace2'], d2Partner: 'ace2' } } }, 'admin', true).state;
   const check = singlesEligibility(teamId, state.fixtures.goat);
-  assert.deepEqual([check.matchDays, check.required, check.left], [5, 2, 2]);
+  assert.deepEqual([check.matchDays, check.required, check.left], [5, 1, 2]);
   assert.deepEqual(check.players.ace1, { days: 3, met: true, possible: true }, 'ace1 is left out of Doubles 2 and plays every singles');
   assert.deepEqual(check.players.captain, { days: 0, met: false, possible: true });
   assert.equal(singlesEligibility(teamId, state.fixtures.goat, { ...DEFAULT_LEAGUE_RULES, singlesMinPercent: 100 }).players.captain.possible, false);
@@ -326,4 +326,30 @@ test('a captain login owns the team on any device, survives recalculation, and t
   assert.deepEqual(given.teamsByOwner.cap_x, { team_bare000000000000000: true });
   assert.throws(() => applySetCaptainLogin(bare, { teamId: 'team_gone0000000000000', uid: 'cap_y', username: 'gone-1' }), /no longer exists/);
   assert.throws(() => applySetCaptainLogin(bare, { teamId: 'team_bare000000000000000', uid: '', username: '' }), /Invalid captain login/);
+});
+
+// ---- singles minimum must be satisfiable by all three players ----
+import { MAX_SINGLES_PERCENT, validateLeagueRules } from '../../functions/lib/tournament.js';
+test('the singles minimum is something every player of a three-player team can reach', () => {
+  assert.equal(MAX_SINGLES_PERCENT, 33);
+  assert.equal(DEFAULT_LEAGUE_RULES.singlesMinPercent, 25);
+  for (let percent = 0; percent <= MAX_SINGLES_PERCENT; percent++) {
+    for (let matchDays = 1; matchDays <= 40; matchDays++) {
+      const each = Math.floor((matchDays * percent) / 100);
+      assert.ok(each * 3 <= matchDays, `${percent}% of ${matchDays} match days needs ${each * 3} singles slots but there are only ${matchDays}`);
+    }
+  }
+  // the old 40% could not work: 8 match days need 3 singles days each = 9 singles matches, but there are 8
+  assert.ok(3 * Math.floor((8 * 40) / 100) > 8);
+});
+
+test('an impossible singles minimum can neither be saved nor applied', () => {
+  for (const bad of [34, 40, 50, 100]) assert.throws(() => validateLeagueRules({ ...DEFAULT_LEAGUE_RULES, singlesMinPercent: bad }), /0–33%/, `${bad}`);
+  assert.doesNotThrow(() => validateLeagueRules({ ...DEFAULT_LEAGUE_RULES, singlesMinPercent: 33 }));
+  assert.equal(rulesOf({}).singlesMinPercent, 25, 'nothing saved: the default');
+  assert.equal(rulesOf({ leagueRules: { singlesMinPercent: 40 } }).singlesMinPercent, 33, 'an older saved 40% is capped');
+  assert.equal(rulesOf({ leagueRules: { singlesMinPercent: 30 } }).singlesMinPercent, 30);
+  // a team can really meet it: 8 match days at the default needs 2 singles days each (6 of the 8 singles matches)
+  const state = league(2), id = Object.keys(state.registrations)[0];
+  assert.equal(singlesEligibility(id, state.fixtures.goat, rulesOf(state)).required, Math.floor((Object.values(state.fixtures.goat).length * 25) / 100));
 });
