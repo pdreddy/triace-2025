@@ -135,6 +135,7 @@ export function demoPlugin(env) {
           });
           return send(200, { teamId: record.teamId, username, password });
         }
+        if (endpoint === '/backup-now') { await mkdir(path.join(directory, 'backups'), { recursive: true }); const name = `backups/traice-${new Date().toISOString().replace(/[:.]/g, '-')}.json`; await writeFile(path.join(directory, name), JSON.stringify(state), { mode: 0o600 }); return send(200, { bucket: 'local demo folder', json: name, txt: name, teams: Object.keys(state.registrations || {}).length }); }
         if (endpoint === '/calendar') return send(200, await mutate(current => applyCalendar(current, payload)));
         if (endpoint === '/auto-schedule') return send(200, await mutate(current => applyAutoSchedule(current, payload)));
         if (endpoint === '/add-buffer') return send(200, await mutate(current => applyAddBuffer(current, payload)));

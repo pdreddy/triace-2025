@@ -112,3 +112,9 @@ Deploy the functions **before** the web app goes live: the first visit calls `bo
 - **Admin → Teams → Download full backup**: one JSON file with every registration (private details), fixtures, results, calendar and rules, saved on the device you are using. Do this before and after registration closes, and before every deploy.
 - **From your Mac (complete copy, including Season 1 and the partner board)**: `npm run backup` (after `gcloud auth application-default login`). It writes `backups/traice-backup-<time>.json`; the folder is git-ignored because it holds phone numbers. Keep a copy somewhere private (iCloud, Drive).
 - Also turn on Firebase's own safety net: Console → Realtime Database → Backups (daily, needs the Blaze plan).
+
+### Automatic backups (every 6 hours)
+
+The `scheduledBackup` function saves the whole tournament to your project's Cloud Storage bucket every 6 hours, as `traice-backups/traice-<time>.json` and a readable `.txt` (newest 80 of each are kept). **Admin → Teams → Back up now (cloud)** does it on demand.
+
+One-time setup: Firebase Console → **Storage → Get started** (needs the Blaze plan you already use) and keep the Storage rules closed. Deploy with `./deploy.sh --no-hosting`; the first deploy enables Cloud Scheduler. To fetch a file: Console → Storage → `traice-backups`. If "Back up now" says Storage is not set up, do the one-time step above.

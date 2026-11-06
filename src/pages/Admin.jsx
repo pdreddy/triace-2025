@@ -117,6 +117,9 @@ export default function Admin() {
     link.href = url; link.download = `traice-backup-${new Date().toISOString().slice(0, 10)}.json`; link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
+  function backupNow() {
+    return action(async () => { const r = await service.backupNow(); setMessage(`Backed up ${r.teams} team(s) to ${r.bucket}: ${r.json}`); });
+  }
   function exportText() {
     const blob = new Blob([registrationsText(teams, data?.tierConfig || {})], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob), link = document.createElement('a');
@@ -247,6 +250,7 @@ export default function Admin() {
             <button className="secondary" disabled={loading || !!readError} onClick={exportCsv}>Export private CSV ↓</button>
             <button className="secondary" disabled={loading || !!readError} onClick={exportBackup}>Download full backup ↓</button>
             <button className="secondary" disabled={loading || !!readError} onClick={exportText}>Save as text file ↓</button>
+            <button className="secondary" disabled={busy || !connected} onClick={backupNow}>Back up now (cloud)</button>
           </div>
           <label className="checkbox pane pane-teams"><input type="checkbox" checked={captainOnly} onChange={e => setCaptainOnly(e.target.checked)} /><span>Captain only: hide the other players (cards, search and export)</span></label>
           <label className="checkbox pane pane-teams"><input type="checkbox" checked={reveal} disabled={captainOnly} onChange={e => setReveal(e.target.checked)} /><span>Reveal Ace names in admin cards</span></label>

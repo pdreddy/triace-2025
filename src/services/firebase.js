@@ -147,6 +147,7 @@ export function createFirebaseService() {
       }, () => callback({}));
       return () => { off(); offs.forEach(stop => stop()); };
     },
+    backupNow: withError(async () => (await httpsCallable(functions, 'backupNow')({})).data),
     saveCalendar: withError(async payload => (await httpsCallable(functions, 'saveCalendar')(payload)).data),
     autoSchedule: withError(async payload => (await httpsCallable(functions, 'autoSchedule')(payload)).data),
     addBufferWeeks: withError(async payload => (await httpsCallable(functions, 'addBufferWeeks')(payload)).data),

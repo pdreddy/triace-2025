@@ -33,6 +33,7 @@ export function createDemoService() {
     markPartnerPicked: payload => request('partner-picked', payload),
     reopenPartnerPost: payload => request('partner-reopen', payload),
     subscribeMyPartnerPosts: (uid, callback) => poll('partner-mine', callback, () => callback({})),
+    backupNow: () => request('backup-now', {}),
     saveCalendar: payload => request('calendar', payload),
     autoSchedule: payload => request('auto-schedule', payload),
     addBufferWeeks: payload => request('add-buffer', payload),

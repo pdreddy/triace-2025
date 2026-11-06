@@ -1,6 +1,9 @@
 import { initializeApp } from 'firebase-admin/app';
 import { getDatabase } from 'firebase-admin/database';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
+import { getStorage } from 'firebase-admin/storage';
+import { registrationsText } from './lib/backupText.js';
 import { randomUUID, randomInt } from 'node:crypto';
 import { applyCreatePost, applyExpressInterest, applyClosePost, applyMarkPicked, applyReopenPost } from './lib/partners.js';
 import { applyRegistration, applyEarlyBird, applyConfiguration, applyRecalculation, applyLeagueRules, applyCalendar, bootstrapState, ValidationError } from './lib/tournament.js';
@@ -177,4 +180,38 @@ export const removeAdmin = onCall(options, async request => {
   asRefusal(() => checkRemoval(admins, uid, request.auth.uid));
   await getAuth().setCustomUserClaims(uid, { admin: false }); await getAuth().revokeRefreshTokens(uid);
   return { uid };
+});
+
+// ---------- Automatic backups ----------
+// Every 6 hours, and on demand from Admin, a copy of the whole tournament is saved to the project's Cloud Storage bucket under traice-backups/
+// (a .json with everything and a readable .txt of the registrations). The newest 80 of each are kept. Only the Admin SDK can read these files
+// unless your Storage rules say otherwise: keep the Storage rules closed (the default is "no access").
+const BACKUP_DIR = 'traice-backups', KEEP = 80;
+async function runBackup() {
+  const root = (await getDatabase().ref(paths.root).get()).val();
+  if (!root) throw new HttpsError('failed-precondition', 'There is nothing to back up yet.');
+  const season1 = paths.season1UnderRoot ? undefined : (await getDatabase().ref(paths.season1).get()).val();
+  const bucket = getStorage().bucket(), stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const json = `${BACKUP_DIR}/traice-${stamp}.json`, txt = `${BACKUP_DIR}/traice-${stamp}.txt`;
+  await bucket.file(json).save(JSON.stringify({ backedUpAt: new Date().toISOString(), rootPath: paths.root, root, season1 }, null, 2), { contentType: 'application/json' });
+  await bucket.file(txt).save(registrationsText(root.registrations, root.tierConfig), { contentType: 'text/plain; charset=utf-8' });
+  for (const ext of ['.json', '.txt']) {                       // keep the newest KEEP of each kind
+    const [files] = await bucket.getFiles({ prefix: `${BACKUP_DIR}/traice-` });
+    const old = files.map(f => f.name).filter(n => n.endsWith(ext)).sort().reverse().slice(KEEP);
+    await Promise.all(old.map(name => bucket.file(name).delete().catch(() => {})));
+  }
+  return { bucket: bucket.name, json, txt, teams: Object.keys(root.registrations || {}).length };
+}
+export const scheduledBackup = onSchedule({ schedule: 'every 6 hours', region: 'us-central1', timeoutSeconds: 120, maxInstances: 1 }, async () => {
+  try { const result = await runBackup(); console.log('Backup saved', result); }
+  catch (error) { console.error('Scheduled backup failed', { name: error.name, code: error.code, message: error.message }); throw error; }
+});
+export const backupNow = onCall(options, async request => {
+  requireAuth(request, true);
+  try { return await runBackup(); }
+  catch (error) {
+    if (error instanceof HttpsError) throw error;
+    console.error('Backup failed', { name: error.name, code: error.code, message: error.message });
+    throw new HttpsError('internal', 'The backup could not be saved. Check that Cloud Storage is set up for this project (Firebase Console → Storage → Get started).');
+  }
 });
