@@ -66,7 +66,7 @@ const tracked = git('ls-files').split('\n');
 check('no demo data or local env files are committed', !tracked.some(f => /^\.local-demo\/|\.env\.demo\.local$|\.env\.local$/.test(f)));
 check('no service-account keys are committed', !tracked.some(f => /\.json$/.test(f) && /"private_key"/.test(read(f))));
 check('the demo server is not part of the production build', !existsSync('dist/index.html') || !read('dist/index.html').includes('demo-plugin'));
-if (/Winter#2026!/.test(read('README.md'))) warn('README still lists the temporary admin password', 'create the admin with a unique password in Firebase and delete it from the README before launch');
+if (/Winter#2026!/.test(read('README.md')) || /reddi2026@traice\.local`?\s+with[^.\n]*password\s+`[^`]+`/i.test(read('README.md'))) warn('README lists an admin password', 'create the admin with a unique password in Firebase and delete it from the README before launch');
 if (!tracked.includes('functions/package-lock.json')) warn('functions/package-lock.json is not committed');
 
 console.log('\nBuild and PWA');
