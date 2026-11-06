@@ -1,10 +1,11 @@
 import { initializeApp } from 'firebase-admin/app';
 import { getDatabase } from 'firebase-admin/database';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, randomInt } from 'node:crypto';
 import { applyCreatePost, applyExpressInterest, applyClosePost, applyMarkPicked, applyReopenPost } from './lib/partners.js';
-import { applyRegistration, applyEarlyBird, applyConfiguration, applyRecalculation, applyLeagueRules, bootstrapState, ValidationError } from './lib/tournament.js';
-import { applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult, applyManageSeason, applySetSchedule, applyMoveFixture, applyIssueChallenge, applyUpdateTeam, applyWithdrawTeam, applySetCaptainLogin } from './lib/league.js';
+import { applyRegistration, applyEarlyBird, applyConfiguration, applyRecalculation, applyLeagueRules, applyCalendar, bootstrapState, ValidationError } from './lib/tournament.js';
+import { applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult, applyManageSeason, applySetSchedule, applyMoveFixture, applyIssueChallenge, applyUpdateTeam, applyWithdrawTeam, applySetCaptainLogin, applyAutoSchedule, applyAddBuffer } from './lib/league.js';
+import { adminEmail, adminUsername, validateAdminUsername, newAdminPassword, checkRemoval } from './lib/admins.js';
 import { getAuth } from 'firebase-admin/auth';
 import { usernameAttempt, newPassword, loginNames, captainUid, loginEmail } from './lib/captainLogin.js';
 import { runRegistration } from './lib/registerFlow.js';
@@ -92,6 +93,9 @@ export const closePartnerPost = onCall(options, async request => { requireAuth(r
 export const markPartnerPicked = onCall(options, async request => { requireAuth(request); return mutate(state => applyMarkPicked(state, request.data, request.auth.uid, request.auth?.token?.admin === true)); });
 export const reopenPartnerPost = onCall(options, async request => { requireAuth(request); return mutate(state => applyReopenPost(state, request.data, request.auth.uid, request.auth?.token?.admin === true)); });
 export const saveEarlyBird = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyEarlyBird(state, request.data)); });
+export const saveCalendar = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyCalendar(state, request.data)); });
+export const autoSchedule = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyAutoSchedule(state, request.data)); });
+export const addBufferWeeks = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyAddBuffer(state, request.data)); });
 export const saveLeagueRules = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyLeagueRules(state, request.data)); });
 export const manageSeason = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyManageSeason(state, request.data)); });
 const isAdmin = request => request.auth?.token?.admin === true;
@@ -124,4 +128,53 @@ export const resetCaptainLogin = onCall(options, async request => {
     await mutate(state => applySetCaptainLogin(state, { teamId, uid, username }));
   }
   return { teamId, username, password };
+});
+
+// ---------- Administrators ----------
+// An administrator is an Email/Password account (<name>@traice.local) with the `admin` claim. The password is returned once and never stored.
+async function listAdminUsers() {
+  const admins = []; let token;
+  do {
+    const page = await getAuth().listUsers(1000, token);
+    for (const user of page.users) if (user.customClaims?.admin === true) admins.push({ uid: user.uid, email: user.email || '', username: adminUsername(user.email), createdAt: Date.parse(user.metadata.creationTime) || null, lastSignIn: Date.parse(user.metadata.lastSignInTime) || null, disabled: user.disabled });
+    token = page.pageToken;
+  } while (token);
+  return admins.sort((a, b) => a.username.localeCompare(b.username));
+}
+const asRefusal = fn => { try { return fn(); } catch (error) { throw new HttpsError('failed-precondition', error.message); } };
+export const listAdmins = onCall(options, async request => {
+  requireAuth(request, true);
+  return { admins: (await listAdminUsers()).map(a => ({ ...a, you: a.uid === request.auth.uid })) };
+});
+export const createAdmin = onCall(options, async request => {
+  requireAuth(request, true);
+  const username = asRefusal(() => validateAdminUsername(request.data?.username)), password = newAdminPassword(max => randomInt(max));
+  try {
+    const user = await getAuth().createUser({ email: adminEmail(username), password, displayName: `${username} (admin)` });
+    await getAuth().setCustomUserClaims(user.uid, { admin: true });
+    return { uid: user.uid, username, password };
+  } catch (error) {
+    if (error.code === 'auth/email-already-exists') throw new HttpsError('failed-precondition', `“${username}” already has an account. Choose another name.`);
+    console.error('Admin creation failed', { code: error.code });
+    throw new HttpsError('internal', 'Could not create the admin. Please retry.');
+  }
+});
+export const resetAdminPassword = onCall(options, async request => {
+  requireAuth(request, true);
+  const uid = request.data?.uid;
+  if (typeof uid !== 'string' || !uid || uid.length > 128) throw new HttpsError('invalid-argument', 'Choose an admin.');
+  const admins = await listAdminUsers(), admin = admins.find(a => a.uid === uid);
+  if (!admin) throw new HttpsError('not-found', 'That person is not an administrator.');
+  const password = newAdminPassword(max => randomInt(max));
+  await getAuth().updateUser(uid, { password }); await getAuth().revokeRefreshTokens(uid);
+  return { uid, username: admin.username, password };
+});
+export const removeAdmin = onCall(options, async request => {
+  requireAuth(request, true);
+  const uid = request.data?.uid;
+  if (typeof uid !== 'string' || !uid || uid.length > 128) throw new HttpsError('invalid-argument', 'Choose an admin.');
+  const admins = await listAdminUsers();
+  asRefusal(() => checkRemoval(admins, uid, request.auth.uid));
+  await getAuth().setCustomUserClaims(uid, { admin: false }); await getAuth().revokeRefreshTokens(uid);
+  return { uid };
 });

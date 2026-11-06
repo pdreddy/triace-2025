@@ -1,7 +1,8 @@
 // League play: round-robin fixtures, playoffs, captain score submissions with admin approval,
 // standings and player ratings. Like tournament.js, every apply* function takes the whole
 // tournament state and returns { state, result }.
-import { ValidationError, DEFAULT_LEAGUE_RULES, DEFAULT_SEASON_NAME, rulesOf, isOwner, validateRegistration, publicRecord } from './tournament.js';
+import { addDays, roundStart, validateBuffers, calendarOf } from './calendar.js';
+import { guard, ValidationError, DEFAULT_LEAGUE_RULES, DEFAULT_SEASON_NAME, rulesOf, isOwner, validateRegistration, publicRecord } from './tournament.js';
 
 export const ROLES = ['captain', 'ace1', 'ace2'];
 export const ROLE_LABELS = { captain: 'Captain', ace1: 'Ace 1', ace2: 'Ace 2' };
@@ -35,13 +36,17 @@ const isLeague = fixture => !fixture.stage && !fixture.challenge;
 // earth (UTC−12), so a result entered late in the evening in any time zone still counts as on time.
 const DAY = 86400000, DATE = /^\d{4}-\d{2}-\d{2}$/;
 const toDay = ms => new Date(ms).toISOString().slice(0, 10);
-export const addDays = (date, days) => toDay(Date.parse(`${date}T00:00:00Z`) + days * DAY);
+export { addDays };
 export const deadlineEnd = date => Date.parse(`${date}T23:59:59Z`) + 12 * 3600000;
 export const isOverdue = (fixture, now = Date.now()) => !!fixture.dueBy && fixture.status !== 'final' && now > deadlineEnd(fixture.dueBy);
 export const onTime = fixture => !fixture.dueBy || (fixture.completedAt != null && fixture.completedAt <= deadlineEnd(fixture.dueBy));
 function validDate(value, label) { assert(typeof value === 'string' && DATE.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`)), `${label} must be a date.`); return value; }
-function dateRounds(fixtures, start, intervalDays) {
-  for (const f of Object.values(fixtures)) if (isLeague(f) && f.round) { f.startsOn = addDays(start, (f.round - 1) * intervalDays); f.dueBy = addDays(f.startsOn, intervalDays - 1); }
+// Dates every league round of a tier from its schedule ({ start, intervalDays, buffers }) and returns the schedule with the playoff start filled in.
+function dateRounds(fixtures, schedule, playoffGapWeeks = 1) {
+  const { start, intervalDays, buffers = [] } = schedule;
+  let last = 0;
+  for (const f of Object.values(fixtures)) if (isLeague(f) && f.round) { f.startsOn = roundStart(start, intervalDays, buffers, f.round); f.dueBy = addDays(f.startsOn, intervalDays - 1); last = Math.max(last, f.round); }
+  return last ? { ...schedule, lastRound: last, playoffsStart: addDays(roundStart(start, intervalDays, buffers, last), intervalDays + playoffGapWeeks * 7) } : { ...schedule };
 }
 
 export function deriveLineup(choice) {
@@ -93,23 +98,71 @@ export function applyGenerateFixtures(current, payload) {
     state.fixtures[tierId][id] = { id, tierId, round: r + 1, format: 'rr', home, away, status: 'scheduled' };
   }));
   const schedule = payload.start ? validSchedule(payload) : state.schedules?.[tierId];
-  if (schedule) { state.schedules ||= {}; state.schedules[tierId] = schedule; dateRounds(state.fixtures[tierId], schedule.start, schedule.intervalDays); }
+  if (schedule) { state.schedules ||= {}; state.schedules[tierId] = dateRounds(state.fixtures[tierId], schedule, calendarOf(state).playoffGapWeeks); }
   return { state, result: { tierId, fixtures: Object.keys(state.fixtures[tierId]).length, rounds: Math.max(0, teams.length - 1 + (teams.length % 2)) } };
 }
 
 function validSchedule(payload) {
   const intervalDays = Number(payload.intervalDays);
   assert(Number.isInteger(intervalDays) && intervalDays >= 1 && intervalDays <= 60, 'Days per round must be 1–60.');
-  return { start: validDate(payload.start, 'The start date'), intervalDays };
+  const buffers = guard(() => validateBuffers(payload.buffers ?? []));
+  return { start: validDate(payload.start, 'The start date'), intervalDays, buffers };
 }
 // Date every round: round r starts start + (r − 1) × interval and is due interval − 1 days later.
 export function applySetSchedule(current, payload) {
   const tierId = payload?.tierId;
   assert(Object.hasOwn(current?.tierConfig || {}, tierId), 'Choose an existing tier.');
   const schedule = validSchedule(payload), state = structuredClone(current);
-  state.schedules ||= {}; state.schedules[tierId] = schedule;
-  if (state.fixtures?.[tierId]) dateRounds(state.fixtures[tierId], schedule.start, schedule.intervalDays);
-  return { state, result: { tierId, schedule } };
+  state.schedules ||= {}; state.schedules[tierId] = state.fixtures?.[tierId] ? dateRounds(state.fixtures[tierId], schedule, calendarOf(state).playoffGapWeeks) : schedule;
+  return { state, result: { tierId, schedule: state.schedules[tierId] } };
+}
+// One click for the whole season: every tier with at least two teams gets its round-robin fixtures (kept if they already exist, so
+// submitted results are never lost) and every round is dated from the season calendar, buffer weeks included. Run it again after
+// changing the calendar or after teams were added: tiers whose teams changed and have no results yet are regenerated.
+export function applyAutoSchedule(current, payload = {}) {
+  const calendar = calendarOf(current);
+  assert(calendar.seasonStart, 'Set the season start date in the calendar first.');
+  const state = structuredClone(current), summary = [];
+  for (const tierId of Object.keys(current.tierConfig || {})) {
+    const teams = tierTeams(state, tierId).sort((a, b) => a.registeredAt - b.registeredAt);
+    if (teams.length < 2) { if (teams.length) summary.push({ tierId, skipped: 'Only one team so far.' }); continue; }
+    state.fixtures ||= {}; state.schedules ||= {};
+    const existing = Object.values(state.fixtures[tierId] || {}).filter(isLeague);
+    const played = existing.some(f => f.status !== 'scheduled' && f.status !== 'pending');
+    const teamIds = new Set(teams.flatMap(t => [t.teamId])), inFixtures = new Set(existing.flatMap(f => [f.home, f.away]));
+    const same = existing.length && teamIds.size === inFixtures.size && [...teamIds].every(id => inFixtures.has(id));
+    let created = false;
+    if (!same && !played) {
+      const keep = Object.values(state.fixtures[tierId] || {}).filter(f => !isLeague(f));
+      state.fixtures[tierId] = Object.fromEntries(keep.map(f => [f.id, f]));
+      roundRobin(teams.map(t => t.teamId)).forEach((pairs, r) => pairs.forEach(([home, away], i) => {
+        const id = `r${String(r + 1).padStart(2, '0')}m${i + 1}`;
+        state.fixtures[tierId][id] = { id, tierId, round: r + 1, format: 'rr', home, away, status: 'scheduled' };
+      }));
+      created = true;
+    } else if (!same && played) { summary.push({ tierId, skipped: 'Has results and its teams changed: regenerate it by hand.' }); continue; }
+    const schedule = dateRounds(state.fixtures[tierId], { start: calendar.seasonStart, intervalDays: calendar.roundDays, buffers: calendar.buffers }, calendar.playoffGapWeeks);
+    state.schedules[tierId] = schedule;
+    summary.push({ tierId, created, rounds: schedule.lastRound, firstRound: schedule.start, playoffsStart: schedule.playoffsStart });
+  }
+  assert(summary.length, 'No tier has two teams yet, so there is nothing to schedule.');
+  return { state, result: { tiers: summary } };
+}
+// Adds buffer weeks after a round (rained off, holiday, exams) for the whole season, or one tier, and re-dates the rounds after it.
+export function applyAddBuffer(current, payload) {
+  const [buffer] = guard(() => validateBuffers([{ afterRound: payload?.afterRound, weeks: payload?.weeks }]));
+  const state = structuredClone(current), tierId = payload?.tierId;
+  if (tierId) assert(state.schedules?.[tierId], 'That tier has no dates yet.');
+  const add = list => validateBuffers([...(list || []), buffer]);
+  if (!tierId) { state.calendar = { ...calendarOf(state), buffers: add(state.calendar?.buffers) }; }
+  let changed = 0;
+  for (const id of tierId ? [tierId] : Object.keys(state.schedules || {})) {
+    const schedule = state.schedules[id];
+    if (!schedule) continue;
+    const next = { ...schedule, buffers: add(schedule.buffers) };
+    state.schedules[id] = state.fixtures?.[id] ? dateRounds(state.fixtures[id], next, calendarOf(state).playoffGapWeeks) : next; changed++;
+  }
+  return { state, result: { buffer, tiers: changed } };
 }
 // Move one fixture's deadline, e.g. for a rained-off week.
 export function applyMoveFixture(current, payload) {

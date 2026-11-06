@@ -1041,13 +1041,15 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
   .admin .page-head p:not(.eyebrow), .admin .page-head .secondary { display: none; }
   .admin .stat-row { display: flex; margin: 0 calc(-1 * var(--gutter)) 10px; padding: 0 var(--gutter); overflow-x: auto; scrollbar-width: none; }
   .admin .stat { flex: 0 0 auto; min-width: 104px; }
-  .admin-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
-  .admin-tabs button { flex: 1; min-height: 42px; border-radius: 999px; font-family: var(--display); font-size: 16px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); background: var(--surface); border: 1px solid var(--line-2); }
+  .admin-tabs { display: flex; gap: 6px; margin-bottom: 10px; overflow-x: auto; scrollbar-width: none; }
+  .admin-tabs button { flex: 1 0 auto; padding: 0 14px; min-height: 42px; border-radius: 999px; font-family: var(--display); font-size: 16px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); background: var(--surface); border: 1px solid var(--line-2); }
   .admin-tabs button[aria-selected=true] { color: var(--ink); background: var(--lime); border-color: var(--lime); }
   .admin[data-tab=settings] .pane:not(.pane-settings),
   .admin[data-tab=tiers] .pane:not(.pane-tiers),
   .admin[data-tab=teams] .pane:not(.pane-teams),
-  .admin[data-tab=league] .pane:not(.pane-league) { display: none; }
+  .admin[data-tab=league] .pane:not(.pane-league),
+  .admin[data-tab=calendar] .pane:not(.pane-calendar),
+  .admin[data-tab=admins] .pane:not(.pane-admins) { display: none; }
   .admin-save-bar { top: -12px; padding: 8px 8px 8px 12px; }
   .tier-editors, .admin-tools, .recalculate { grid-template-columns: 1fr; }
   .stats { grid-template-columns: repeat(2, 1fr); }
@@ -1278,6 +1280,11 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
 .early-steps li.current i { color: var(--ink); background: #f6c93b; border-color: #f6c93b; }
 .early-steps li.done i { color: var(--ink); background: var(--good); border-color: var(--good); }
 .early-note { padding: 8px 12px; border-radius: var(--r); background: #f6c93b14; color: #fff !important; }
+.admin-list { list-style: none; margin: 10px 0; padding: 0; display: grid; gap: 8px; }
+.admin-list li { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; padding: 8px 12px; border-radius: var(--r); background: #ffffff0a; }
+.admin-list small { color: var(--muted); }
+.auto-result { margin: 10px 0 0; padding-left: 18px; }
+.buffer-form { margin-top: 12px; }
 .early-preview { padding: 8px 12px; border-radius: var(--r); background: #ffffff0a; font-size: 14px; }
 @media (max-width: 760px) {
   .early-bar { font-size: 12.5px; padding: 3px var(--gutter); gap: 2px 8px; }

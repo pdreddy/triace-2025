@@ -1,3 +1,4 @@
+import { registrationWindow } from '../config/calendar.js';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTournament } from '../hooks/useTournament';
@@ -70,7 +71,7 @@ export default function Register() {
   const [players, setPlayers] = useState(emptyPlayers), [whatsappPhone, setWhatsappPhone] = useState(''), [selectedTier, setSelectedTier] = useState('higher'), [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [success, setSuccess] = useState(null), [step, setStep] = useState(0);
   const id = useRef(crypto.randomUUID()), form = useRef(null);
-  const settings = data?.settings, config = settings ? data?.tierConfig || {} : DEFAULT_TIERS, active = orderedTiers(config, true), gap = data?.leagueRules?.utrGapLimit ?? UTR_GAP_LIMIT;
+  const settings = data?.settings, window0 = registrationWindow(settings, data?.calendar), config = settings ? data?.tierConfig || {} : DEFAULT_TIERS, active = orderedTiers(config, true), gap = data?.leagueRules?.utrGapLimit ?? UTR_GAP_LIMIT;
 
   let combined = 0, complete = true;
   for (const value of Object.values(players)) {
@@ -94,7 +95,7 @@ export default function Register() {
     !connected && 'Connecting to the tournament server…',
     connected && !data && (loadError ? `Tournament data could not be loaded: ${loadError}` : 'Loading tournament settings…'),
     data && !settings && (loadError ? `Registration setup is unavailable: ${loadError}` : 'Opening tournament registration…'),
-    settings && !settings.registrationEnabled && 'Registration is closed.',
+    settings && !window0.open && window0.reason,
     data && settings && !active.length && 'No tier is open for registration. An admin must activate a tier.',
     !user?.uid && 'Signing you in… (anonymous sign-in must be enabled in Firebase Authentication)'
   ].filter(Boolean);
@@ -190,7 +191,7 @@ export default function Register() {
                 <span>I have permission to register these players and publish the captain’s first name and all three UTR values. All three WhatsApp numbers stay private to the team owner and admin. Ace names are public only when the admin turns masking off.</span>
               </label>
               <Message error>{error}</Message>
-              <button className="button block" disabled={busy || !settings?.registrationEnabled || !connected || !user?.uid || !active.length}>{busy ? 'Saving registration…' : 'Register team ↗'}</button>
+              <button className="button block" disabled={busy || !settings?.registrationEnabled || !window0.open || !connected || !user?.uid || !active.length}>{busy ? 'Saving registration…' : 'Register team ↗'}</button>
             </div>
 
             <div className="step-nav">

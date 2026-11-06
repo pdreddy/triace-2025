@@ -97,3 +97,11 @@ Deploy the functions **before** the web app goes live: the first visit calls `bo
 - [ ] Remove any test teams. Keep Firebase budget alerts on.
 - [ ] Watch Functions logs for the first registrations.
 - [ ] Next version: dedicated Schedule and Score entry screens (placeholders are in the League page).
+
+## Dates, auto-schedule and more admins (Admin → Dates / Admins)
+
+- **Dates tab**: registration opens / last registration day (registration closes itself), season start, days per round, weeks before playoffs, and **buffer weeks** written as `round:weeks` (for example `3:1, 6:2` = one free week after round 3, two after round 6). Early-bird dates stay in Settings.
+- **Auto-schedule all tiers** creates round-robin fixtures for every tier with two or more teams and dates every round from the calendar. Run it again after changing the calendar: fixtures with results are never deleted, and a tier whose teams changed after results exist is skipped (regenerate it by hand).
+- **Add buffer** pushes every later round back by the weeks you choose (rain-off, holiday). A single match can still be moved from the League tab.
+- **Admins tab**: add an administrator by sign-in name (they sign in at `/admin/login` with that name); the 12-character password is shown once. Reset password and Remove are there too; you cannot remove yourself or the last admin.
+- New backend functions: `saveCalendar`, `autoSchedule`, `addBufferWeeks`, `listAdmins`, `createAdmin`, `resetAdminPassword`, `removeAdmin`. Deploy with `./deploy.sh --no-hosting --rules` (the `calendar` node needs the new database rule), then the site.

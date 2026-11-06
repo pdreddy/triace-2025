@@ -45,6 +45,9 @@
       "earlyBird": {
         ".read": true
       },
+      "calendar": {
+        ".read": true
+      },
       "partnerPosts": {
         ".read": true
       },

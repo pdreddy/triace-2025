@@ -1,8 +1,9 @@
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
 import path from 'node:path';
-import { initialState, publicState, applyRegistration, applyConfiguration, applyEarlyBird, applyRecalculation, applyLeagueRules, isOwner, ValidationError } from '../functions/lib/tournament.js';
-import { applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult, applyManageSeason, applySetSchedule, applyMoveFixture, applyIssueChallenge, applyUpdateTeam, applyWithdrawTeam, applySetCaptainLogin } from '../functions/lib/league.js';
+import { initialState, publicState, applyRegistration, applyConfiguration, applyEarlyBird, applyRecalculation, applyLeagueRules, applyCalendar, guard, isOwner, ValidationError } from '../functions/lib/tournament.js';
+import { applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult, applyManageSeason, applySetSchedule, applyMoveFixture, applyIssueChallenge, applyUpdateTeam, applyWithdrawTeam, applySetCaptainLogin, applyAutoSchedule, applyAddBuffer } from '../functions/lib/league.js';
+import { adminEmail, validateAdminUsername, newAdminPassword, checkRemoval } from '../functions/lib/admins.js';
 import { newPassword, usernameAttempt, loginNames, captainUid, loginEmail, normalizePassword } from '../functions/lib/captainLogin.js';
 import { validateLegacySeason } from '../functions/lib/legacy.js';
 import { applyCreatePost, applyExpressInterest, applyClosePost, applyMarkPicked, applyReopenPost } from '../functions/lib/partners.js';
@@ -70,7 +71,9 @@ export function demoPlugin(env) {
           if (prior.until < now) { prior.count = 0; prior.until = now + 60000; } prior.count++; attempts.set(ip, prior);
           if (prior.count > 10) return send(429, { error: 'Too many sign-in attempts. Wait one minute.' });
           const identifier = String(payload.username || '').trim().toLowerCase();
-          if (![username.toLowerCase(), email.toLowerCase()].includes(identifier) || !timingSafeEqual(digest(String(payload.password || '')), digest(password))) return send(401, { error: 'Invalid credentials.' });
+          const extra = state.demoAdmins?.[identifier.replace(/@traice\.local$/, '')];
+          const isOwnerLogin = [username.toLowerCase(), email.toLowerCase()].includes(identifier) && timingSafeEqual(digest(String(payload.password || '')), digest(password));
+          if (!isOwnerLogin && !(extra && passwordMatches(extra, String(payload.password || '')))) return send(401, { error: 'Invalid credentials.' });
           session = newSession(true); attempts.delete(ip); return send(200, safeUser());
         }
         if (endpoint === '/logout') { session = newSession(); return send(200, safeUser()); }
@@ -131,6 +134,32 @@ export function demoPlugin(env) {
             return outcome;
           });
           return send(200, { teamId: record.teamId, username, password });
+        }
+        if (endpoint === '/calendar') return send(200, await mutate(current => applyCalendar(current, payload)));
+        if (endpoint === '/auto-schedule') return send(200, await mutate(current => applyAutoSchedule(current, payload)));
+        if (endpoint === '/add-buffer') return send(200, await mutate(current => applyAddBuffer(current, payload)));
+        if (endpoint.startsWith('/admin')) {
+          const admins = () => [{ uid: 'demo-admin', username, email, you: true }, ...Object.keys(state.demoAdmins || {}).map(name => ({ uid: `demo-${name}`, username: name, email: adminEmail(name), you: false }))];
+          const target = String(payload.uid || '').replace(/^demo-/, '');
+          if (endpoint === '/admins') return send(200, { admins: admins() });
+          if (endpoint === '/admin-create') {
+            const name = guard(() => validateAdminUsername(payload.username));
+            if (name === username.toLowerCase() || state.demoAdmins?.[name]) return send(400, { error: `“${name}” already has an account. Choose another name.` });
+            const pw = newAdminPassword();
+            await mutate(current => ({ state: { ...current, demoAdmins: { ...(current.demoAdmins || {}), [name]: hashPassword(pw) } }, result: null }));
+            return send(200, { uid: `demo-${name}`, username: name, password: pw });
+          }
+          if (endpoint === '/admin-reset') {
+            if (!state.demoAdmins?.[target]) return send(400, { error: 'That person is not an administrator.' });
+            const pw = newAdminPassword();
+            await mutate(current => ({ state: { ...current, demoAdmins: { ...current.demoAdmins, [target]: hashPassword(pw) } }, result: null }));
+            return send(200, { uid: payload.uid, username: target, password: pw });
+          }
+          if (endpoint === '/admin-remove') {
+            guard(() => checkRemoval(admins(), payload.uid, 'demo-admin'));
+            await mutate(current => { const demoAdmins = { ...current.demoAdmins }; delete demoAdmins[target]; return { state: { ...current, demoAdmins }, result: null }; });
+            return send(200, { uid: payload.uid });
+          }
         }
         if (endpoint === '/early-bird') return send(200, await mutate(current => applyEarlyBird(current, payload)));
         if (endpoint === '/league-rules') return send(200, await mutate(current => applyLeagueRules(current, payload)));

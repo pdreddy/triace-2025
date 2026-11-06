@@ -1,3 +1,4 @@
+import { loginIdentifier } from '../../functions/lib/admins.js';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInAnonymously, signInWithEmailAndPassword, signOut, getIdTokenResult, connectAuthEmulator } from 'firebase/auth';
 import { getDatabase, ref, onValue, get, connectDatabaseEmulator } from 'firebase/database';
@@ -58,7 +59,7 @@ export function createFirebaseService() {
       };
       const off = keys.map(key => onValue(ref(database, `${ROOT}/${key}`), snapshot => { state[key] = snapshot.val() ?? (key === 'configRevision' ? 0 : key === 'settings' ? null : {}); ready.add(key); emit(); }, error => onError(new Error(rulesHint(error, ROOT)))));
       // League data loads on its own so a missing database rule for it never blocks the core tournament data.
-      for (const key of ['fixtures', 'leagueRules', 'season', 'seasons', 'schedules', 'earlyBird', 'partnerPosts']) off.push(onValue(ref(database, `${ROOT}/${key}`), snapshot => { state[key] = snapshot.val() || undefined; emit(); }, () => { state[key] = undefined; emit(); }));
+      for (const key of ['fixtures', 'leagueRules', 'season', 'seasons', 'schedules', 'earlyBird', 'calendar', 'partnerPosts']) off.push(onValue(ref(database, `${ROOT}/${key}`), snapshot => { state[key] = snapshot.val() || undefined; emit(); }, () => { state[key] = undefined; emit(); }));
       // Season 1 (legacy) lives in the same database at its own configurable path.
       off.push(onValue(ref(database, paths.season1), snapshot => { state.legacySeasons = snapshot.exists() ? { s1: snapshot.val() } : undefined; emit(); }, () => { state.legacySeasons = undefined; emit(); }));
       return () => off.forEach(unsubscribe => unsubscribe());
@@ -87,7 +88,7 @@ export function createFirebaseService() {
         try { await signInWithEmailAndPassword(auth, loginEmail('setup-check'), 'setup-check-not-a-real-password'); return { status: 'warn', detail: 'unexpectedly signed in' }; }
         catch (error) { return classifyPasswordProbe(error?.code); }
       });
-      for (const name of ['bootstrapTournament', 'registerTeam', 'createPartnerPost', 'expressInterest', 'markPartnerPicked', 'reopenPartnerPost', 'closePartnerPost', 'saveEarlyBird', 'resetCaptainLogin', 'importSeason1']) {
+      for (const name of ['bootstrapTournament', 'registerTeam', 'createPartnerPost', 'expressInterest', 'markPartnerPicked', 'reopenPartnerPost', 'closePartnerPost', 'saveEarlyBird', 'saveCalendar', 'addBufferWeeks', 'listAdmins', 'createAdmin', 'resetAdminPassword', 'removeAdmin', 'resetCaptainLogin', 'importSeason1']) {
         await step(`fn-${name}`, `Function ${name}`, async () => { try { await httpsCallable(functions, name)({}); return { status: 'ok', detail: 'answers' }; } catch (error) { return classifyCallable(error?.code, error?.message); } });
       }
       await step('account', 'This browser’s account', async () => {
@@ -120,7 +121,7 @@ export function createFirebaseService() {
     subscribePrivate(callback, onError) { return onValue(ref(database, `${ROOT}/registrations`), snapshot => callback(snapshot.val() || {}), error => onError(new Error(errorMessage(error)))); },
     async login(username, password) {
       const alias = env.VITE_ADMIN_USERNAME || 'reddi2026', email = env.VITE_ADMIN_EMAIL || 'reddi2026@traice.local';
-      try { await signInWithEmailAndPassword(auth, username.trim().toLowerCase() === alias.toLowerCase() ? email : username.trim(), password); }
+      try { await signInWithEmailAndPassword(auth, username.trim().toLowerCase() === alias.toLowerCase() ? email : loginIdentifier(username), password); }
       catch (error) { throw new Error(`${LOGIN_ERRORS[error?.code] || errorMessage(error)}${error?.code ? ` (${error.code})` : ''}`); }
     },
     logout: withError(() => signOut(auth)),
@@ -146,6 +147,13 @@ export function createFirebaseService() {
       }, () => callback({}));
       return () => { off(); offs.forEach(stop => stop()); };
     },
+    saveCalendar: withError(async payload => (await httpsCallable(functions, 'saveCalendar')(payload)).data),
+    autoSchedule: withError(async payload => (await httpsCallable(functions, 'autoSchedule')(payload)).data),
+    addBufferWeeks: withError(async payload => (await httpsCallable(functions, 'addBufferWeeks')(payload)).data),
+    listAdmins: withError(async () => (await httpsCallable(functions, 'listAdmins')({})).data),
+    createAdmin: withError(async payload => (await httpsCallable(functions, 'createAdmin')(payload)).data),
+    resetAdminPassword: withError(async payload => (await httpsCallable(functions, 'resetAdminPassword')(payload)).data),
+    removeAdmin: withError(async payload => (await httpsCallable(functions, 'removeAdmin')(payload)).data),
     saveEarlyBird: withError(async payload => (await httpsCallable(functions, 'saveEarlyBird')(payload)).data),
     saveLeagueRules: withError(async payload => (await httpsCallable(functions, 'saveLeagueRules')(payload)).data),
     setSchedule: withError(async payload => (await httpsCallable(functions, 'setSchedule')(payload)).data),

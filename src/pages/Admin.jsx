@@ -8,6 +8,8 @@ import { LeagueRulesCard, PlayoffPlanner, ScheduleForm, SeasonCard } from '../co
 import { TeamEditForm } from '../components/TeamTools';
 import FirebasePanel from '../components/FirebasePanel';
 import EarlyBirdAdmin from '../components/EarlyBirdAdmin';
+import AdminCalendar from '../components/AdminCalendar';
+import AdminUsers from '../components/AdminUsers';
 import LoginCard from '../components/LoginCard';
 import { DEFAULT_SETTINGS, DEFAULT_TIERS, orderedTiers, parseUtr, validateSettings, validateTierConfig, registrationsCsv } from '../../functions/lib/tournament.js';
 
@@ -15,7 +17,9 @@ const SECTIONS = [
   { id: 'settings', label: 'Registration & privacy', short: 'Settings', icon: 'shield' },
   { id: 'tiers', label: 'Tier configuration', short: 'Tiers', icon: 'trophy' },
   { id: 'teams', label: 'Private registrations', short: 'Teams', icon: 'register' },
-  { id: 'league', label: 'League & results', short: 'League', icon: 'calendar' }
+  { id: 'calendar', label: 'Dates & schedule', short: 'Dates', icon: 'calendar' },
+  { id: 'league', label: 'League & results', short: 'League', icon: 'calendar' },
+  { id: 'admins', label: 'Administrators', short: 'Admins', icon: 'shield' }
 ];
 const draftFrom = data => ({
   settings: { ...(data?.settings || DEFAULT_SETTINGS) },
@@ -254,7 +258,10 @@ export default function Admin() {
             );
           })}
 
-          <SectionTitle id="league" num="04">League &amp; results</SectionTitle>
+          <SectionTitle id="calendar" num="04">Dates &amp; schedule</SectionTitle>
+          <AdminCalendar service={service} saved={data?.calendar} tiers={liveTiers.map(t => ({ id: t.id, name: t.name, teams: Object.keys(data?.tiers?.[t.id]?.teams || {}).length }))} disabled={busy || !connected || !data?.settings} />
+
+          <SectionTitle id="league" num="05">League &amp; results</SectionTitle>
           <p className="small note pane pane-league">Every league rule is set here. Create each tier’s round-robin schedule once its teams are final, then map the playoffs. Captains submit scores from the League page; they count once you approve them. You can also enter or correct any result there.</p>
           <div className="league-admin pane pane-league">
             <LeagueRulesCard rules={data?.leagueRules} busy={busy || !connected || !data?.settings} onSave={saveRules} />
@@ -279,6 +286,9 @@ export default function Admin() {
             })}
             <Link className="secondary" to="/league">Open the League page ↗</Link>
           </div>
+
+          <SectionTitle id="admins" num="06">Administrators</SectionTitle>
+          <AdminUsers service={service} disabled={busy || !connected || !data?.settings} />
         </div>
       </div>
       <FirebasePanel service={service} data={data} />

@@ -1,4 +1,5 @@
 import { validateEarlyBird } from './earlyBird.js';
+import { validateCalendar, calendarOf, registrationWindow } from './calendar.js';
 export const DEFAULT_SETTINGS = { registrationEnabled: true, aceNameMaskingEnabled: true, minPlayerUtr: 1, maxPlayerUtr: 1650 };
 export const DEFAULT_TIERS = {
   goat: { name: 'GOAT Tier', minCombinedUtr: 1750, maxCombinedUtr: 2200, sortOrder: 1, active: true },
@@ -128,7 +129,15 @@ export function bootstrapState(current) {
   const defaults = initialState();
   return { state: { ...defaults, ...(current || {}), settings: defaults.settings, tierConfig: current?.tierConfig && Object.keys(current.tierConfig).length ? current.tierConfig : defaults.tierConfig, configRevision: current?.configRevision || 1 }, result: { created: true } };
 }
-export function publicState(state) { return { partnerPosts: state.partnerPosts || {}, earlyBird: state.earlyBird, settings: state.settings, tierConfig: state.tierConfig || {}, configRevision: state.configRevision || 0, tiers: state.tiers || {}, fixtures: state.fixtures || {}, leagueRules: rulesOf(state), season: state.season || { name: DEFAULT_SEASON_NAME }, seasons: state.seasons || {}, schedules: state.schedules || {} }; }
+// The shared libraries report problems as plain errors named ValidationError; the server only shows a clear message for the real class.
+export function guard(fn) { try { return fn(); } catch (error) { if (error?.name === 'ValidationError' && !(error instanceof ValidationError)) throw new ValidationError(error.message); throw error; } }
+export function applyCalendar(current, payload) {
+  assert(current?.settings, 'Save the initial tournament configuration first.');
+  const calendar = guard(() => validateCalendar(payload)), state = structuredClone(current);
+  state.calendar = calendar;
+  return { state, result: { calendar } };
+}
+export function publicState(state) { return { calendar: calendarOf(state), partnerPosts: state.partnerPosts || {}, earlyBird: state.earlyBird, settings: state.settings, tierConfig: state.tierConfig || {}, configRevision: state.configRevision || 0, tiers: state.tiers || {}, fixtures: state.fixtures || {}, leagueRules: rulesOf(state), season: state.season || { name: DEFAULT_SEASON_NAME }, seasons: state.seasons || {}, schedules: state.schedules || {} }; }
 function canonical(value) { return JSON.stringify(value, (_, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).filter(key => item[key] !== null && item[key] !== undefined).sort().map(key => [key, item[key]])) : item); }
 // One browser (one anonymous sign-in) can register a few teams, not unlimited ones.
 export const MAX_TEAMS_PER_BROWSER = 3;
@@ -136,6 +145,8 @@ export const MAX_TEAMS_PER_BROWSER = 3;
 export function applyRegistration(current, payload, uid, now = Date.now(), login = null) {
   assert(typeof uid === 'string' && uid.length > 0, 'Sign in before registering.');
   assert(current?.settings, 'The admin must initialize tournament settings first.');
+  const window = registrationWindow(current.settings, current.calendar, now);
+  assert(window.open, window.reason);
   for (const [key, label] of [['whatsappPhone', 'captain'], ['ace1Phone', 'Ace 1'], ['ace2Phone', 'Ace 2']]) assert(Object.hasOwn(payload || {}, key), `Enter ${label}’s WhatsApp number to register.`);
   const team = validateRegistration(payload, current.settings, current.tierConfig || {}, rulesOf(current).utrGapLimit);
   const state = structuredClone(current), previous = state.registrations?.[team.teamId];
