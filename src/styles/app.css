@@ -1485,3 +1485,6 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
 .status-list li span { color: var(--soft); font-size: 13.5px; overflow-wrap: anywhere; }
 .status-list li em { font-style: normal; font-size: 13.5px; color: #f6c93b; overflow-wrap: anywhere; }
 .status-list li.fail em { color: #ffb4a0; }
+.team-card h3 a { display: inline-flex; align-items: center; min-height: 36px; }
+.fixture-team, .standings td a { display: inline-flex; align-items: center; min-height: 36px; }
+td > a, .fixture-team, .team-card h3 a { display: inline-flex; align-items: center; min-height: 36px; min-width: 36px; }

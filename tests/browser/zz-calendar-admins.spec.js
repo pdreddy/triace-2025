@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+// Named zz- so it runs last: it leaves teams, fixtures and dates behind in the shared demo state, which other specs do not expect.
 
 async function adminLogin(page, user = 'reddi2026', password = 'local-e2e-test-password') {
   await page.goto('/admin/login');
@@ -39,13 +40,14 @@ test('registration closes itself after the last registration day', async ({ page
   await card.getByLabel('Season (round 1) starts').fill('2027-01-04');
   await card.getByRole('button', { name: 'Save calendar' }).click();
   await expect(card.getByText('Calendar saved')).toBeVisible();
-  const refused = await page.request.post('/api/register', { data: team('calendar-closed-team-0001', 'Zoe', 600) });
-  expect(refused.status()).toBe(400);
-  expect(await refused.text()).toContain('Registration closed on 2020-01-01.');
-  await page.goto('/admin');
-  await page.locator('.calendar-admin').getByLabel('Last registration day').fill('');
-  await page.locator('.calendar-admin').getByRole('button', { name: 'Save calendar' }).click();
-  await expect(page.getByText('Calendar saved')).toBeVisible();
+  try {
+    const refused = await page.request.post('/api/register', { data: team('calendar-closed-team-0001', 'Zoe', 600) });
+    expect(refused.status()).toBe(400);
+    expect(await refused.text()).toContain('Registration closed on 2020-01-01.');
+  } finally {   // never leave registration closed for anything that runs after
+    const reopened = await page.request.post('/api/calendar', { data: { registrationOpens: '', registrationCloses: '', seasonStart: '2027-01-04', roundDays: 7, buffers: [], playoffGapWeeks: 1 } });
+    expect(reopened.ok()).toBeTruthy();
+  }
 });
 
 test('admin adds another admin, who can sign in; resets and removes them', async ({ page, browser }) => {
