@@ -156,7 +156,9 @@ export function applyRegistration(current, payload, uid, now = Date.now(), login
 }
 // Admin: the early-bird dates and late surcharge (shown on the rules, the registration page and a site-wide bar).
 export function applyEarlyBird(current, payload) {
-  const plan = validateEarlyBird(payload);
+  let plan;
+  try { plan = validateEarlyBird(payload); }
+  catch (error) { throw new ValidationError(error.message); }   // so the server answers with the clear message, not "internal"
   return { state: { ...structuredClone(current || initialState()), earlyBird: plan }, result: { earlyBird: plan } };
 }
 export function applyConfiguration(current, payload) {

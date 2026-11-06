@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_EARLY_BIRD, earlyBirdStatus, validateEarlyBird, nextDay, daysBetween } from '../../src/config/earlyBird.js';
-import { applyEarlyBird, initialState, publicState } from '../../functions/lib/tournament.js';
+import { applyEarlyBird, initialState, publicState, ValidationError } from '../../functions/lib/tournament.js';
 
 const plan = { enabled: true, opens: '2026-11-06', ends: '2026-11-13', surchargeUsd: 10 };
 
@@ -63,4 +63,6 @@ test('the saved plan is public and survives in the state', () => {
   assert.equal(publicState(state).earlyBird.surchargeUsd, 15);
   assert.equal(publicState(initialState()).earlyBird, undefined, 'no saved plan yet: the app uses the default');
   assert.throws(() => applyEarlyBird(initialState(), { ...plan, ends: '2026-01-01' }), /cannot end before/);
+  // the server only turns a ValidationError into a clear refusal; anything else would show as "internal"
+  for (const bad of [{}, null, { ...plan, surchargeUsd: -5 }, { ...plan, opens: 'x' }]) assert.throws(() => applyEarlyBird(initialState(), bad), error => error instanceof ValidationError, JSON.stringify(bad));
 });

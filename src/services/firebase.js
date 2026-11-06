@@ -88,7 +88,7 @@ export function createFirebaseService() {
         catch (error) { return classifyPasswordProbe(error?.code); }
       });
       for (const name of ['bootstrapTournament', 'registerTeam', 'createPartnerPost', 'expressInterest', 'markPartnerPicked', 'reopenPartnerPost', 'closePartnerPost', 'saveEarlyBird', 'resetCaptainLogin', 'importSeason1']) {
-        await step(`fn-${name}`, `Function ${name}`, async () => { try { await httpsCallable(functions, name)({}); return { status: 'ok', detail: 'answers' }; } catch (error) { return classifyCallable(error?.code); } });
+        await step(`fn-${name}`, `Function ${name}`, async () => { try { await httpsCallable(functions, name)({}); return { status: 'ok', detail: 'answers' }; } catch (error) { return classifyCallable(error?.code, error?.message); } });
       }
       await step('account', 'This browser’s account', async () => {
         const user = auth.currentUser;

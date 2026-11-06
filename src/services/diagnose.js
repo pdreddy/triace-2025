@@ -11,12 +11,15 @@ export function diagnose(message = '') {
 
 // ---- Live setup check (the /status page) ----
 // What a callable function's answer to an empty request says about whether it is deployed.
-export function classifyCallable(code = '') {
+export function classifyCallable(code = '', message = '') {
   const c = String(code).replace(/^functions\//, '');
   if (!c) return { status: 'ok', detail: 'answers' };
   if (['unauthenticated', 'permission-denied', 'failed-precondition', 'invalid-argument', 'already-exists', 'aborted'].includes(c)) return { status: 'ok', detail: 'deployed (it refused the empty test request, as it should)' };
   if (c === 'not-found') return { status: 'fail', detail: 'not deployed', fix: 'Deploy the functions: ./deploy.sh --no-hosting' };
-  return { status: 'fail', detail: `error: ${c}`, fix: 'The function exists but failed. Open Firebase Console → Functions → Logs and look at the latest error. Check the project is on the Blaze plan.' };
+  // Our own server wraps unexpected crashes in this message; a bare "internal" is what a browser sees when the function is not deployed at all
+  // (the 404 has no cross-site headers, so the browser hides it).
+  if (c === 'internal' && !/Could not save the update/i.test(message)) return { status: 'fail', detail: 'no answer: most likely not deployed yet', fix: 'Deploy the functions: ./deploy.sh --no-hosting (then run this check again). If it is deployed, open Firebase Console → Functions → Logs for the error.' };
+  return { status: 'fail', detail: `crashed: ${c}`, fix: 'The function exists but failed. Open Firebase Console → Functions → Logs and look at the latest error. Check the project is on the Blaze plan.' };
 }
 // What the answer to a sign-in with an account that does not exist says about the Email/Password provider.
 export function classifyPasswordProbe(code = '') {

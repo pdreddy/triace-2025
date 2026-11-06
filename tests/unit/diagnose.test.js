@@ -19,6 +19,8 @@ test('the setup check reads the answers of functions and of sign-in correctly', 
   for (const code of ['functions/unauthenticated', 'functions/permission-denied', 'functions/failed-precondition', 'functions/invalid-argument']) assert.equal(classifyCallable(code).status, 'ok', code);
   assert.equal(classifyCallable('functions/not-found').status, 'fail');
   assert.match(classifyCallable('functions/not-found').fix, /Deploy the functions/);
+  assert.match(classifyCallable('functions/internal', 'internal').detail, /not deployed yet/);
+  assert.match(classifyCallable('functions/internal', 'Could not save the update. Please retry.').detail, /crashed/);
   assert.equal(classifyCallable('functions/internal').status, 'fail');
   assert.equal(classifyCallable('functions/unavailable').status, 'fail');
   assert.equal(classifyCallable('').status, 'ok');
