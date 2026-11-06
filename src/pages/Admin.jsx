@@ -85,7 +85,7 @@ export default function Admin() {
   const saveTeam = async payload => { await service.updateTeam(payload); setEditing(null); setMessage('Team updated.'); };
   function withdraw(team) {
     if (!window.confirm(`Withdraw ${team.captain.firstName}’s team? Its unplayed fixtures are removed and its results stop counting.`)) return;
-    return action(async () => { const r = await service.withdrawTeam({ teamId: team.teamId }); setMessage(`${team.captain.firstName}’s team withdrawn${r.removedFixtures ? `; ${r.removedFixtures} unplayed fixtures removed` : ''}.`); });
+    return action(async () => { const r = await service.withdrawTeam({ teamId: team.teamId }); setMessage(`${team.captain.firstName}’s team withdrawn${r.removedFixtures ? `; ${r.removedFixtures} unplayed fixtures removed` : ''}.${r.promoted?.length ? ` Moved up from the waitlist: ${r.promoted.map(p => `${p.captainFirstName}’s team`).join(', ')}. Message them on WhatsApp.` : ''}`); });
   }
   function resetLogin(team) {
     if (!window.confirm(`Reset the login for ${team.captain.firstName}’s team? A new password is created, the old one stops working, and the captain is signed out on every device.`)) return;
@@ -103,7 +103,7 @@ export default function Admin() {
     if (hasResults && !window.confirm(`Replace the ${tier.name} playoffs? Their results will be deleted.`)) return;
     return attempt(async () => { await service.generatePlayoffs({ tierId: tier.id, seeds }); setMessage(`${tier.name} playoffs created.`); });
   }
-  const saveRules = rules => attempt(async () => { await service.saveLeagueRules(rules); setMessage('League rules saved. Rules cards, standings and playoffs now use them.'); });
+  const saveRules = rules => attempt(async () => { const r = await service.saveLeagueRules(rules); setMessage(`League rules saved. Rules cards, standings and playoffs now use them.${r?.promoted?.length ? ` Moved up from the waitlist: ${r.promoted.map(p => `${p.captainFirstName}’s team`).join(', ')}. Message them on WhatsApp.` : ''}`); });
   const renameSeason = name => attempt(async () => { await service.manageSeason({ action: 'rename', name }); setMessage('Season renamed.'); });
   const archiveSeason = (name, confirm) => attempt(async () => { await service.manageSeason({ action: 'archive', name, confirm }); setMessage(`Season saved to the history. ${name} has started; registration is open to new teams.`); });
   function review(tierId, fixtureId, approve) {
@@ -268,6 +268,7 @@ export default function Admin() {
                   : (
                     <div className="team-admin" key={team.teamId}>
                       <TeamCard team={team} tierName={group.name} tierId={group.id} privateView masked={masked} captainOnly={captainOnly} />
+                      {data?.tiers?.[group.id]?.waitlist?.[team.teamId] && <p className="small note waitlist-badge"><span className="pill">Waitlist</span> #{Object.values(data.tiers[group.id].waitlist).filter(w => w.registeredAt <= team.registeredAt).length} in {group.name}. Not in the draw until a place opens.</p>}
                       <div className="card-actions">
                         <button type="button" className="secondary small" disabled={busy} onClick={() => setEditing(team.teamId)}>Edit</button>
                         <button type="button" className="secondary small" disabled={busy} onClick={() => resetLogin(team)}>Reset login</button>

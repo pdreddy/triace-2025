@@ -2,7 +2,7 @@
 // standings and player ratings. Like tournament.js, every apply* function takes the whole
 // tournament state and returns { state, result }.
 import { addDays, roundStart, validateBuffers, calendarOf } from './calendar.js';
-import { guard, ValidationError, DEFAULT_LEAGUE_RULES, DEFAULT_SEASON_NAME, rulesOf, isOwner, validateRegistration, publicRecord } from './tournament.js';
+import { guard, seatTeam, promoteWaitlist, ValidationError, DEFAULT_LEAGUE_RULES, DEFAULT_SEASON_NAME, rulesOf, isOwner, validateRegistration, publicRecord } from './tournament.js';
 
 export const ROLES = ['captain', 'ace1', 'ace2'];
 export const ROLE_LABELS = { captain: 'Captain', ace1: 'Ace 1', ace2: 'Ace 2' };
@@ -357,8 +357,7 @@ export function applyIssueChallenge(current, payload, uid, isAdmin = false, now 
 // ---------- Team management ----------
 const fixturesWith = (state, teamId) => Object.values(state.fixtures || {}).flatMap(t => Object.values(t || {})).filter(f => f.home === teamId || f.away === teamId);
 function placeTeam(state, record) {
-  for (const tier of Object.values(state.tiers || {})) if (tier.teams) delete tier.teams[record.teamId];
-  for (const tierId of record.listedTiers) { state.tiers[tierId] ||= { teams: {} }; state.tiers[tierId].teams ||= {}; state.tiers[tierId].teams[record.teamId] = publicRecord(record, state.settings); }
+  seatTeam(state, record);
 }
 // The admin can always edit; a captain only until fixtures exist for the team.
 export function applyUpdateTeam(current, payload, uid, isAdmin = false) {
@@ -387,10 +386,11 @@ export function applyWithdrawTeam(current, payload, uid, isAdmin = false, now = 
   const state = structuredClone(current), teamId = previous.teamId;
   delete state.registrations[teamId];
   state.withdrawn ||= {}; state.withdrawn[teamId] = { ...previous, withdrawnAt: now };
-  for (const tier of Object.values(state.tiers || {})) if (tier.teams) delete tier.teams[teamId];
+  for (const tier of Object.values(state.tiers || {})) { if (tier.teams) delete tier.teams[teamId]; if (tier.waitlist) delete tier.waitlist[teamId]; }
+  const promoted = promoteWaitlist(state);   // the first team waiting for the freed place moves up
   for (const owned of Object.values(state.teamsByOwner || {})) delete owned[teamId];
   for (const tier of Object.values(state.fixtures || {})) for (const f of Object.values(tier || {})) if ((f.home === teamId || f.away === teamId) && f.status !== 'final' && !f.stage) delete tier[f.id];
-  return { state, result: { teamId, removedFixtures: scheduled.filter(f => f.status !== 'final' && !f.stage).length } };
+  return { state, result: { teamId, promoted, removedFixtures: scheduled.filter(f => f.status !== 'final' && !f.stage).length } };
 }
 // Records a team's captain login (its account uid and username) and makes the account an owner of the team.
 // Used when the admin resets a login for a team that has none yet; new teams get it from applyRegistration.

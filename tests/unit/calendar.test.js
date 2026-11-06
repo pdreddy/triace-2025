@@ -96,3 +96,31 @@ test('the text backup lists every team with phones, grouped by tier', async () =
   for (const part of ['1 team', '== GOAT Tier (1) ==', 'Arjun Rana', '+15550000001', '+15550000003', 'Login username: arjuace', 'Team ID: t1']) assert.ok(txt.includes(part), part);
   assert.ok(registrationsText({}).includes('0 teams'));
 });
+
+test('after the tier is full, further teams join a waitlist, are told their place, and move up when a place opens', async () => {
+  const { applyWithdrawTeam } = await import('../../functions/lib/league.js');
+  const { applyLeagueRules, DEFAULT_LEAGUE_RULES } = await import('../../functions/lib/tournament.js');
+  let state = initialState();
+  const payload = (n, utr = 600) => ({ teamId: `waitlist-team-${String(n).padStart(4, '0')}`, whatsappPhone: '+15550000001', ace1Phone: '+15550000002', ace2Phone: '+15550000003',
+    captain: { firstName: `Cap${'abcdefghijklmnop'[n]}`, lastName: 'Lee', singlesUtr: utr, doublesUtr: null }, ace1: { fullName: `Ace One ${n}`, singlesUtr: utr, doublesUtr: null }, ace2: { fullName: `Ace Two ${n}`, singlesUtr: utr, doublesUtr: null },
+    selectedTier: 'higher', consent: true, rulesAccepted: true });
+  assert.equal(DEFAULT_LEAGUE_RULES.tierCapacity, 9);
+  const results = [];
+  for (let n = 0; n < 11; n++) { const r = applyRegistration(state, payload(n), `u${n}`, 1000 + n); state = r.state; results.push(r.result); }
+  const tier = results[0].assignedTier;
+  assert.equal(Object.keys(state.tiers[tier].teams).length, 9);
+  assert.ok(results.slice(0, 9).every(r => r.waitlisted.length === 0));
+  assert.deepEqual(results[9].waitlisted, [{ tierId: tier, position: 1 }]);
+  assert.deepEqual(results[10].waitlisted, [{ tierId: tier, position: 2 }]);
+  assert.equal(Object.keys(state.tiers[tier].waitlist).length, 2);
+  assert.deepEqual(applyRegistration(state, payload(9), 'u9', 5000).result.waitlisted, [{ tierId: tier, position: 1 }], 'a repeat reports the same place');
+  const out = applyWithdrawTeam(state, { teamId: payload(2).teamId }, 'x', true);
+  assert.deepEqual(out.result.promoted.map(p => p.teamId), [payload(9).teamId]);
+  assert.equal(Object.keys(out.state.tiers[tier].teams).length, 9);
+  assert.deepEqual(Object.keys(out.state.tiers[tier].waitlist), [payload(10).teamId]);
+  const raised = applyLeagueRules(out.state, { ...DEFAULT_LEAGUE_RULES, tierCapacity: 12 });
+  assert.equal(raised.result.promoted.length, 1);
+  assert.equal(raised.state.tiers[tier].waitlist, undefined);
+  assert.throws(() => applyLeagueRules(state, { ...DEFAULT_LEAGUE_RULES, tierCapacity: 99 }), /0–64/);
+  assert.equal(Object.keys(applyLeagueRules(state, { ...DEFAULT_LEAGUE_RULES, tierCapacity: 0 }).state.tiers[tier].teams).length, 11, 'no limit seats everyone');
+});

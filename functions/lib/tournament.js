@@ -16,7 +16,7 @@ export function playerUtr(singlesUtr, doublesUtr = null, gapLimit = UTR_GAP_LIMI
 }
 // League rules the admin can change. Missing values (older saved data) fall back to these defaults.
 export const DEFAULT_LEAGUE_RULES = {
-  utrGapLimit: 175, pointsPerWin: 2, playoffThreshold: 7, playoffSpotsLarge: 4, playoffSpotsSmall: 3, singlesMinPercent: 30,
+  utrGapLimit: 175, pointsPerWin: 2, playoffThreshold: 7, playoffSpotsLarge: 4, playoffSpotsSmall: 3, singlesMinPercent: 30, tierCapacity: 9,
   // Challenge rule (provisional): a team in challengerFrom–challengerTo may challenge one in targetFrom–targetTo once,
   // before the last challengeCutoffRounds rounds; a challenger win swaps the two places in the table.
   challengeEnabled: true, challengerFrom: 5, challengerTo: 6, targetFrom: 2, targetTo: 4, challengeCutoffRounds: 3
@@ -142,6 +142,38 @@ function canonical(value) { return JSON.stringify(value, (_, item) => item && ty
 // One browser (one anonymous sign-in) can register a few teams, not unlimited ones.
 export const MAX_TEAMS_PER_BROWSER = 3;
 // `login` is the captain's new login account ({ uid, username }); it is added as an owner so signing in on any device manages the team.
+// ---------- Tier capacity and waitlist ----------
+// Each tier seats `tierCapacity` teams (0 = no limit); later registrations join that tier's waitlist, in order of registration, and are
+// seated automatically when a place opens (a withdrawal, or a higher limit).
+export function seatTeam(state, record) {
+  const cap = rulesOf(state).tierCapacity, waitlisted = [];
+  state.tiers ||= {};
+  for (const tier of Object.values(state.tiers)) { if (tier.teams) delete tier.teams[record.teamId]; if (tier.waitlist) delete tier.waitlist[record.teamId]; }
+  for (const tierId of record.listedTiers || []) {
+    const tier = (state.tiers[tierId] ||= { teams: {} });
+    tier.teams ||= {};
+    if (cap > 0 && Object.keys(tier.teams).length >= cap) { (tier.waitlist ||= {})[record.teamId] = { teamId: record.teamId, captainFirstName: record.captain.firstName, registeredAt: record.registeredAt }; waitlisted.push(tierId); }
+    else tier.teams[record.teamId] = publicRecord(record, state.settings);
+  }
+  return waitlisted;
+}
+export const waitlistPosition = (state, tierId, teamId) => Object.values(state.tiers?.[tierId]?.waitlist || {}).sort((a, b) => a.registeredAt - b.registeredAt).findIndex(w => w.teamId === teamId) + 1;
+const waitlistInfo = (state, record, tierIds) => tierIds.map(tierId => ({ tierId, position: waitlistPosition(state, tierId, record.teamId) }));
+// Seats waiting teams while places are free; returns who moved so the admin can tell them.
+export function promoteWaitlist(state) {
+  const cap = rulesOf(state).tierCapacity, moved = [];
+  for (const [tierId, tier] of Object.entries(state.tiers || {})) {
+    const queue = Object.values(tier.waitlist || {}).sort((a, b) => a.registeredAt - b.registeredAt);
+    for (const waiting of queue) {
+      if (cap > 0 && Object.keys(tier.teams || {}).length >= cap) break;
+      const record = state.registrations?.[waiting.teamId];
+      delete tier.waitlist[waiting.teamId];
+      if (record) { (tier.teams ||= {})[waiting.teamId] = publicRecord(record, state.settings); moved.push({ teamId: waiting.teamId, tierId, captainFirstName: record.captain.firstName }); }
+    }
+    if (tier.waitlist && !Object.keys(tier.waitlist).length) delete tier.waitlist;
+  }
+  return moved;
+}
 export function applyRegistration(current, payload, uid, now = Date.now(), login = null) {
   assert(typeof uid === 'string' && uid.length > 0, 'Sign in before registering.');
   assert(current?.settings, 'The admin must initialize tournament settings first.');
@@ -153,7 +185,7 @@ export function applyRegistration(current, payload, uid, now = Date.now(), login
   if (previous) {
     const { ownerUid, registeredAt, owners, captainUid, captainUsername, ...saved } = previous;
     assert(ownerUid === uid && canonical(saved) === canonical(team), 'This registration identifier is already in use.');
-    return { state, result: { teamId: previous.teamId, assignedTier: previous.assignedTier, combinedUtr: previous.combinedUtr, listedTiers: previous.listedTiers || [previous.assignedTier] } };
+    return { state, result: { teamId: previous.teamId, assignedTier: previous.assignedTier, combinedUtr: previous.combinedUtr, listedTiers: previous.listedTiers || [previous.assignedTier], waitlisted: waitlistInfo(state, previous, Object.keys(state.tiers || {}).filter(id => state.tiers[id].waitlist?.[previous.teamId])) } };
   }
   const already = Object.values(state.registrations || {}).filter(r => r.ownerUid === uid).length;
   assert(already < MAX_TEAMS_PER_BROWSER, `You have already registered ${MAX_TEAMS_PER_BROWSER} teams from this browser. Ask the tournament admin if you need to register more.`);
@@ -161,9 +193,8 @@ export function applyRegistration(current, payload, uid, now = Date.now(), login
   state.registrations ||= {}; state.registrations[team.teamId] = record;
   state.teamsByOwner ||= {}; state.teamsByOwner[uid] ||= {}; state.teamsByOwner[uid][team.teamId] = true;
   if (login) { state.teamsByOwner[login.uid] ||= {}; state.teamsByOwner[login.uid][team.teamId] = true; }
-  state.tiers ||= {};
-  for (const tierId of team.listedTiers) { state.tiers[tierId] ||= { teams: {} }; state.tiers[tierId].teams ||= {}; state.tiers[tierId].teams[team.teamId] = publicRecord(record, state.settings); }
-  return { state, result: { teamId: record.teamId, assignedTier: record.assignedTier, combinedUtr: record.combinedUtr, listedTiers: record.listedTiers, created: true } };
+  const waitlisted = seatTeam(state, record);
+  return { state, result: { teamId: record.teamId, assignedTier: record.assignedTier, combinedUtr: record.combinedUtr, listedTiers: record.listedTiers, created: true, waitlisted: waitlistInfo(state, record, waitlisted) } };
 }
 // Admin: the early-bird dates and late surcharge (shown on the rules, the registration page and a site-wide bar).
 export function applyEarlyBird(current, payload) {
@@ -189,7 +220,7 @@ export function applyRecalculation(current) {
   validateTierConfig(current.tierConfig || {});
   const state = structuredClone(current), summary = { reviewed: 0, moved: 0, unchanged: 0, unassigned: 0 };
   state.tiers = {}; state.teamsByOwner = {};
-  for (const team of Object.values(state.registrations || {})) {
+  for (const team of Object.values(state.registrations || {}).sort((a, b) => a.registeredAt - b.registeredAt)) {   // earliest registrations keep their places
     for (const uid of [team.ownerUid, ...Object.keys(team.owners || {})].filter(Boolean)) { state.teamsByOwner[uid] ||= {}; state.teamsByOwner[uid][team.teamId] = true; }
     for (const key of ['captain', 'ace1', 'ace2']) if (Number.isInteger(team[key].singlesUtr)) team[key].utr = playerUtr(team[key].singlesUtr, team[key].doublesUtr ?? null, rulesOf(state).utrGapLimit);
     const total = team.captain.utr + team.ace1.utr + team.ace2.utr;
@@ -197,7 +228,7 @@ export function applyRecalculation(current) {
     summary.reviewed++; if (assigned === (team.assignedTier ?? null) && JSON.stringify(listedTiers(total, state.tierConfig, team.selectedTier)) === JSON.stringify(team.listedTiers || (team.assignedTier ? [team.assignedTier] : []))) summary.unchanged++; else summary.moved++;
     if (!assigned) summary.unassigned++;
     team.combinedUtr = total; team.assignedTier = assigned; team.listedTiers = listedTiers(total, state.tierConfig, team.selectedTier);
-    for (const tierId of team.listedTiers) { state.tiers[tierId] ||= { teams: {} }; state.tiers[tierId].teams[team.teamId] = publicRecord(team, state.settings); }
+    seatTeam(state, team);
   }
   return { state, result: summary };
 }
@@ -217,6 +248,7 @@ export function validateLeagueRules(value) {
   assert(integer(value.playoffThreshold, 2, 64), 'The playoff team threshold must be 2–64.');
   assert(integer(value.playoffSpotsSmall, 2, 4) && integer(value.playoffSpotsLarge, 2, 4), 'Playoff spots must be 2, 3 or 4.');
   assert(integer(value.singlesMinPercent, 0, MAX_SINGLES_PERCENT), `The singles minimum must be 0–${MAX_SINGLES_PERCENT}%. Every encounter has one singles match shared by three players, so a higher minimum cannot work for everyone (30% is the default).`);
+  assert(integer(value.tierCapacity, 0, 64), 'Teams per tier must be 0–64 (0 = no limit). Teams beyond it join the waitlist.');
   assert(typeof value.challengeEnabled === 'boolean', 'Turn the challenge rule on or off.');
   for (const key of ['challengerFrom', 'challengerTo', 'targetFrom', 'targetTo']) assert(integer(value[key], 1, 64), 'Challenge positions must be 1–64.');
   assert(value.challengerFrom <= value.challengerTo && value.targetFrom <= value.targetTo && value.targetTo < value.challengerFrom, 'Challengers must sit below the teams they can challenge.');
@@ -227,5 +259,6 @@ export function applyLeagueRules(current, payload) {
   assert(current?.settings, 'Save the initial tournament configuration first.');
   const state = structuredClone(current);
   state.leagueRules = validateLeagueRules(payload);
-  return { state, result: { leagueRules: state.leagueRules } };
+  const promoted = promoteWaitlist(state);   // a higher limit seats waiting teams straight away
+  return { state, result: { leagueRules: state.leagueRules, promoted } };
 }

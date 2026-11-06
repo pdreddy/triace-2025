@@ -46,6 +46,12 @@ function Success({ result, config, onAgain }) {
       <p className="eyebrow">Registration complete</p>
       <h1>You’re in the <em>draw.</em></h1>
       <p>Team registered successfully! Listed in {listed}, combined UTR {formatUtr(result.combinedUtr)}.</p>
+      {result.waitlisted?.length > 0 && (
+        <div className="early-bird late waitlist-note" role="status">
+          <span className="pill">Waitlist</span>
+          <span><strong>{result.waitlisted.length > 1 && result.waitlisted.length === (result.listedTiers || []).length ? 'Both tiers are full, so you are on the waitlist.' : 'This tier is full, so you are on the waitlist.'}</strong> {result.waitlisted.map(w => `${config[w.tierId]?.name || w.tierId}: #${w.position}`).join(' · ')}. Your registration is saved. If a place opens you move up automatically and the tournament admin will message you on WhatsApp. Keep your login safe.</span>
+        </div>
+      )}
       {(bird.phase === 'open' || bird.phase === 'late') && <p className={`early-bird ${bird.phase}`}><span className="pill">{bird.phase === 'open' ? 'Early bird' : 'After early bird'}</span><span>{bird.phase === 'open' ? 'You registered during the early-bird period.' : bird.detail}</span></p>}
       <dl className="success-facts">
         <div><dt>Combined UTR</dt><dd>{formatUtr(result.combinedUtr)}</dd></div>
