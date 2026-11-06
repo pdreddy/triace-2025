@@ -173,7 +173,11 @@ test('partner board: a picked player is shown publicly with who picked them, the
   const adminCard = admin.locator('.partner-card', { hasText: 'Pickme' });
   await adminCard.getByRole('button', { name: 'Mark as picked' }).click();                    // the admin can mark any post
   await adminCard.getByRole('button', { name: 'Show as picked' }).click();
-  await expect(adminCard).toContainText('Picked');
-  await adminCard.getByRole('button', { name: 'Remove' }).click();
+  await expect(admin.getByText('Marked as picked.')).toBeVisible();
+  await expect(adminCard).toHaveCount(0);                                                       // it leaves the Players list...
+  await admin.getByRole('tab', { name: /^Picked/ }).click();                                    // ...and is listed under Picked
+  const adminPicked = admin.locator('.partner-card', { hasText: 'Pickme' });
+  await expect(adminPicked).toContainText('Joined a team');
+  await adminPicked.getByRole('button', { name: 'Remove' }).click();
   await expect(admin.locator('.partner-card', { hasText: 'Pickme' })).toHaveCount(0);
 });

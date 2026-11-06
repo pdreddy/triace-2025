@@ -10,6 +10,7 @@ firebase-config.json
 .local-demo/
 test-results/
 playwright-report/
+backups/
 dist-pwa/
 
 # Editor and OS files

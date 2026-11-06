@@ -108,6 +108,14 @@ export default function Admin() {
   function review(tierId, fixtureId, approve) {
     return action(async () => { await service.reviewResult({ tierId, fixtureId, approve }); setMessage(approve ? 'Result approved. Standings are updated.' : 'Submission rejected. The captains can submit again.'); });
   }
+  // A full copy of what the admin can read (private registrations + the public tournament data), saved as a JSON file on this device.
+  function exportBackup() {
+    const { fixtures, tiers, settings, tierConfig, leagueRules, calendar, earlyBird, schedules, season, seasons } = data || {};
+    const blob = new Blob([JSON.stringify({ backedUpAt: new Date().toISOString(), registrations: teams, settings, tierConfig, leagueRules, calendar, earlyBird, schedules, fixtures, tiers, season, seasons }, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob), link = document.createElement('a');
+    link.href = url; link.download = `traice-backup-${new Date().toISOString().slice(0, 10)}.json`; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
   function exportCsv() {
     const blob = new Blob(['﻿' + registrationsCsv(teams, data?.tierConfig || {}, { captainOnly })], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob), link = document.createElement('a');
@@ -230,6 +238,7 @@ export default function Admin() {
               </select>
             </div>
             <button className="secondary" disabled={loading || !!readError} onClick={exportCsv}>Export private CSV ↓</button>
+            <button className="secondary" disabled={loading || !!readError} onClick={exportBackup}>Download full backup ↓</button>
           </div>
           <label className="checkbox pane pane-teams"><input type="checkbox" checked={captainOnly} onChange={e => setCaptainOnly(e.target.checked)} /><span>Captain only: hide the other players (cards, search and export)</span></label>
           <label className="checkbox pane pane-teams"><input type="checkbox" checked={reveal} disabled={captainOnly} onChange={e => setReveal(e.target.checked)} /><span>Reveal Ace names in admin cards</span></label>

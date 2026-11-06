@@ -21,6 +21,7 @@
     "check:pwa": "node scripts/check-pwa.mjs",
     "test:pwa": "playwright test -c playwright.pwa.config.js",
     "preflight": "node scripts/preflight.mjs",
+    "backup": "node scripts/backup.cjs",
     "rules:generate": "node scripts/generate-rules.mjs",
     "rules:check": "node scripts/generate-rules.mjs --check",
     "rules:deploy": "node scripts/generate-rules.mjs && firebase deploy --only database"

@@ -68,3 +68,15 @@ test('admin adds another admin, who can sign in; resets and removes them', async
   await expect(box.locator('li', { hasText: '(you)' })).toHaveCount(1);
   await expect(box.locator('li', { hasText: '(you)' }).getByRole('button', { name: 'Remove' })).toHaveCount(0);
 });
+
+test('admin downloads a full backup file with the registrations', async ({ page }) => {
+  await adminLogin(page);
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: /Download full backup/ }).click();
+  const file = await download;
+  expect(file.suggestedFilename()).toMatch(/^traice-backup-\d{4}-\d{2}-\d{2}\.json$/);
+  const backup = JSON.parse(await (await import('node:fs/promises')).readFile(await file.path(), 'utf8'));
+  expect(Object.keys(backup.registrations).length).toBeGreaterThan(0);
+  expect(JSON.stringify(backup.registrations)).toContain('+1555');       // private phone numbers are in the admin's backup
+  expect(backup.calendar.seasonStart).toBe('2027-01-04');
+});

@@ -105,3 +105,9 @@ Deploy the functions **before** the web app goes live: the first visit calls `bo
 - **Add buffer** pushes every later round back by the weeks you choose (rain-off, holiday). A single match can still be moved from the League tab.
 - **Admins tab**: add an administrator by sign-in name (they sign in at `/admin/login` with that name); the 12-character password is shown once. Reset password and Remove are there too; you cannot remove yourself or the last admin.
 - New backend functions: `saveCalendar`, `autoSchedule`, `addBufferWeeks`, `listAdmins`, `createAdmin`, `resetAdminPassword`, `removeAdmin`. Deploy with `./deploy.sh --no-hosting --rules` (the `calendar` node needs the new database rule), then the site.
+
+## Backups
+
+- **Admin → Teams → Download full backup**: one JSON file with every registration (private details), fixtures, results, calendar and rules, saved on the device you are using. Do this before and after registration closes, and before every deploy.
+- **From your Mac (complete copy, including Season 1 and the partner board)**: `npm run backup` (after `gcloud auth application-default login`). It writes `backups/traice-backup-<time>.json`; the folder is git-ignored because it holds phone numbers. Keep a copy somewhere private (iCloud, Drive).
+- Also turn on Firebase's own safety net: Console → Realtime Database → Backups (daily, needs the Blaze plan).
