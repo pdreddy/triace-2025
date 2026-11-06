@@ -123,6 +123,8 @@ export function bootstrapState(current) {
 }
 export function publicState(state) { return { partnerPosts: state.partnerPosts || {}, earlyBird: state.earlyBird, settings: state.settings, tierConfig: state.tierConfig || {}, configRevision: state.configRevision || 0, tiers: state.tiers || {}, fixtures: state.fixtures || {}, leagueRules: rulesOf(state), season: state.season || { name: DEFAULT_SEASON_NAME }, seasons: state.seasons || {}, schedules: state.schedules || {} }; }
 function canonical(value) { return JSON.stringify(value, (_, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).filter(key => item[key] !== null && item[key] !== undefined).sort().map(key => [key, item[key]])) : item); }
+// One browser (one anonymous sign-in) can register a few teams, not unlimited ones.
+export const MAX_TEAMS_PER_BROWSER = 3;
 // `login` is the captain's new login account ({ uid, username }); it is added as an owner so signing in on any device manages the team.
 export function applyRegistration(current, payload, uid, now = Date.now(), login = null) {
   assert(typeof uid === 'string' && uid.length > 0, 'Sign in before registering.');
@@ -135,6 +137,8 @@ export function applyRegistration(current, payload, uid, now = Date.now(), login
     assert(ownerUid === uid && canonical(saved) === canonical(team), 'This registration identifier is already in use.');
     return { state, result: { teamId: previous.teamId, assignedTier: previous.assignedTier, combinedUtr: previous.combinedUtr, listedTiers: previous.listedTiers || [previous.assignedTier] } };
   }
+  const already = Object.values(state.registrations || {}).filter(r => r.ownerUid === uid).length;
+  assert(already < MAX_TEAMS_PER_BROWSER, `You have already registered ${MAX_TEAMS_PER_BROWSER} teams from this browser. Ask the tournament admin if you need to register more.`);
   const record = { ...team, ownerUid: uid, registeredAt: now, ...(login ? { captainUid: login.uid, captainUsername: login.username, owners: { [login.uid]: true } } : {}) };
   state.registrations ||= {}; state.registrations[team.teamId] = record;
   state.teamsByOwner ||= {}; state.teamsByOwner[uid] ||= {}; state.teamsByOwner[uid][team.teamId] = true;

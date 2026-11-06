@@ -44,6 +44,8 @@ All of this is in the browser, on the **Admin** page (sign in at `/admin/login`)
 
 > **After adding the partner board you must redeploy the backend and the rules:** `./deploy.sh --no-hosting` (new functions `createPartnerPost`, `expressInterest`, `closePartnerPost`) and publish the updated rules (`./deploy.sh --no-hosting --rules` after merging them into the live rules). New nodes: `partnerPosts` (public read), `partnerPrivate` and `partnerByOwner` (owner or admin only).
 
+> **Registration safeguards:** one browser can register at most 3 teams (ask the admin for more). If a captain login cannot be created (for example Email/Password is switched off), the team is still registered with a "login pending" note and the admin creates the login later with **Reset login** on the team card. Teams without a login show "not created yet" there.
+
 ## 1. Firebase project (needs your Firebase account)
 
 - [ ] Realtime Database enabled; Authentication → **Email/Password** and **Anonymous** enabled.

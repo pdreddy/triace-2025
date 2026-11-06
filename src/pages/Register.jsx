@@ -50,6 +50,9 @@ function Success({ result, config, onAgain }) {
         <div><dt>Combined UTR</dt><dd>{formatUtr(result.combinedUtr)}</dd></div>
         <div><dt>Registration ID</dt><dd className="mono">{result.teamId}</dd></div>
       </dl>
+      {result.loginPending && (
+        <div className="early-bird late" role="status"><span className="pill">Login pending</span><span><strong>Your team is registered.</strong> We couldn’t create your captain login automatically. The tournament admin will send it to you; keep your Registration ID below.</span></div>
+      )}
       {result.login && <LoginCard login={result.login} teamLabel={`${result.captainName || 'your'}’s team`} />}
       {result.login && <label className="checkbox saved-check"><input type="checkbox" checked={saved} onChange={e => setSaved(e.target.checked)} /><span>I’ve saved my username and password</span></label>}
       <div className="success-actions">

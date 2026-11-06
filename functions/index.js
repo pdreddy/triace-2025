@@ -7,6 +7,7 @@ import { applyRegistration, applyEarlyBird, applyConfiguration, applyRecalculati
 import { applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult, applyManageSeason, applySetSchedule, applyMoveFixture, applyIssueChallenge, applyUpdateTeam, applyWithdrawTeam, applySetCaptainLogin } from './lib/league.js';
 import { getAuth } from 'firebase-admin/auth';
 import { newLogin, newPassword, captainUid, loginEmail } from './lib/captainLogin.js';
+import { runRegistration } from './lib/registerFlow.js';
 import { resolveDbPaths } from './lib/paths.js';
 import { validateLegacySeason } from './lib/legacy.js';
 initializeApp();
@@ -64,19 +65,18 @@ async function createCaptainAccount(uid, firstName, password = newPassword()) {
   throw new HttpsError('aborted', 'Could not create a login. Please retry.');
 }
 // Registering also creates the captain's login (username + 8-character password), returned once for the captain to save.
+// If the login cannot be created the team is still registered (loginPending) and the admin creates it with Reset login.
 export const registerTeam = onCall(options, async request => {
   requireAuth(request);
   const teamId = request.data?.teamId;
   if (typeof teamId !== 'string' || !TEAM_ID.test(teamId)) throw new HttpsError('failed-precondition', 'Invalid registration identifier.');
-  const uid = captainUid(teamId);
-  let login = null;
-  try { login = await createCaptainAccount(uid, request.data?.captain?.firstName); }
-  catch (error) { if (error.code !== 'auth/uid-already-exists') { if (error instanceof HttpsError) throw error; console.error('Captain login failed', { code: error.code }); throw new HttpsError('internal', 'Could not create the team login. Please retry.'); } }   // already exists: a repeat of the same request
-  let result;
-  try { result = await mutate(state => applyRegistration(state, request.data, request.auth.uid, Date.now(), login && { uid, username: login.username })); }
-  catch (error) { if (login) await getAuth().deleteUser(uid).catch(() => {}); throw error; }   // registration refused: don't leave an orphan login
-  if (!result.created && login) await getAuth().deleteUser(uid).catch(() => {});
-  return result.created && login ? { ...result, login } : result;
+  return runRegistration({
+    teamId, firstName: request.data?.captain?.firstName,
+    createAccount: createCaptainAccount,
+    deleteAccount: uid => getAuth().deleteUser(uid),
+    register: login => mutate(state => applyRegistration(state, request.data, request.auth.uid, Date.now(), login)),
+    log: error => console.error('Captain login could not be created; the team is registered without one', { code: error?.code })
+  });
 });
 export const saveConfiguration = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyConfiguration(state, request.data)); });
 export const recalculateTiers = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyRecalculation(state)); });

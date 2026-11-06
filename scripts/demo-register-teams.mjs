@@ -42,11 +42,19 @@ if (!session?.ok) { console.error('Cannot reach the demo. Start it first with ./
 console.log('\nRegistering 5 teams');
 const logins = new Map();
 for (const team of TEAMS) {
-  const result = await visitor.call('register', team.payload);
+  const browser = new Client(); await browser.call('session');                 // each team from its own browser: one browser may register only a few
+  const result = await browser.call('register', team.payload);
   const { assignedTier, login } = result.json;
   check(`${team.captain}’s team registered in ${team.tier.toUpperCase()} with a login`, result.ok && assignedTier === team.tier && /^[a-z0-9]+-[a-z2-9]{4}$/.test(login?.username || '') && /^[a-z2-9]{8}$/.test(login?.password || ''), `${result.status} ${result.text.slice(0, 120)}`);
   logins.set(team.payload.teamId, login);
 }
+
+console.log('\nOne browser cannot register unlimited teams');
+const greedy = new Client(); await greedy.call('session');
+const attempts = [];
+for (let i = 0; i < 4; i++) attempts.push(await greedy.call('register', { ...structuredClone(TEAMS[0].payload), teamId: `demo-${randomUUID()}` }));
+check('the first three teams from one browser are accepted', attempts.slice(0, 3).every(r => r.ok), attempts.map(r => r.status).join());
+check('a fourth team from the same browser is refused', !attempts[3].ok && /already registered 3 teams/.test(attempts[3].text), `${attempts[3].status} ${attempts[3].text.slice(0, 100)}`);
 
 console.log('\nRules that must reject');
 const bad = async (name, mutate, expected) => {
