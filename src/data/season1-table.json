@@ -1,0 +1,366 @@
+{
+ "_note": "Season 1 published group tables, team members and Super Six details, edited by hand. 'champions' are the Super Six tier winners.",
+ "champions": {
+  "goat": {
+   "winner": "a1",
+   "runnerUp": "a2"
+  },
+  "rising": {
+   "winner": "a5",
+   "runnerUp": "b5"
+  }
+ },
+ "tables": {
+  "a": [
+   {
+    "teamId": "a2",
+    "members": "Prashant/Vinoth/Vamsi",
+    "m": 10,
+    "w": 9,
+    "l": 1,
+    "game": 158,
+    "singles": 109,
+    "pts": 26
+   },
+   {
+    "teamId": "a1",
+    "members": "Yogesh/Dinkar/Sudarshan",
+    "m": 9,
+    "w": 9,
+    "l": 0,
+    "game": 91,
+    "singles": 49,
+    "pts": 17
+   },
+   {
+    "teamId": "a3",
+    "members": "Sudhakar/Dinesh/Uma",
+    "m": 11,
+    "w": 6,
+    "l": 5,
+    "game": 56,
+    "singles": 36,
+    "pts": 3
+   },
+   {
+    "teamId": "a7",
+    "members": "Sreekanth B/Uday P/Sashi R",
+    "m": 8,
+    "w": 4,
+    "l": 4,
+    "game": -8,
+    "singles": -1,
+    "pts": 0
+   },
+   {
+    "teamId": "a5",
+    "members": "Hari/Ram/Satish",
+    "m": 8,
+    "w": 4,
+    "l": 4,
+    "game": -25,
+    "singles": -8,
+    "pts": -2
+   },
+   {
+    "teamId": "a9",
+    "members": "Harsha S/Vijay V/Kartha V",
+    "m": 4,
+    "w": 1,
+    "l": 3,
+    "game": -51,
+    "singles": -32,
+    "pts": -6
+   },
+   {
+    "teamId": "a4",
+    "members": "Sandeep G/Damu/Vidhya Sagar",
+    "m": 10,
+    "w": 2,
+    "l": 8,
+    "game": -62,
+    "singles": -45,
+    "pts": -12
+   },
+   {
+    "teamId": "a6",
+    "members": "Nagarjuna/Mohan/Ganesh",
+    "m": 6,
+    "w": 1,
+    "l": 5,
+    "game": -69,
+    "singles": -46,
+    "pts": -12
+   },
+   {
+    "teamId": "a8",
+    "members": "Mayur Patel/Chandrakant/Pardeep K",
+    "m": 6,
+    "w": 0,
+    "l": 6,
+    "game": -90,
+    "singles": -62,
+    "pts": -14
+   }
+  ],
+  "b": [
+   {
+    "teamId": "b2",
+    "members": "Kalyan/Sandeep/Uday",
+    "m": 10,
+    "w": 9,
+    "l": 1,
+    "game": 92,
+    "singles": 56,
+    "pts": 16
+   },
+   {
+    "teamId": "b3",
+    "members": "Kails/Raja M/Vivek Reddy",
+    "m": 9,
+    "w": 6,
+    "l": 3,
+    "game": 43,
+    "singles": 34,
+    "pts": 15
+   },
+   {
+    "teamId": "b5",
+    "members": "Narayan P/Ratnesh/Jay S",
+    "m": 9,
+    "w": 6,
+    "l": 3,
+    "game": 34,
+    "singles": 36,
+    "pts": 5
+   },
+   {
+    "teamId": "b6",
+    "members": "Vinod A/Raj K/Krishna",
+    "m": 9,
+    "w": 5,
+    "l": 4,
+    "game": 20,
+    "singles": -9,
+    "pts": 5
+   },
+   {
+    "teamId": "b4",
+    "members": "Venky DH/Kalam/Vasu",
+    "m": 0,
+    "w": 0,
+    "l": 0,
+    "game": 0,
+    "singles": 0,
+    "pts": 0
+   },
+   {
+    "teamId": "b1",
+    "members": "Manish/Biju/Ritesh",
+    "m": 11,
+    "w": 5,
+    "l": 6,
+    "game": 36,
+    "singles": 11,
+    "pts": -1
+   },
+   {
+    "teamId": "b8",
+    "members": "Mahi/Shivaji/Vikas",
+    "m": 5,
+    "w": 2,
+    "l": 3,
+    "game": -22,
+    "singles": -20,
+    "pts": -3
+   },
+   {
+    "teamId": "b7",
+    "members": "Srikanth/Bharat/Sridhar",
+    "m": 8,
+    "w": 4,
+    "l": 4,
+    "game": -27,
+    "singles": 8,
+    "pts": -4
+   },
+   {
+    "teamId": "b9",
+    "members": "Chandu M/Dinesh K/Malla",
+    "m": 13,
+    "w": 0,
+    "l": 13,
+    "game": -176,
+    "singles": -116,
+    "pts": -33
+   }
+  ]
+ },
+ "superSix": {
+  "tiers": {
+   "goat": {
+    "name": "GOAT tier",
+    "teams": [
+     "a1",
+     "a2",
+     "a3",
+     "b1",
+     "b2",
+     "b3"
+    ]
+   },
+   "rising": {
+    "name": "Rising Aces",
+    "teams": [
+     "a4",
+     "a5",
+     "a7",
+     "b5",
+     "b6",
+     "b7"
+    ]
+   }
+  },
+  "rosters": {
+   "a1": "Yogesh / Dinkar / Sudharshan",
+   "a2": "Prashanth / Vinoth / Vamsi",
+   "a3": "Sudhakar / Dinesh / Uma",
+   "b1": "Manish / Biju / Ritesh",
+   "b2": "Kalyan / Kalam / Uday",
+   "b3": "Kailas / Raja M / Vivek Reddy",
+   "a4": "Sandeep G / Damu / Raj C",
+   "a5": "Hari / Ram / Satish",
+   "a7": "Sreekanth B / Uday P / Sashi R",
+   "b5": "Narayan P / Ratnesh / Jay S",
+   "b6": "Vinod A / Raj K / Krishna",
+   "b7": "Avinash / Bharat / Sridhar"
+  },
+  "weeks": [
+   {
+    "date": "Apr 10",
+    "label": "Week 1",
+    "matches": {
+     "goat": [
+      {
+       "home": "a1",
+       "away": "b1"
+      },
+      {
+       "home": "a2",
+       "away": "b2"
+      },
+      {
+       "home": "a3",
+       "away": "b3"
+      }
+     ],
+     "rising": [
+      {
+       "home": "a7",
+       "away": "b6"
+      },
+      {
+       "home": "a5",
+       "away": "b5"
+      },
+      {
+       "home": "a4",
+       "away": "b7"
+      }
+     ]
+    }
+   },
+   {
+    "date": "Apr 17",
+    "label": "Week 2",
+    "matches": {
+     "goat": [
+      {
+       "home": "a1",
+       "away": "b2"
+      },
+      {
+       "home": "a2",
+       "away": "b3"
+      },
+      {
+       "home": "a3",
+       "away": "b1"
+      }
+     ],
+     "rising": [
+      {
+       "home": "a7",
+       "away": "b5"
+      },
+      {
+       "home": "a5",
+       "away": "b7"
+      },
+      {
+       "home": "a4",
+       "away": "b6"
+      }
+     ]
+    }
+   },
+   {
+    "date": "Apr 24",
+    "label": "Week 3",
+    "matches": {
+     "goat": [
+      {
+       "home": "a1",
+       "away": "b3"
+      },
+      {
+       "home": "a2",
+       "away": "b1"
+      },
+      {
+       "home": "a3",
+       "away": "b2"
+      }
+     ],
+     "rising": [
+      {
+       "home": "a7",
+       "away": "b7"
+      },
+      {
+       "home": "a5",
+       "away": "b6"
+      },
+      {
+       "home": "a4",
+       "away": "b5"
+      }
+     ]
+    }
+   }
+  ],
+  "scoring": {
+   "matchPoints": [
+    [
+     "3–0 win",
+     "+3 pts"
+    ],
+    [
+     "3–1 win",
+     "+2 pts"
+    ],
+    [
+     "3–2 win",
+     "+1 pt"
+    ]
+   ],
+   "note": "Bigger win = more points"
+  }
+ },
+ "fullNames": {
+  "Hari": "Hari Mothkuri",
+  "Chandrakant": "Chandrakant Dharme",
+  "Raj C": "Raj Chinta"
+ },
+ "_fullNamesNote": "Short name used in the squads -> full name found in the Season 1 database (only names the DB actually spells out). Add more here as they are confirmed."
+}

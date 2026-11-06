@@ -6,13 +6,21 @@ import { Icon } from '../components/Icons';
 import { FixtureCard, teamIndex } from '../components/League';
 import { LeagueRulesCard, PlayoffPlanner, ScheduleForm, SeasonCard } from '../components/AdminLeague';
 import { TeamEditForm } from '../components/TeamTools';
+import FirebasePanel from '../components/FirebasePanel';
+import EarlyBirdAdmin from '../components/EarlyBirdAdmin';
+import AdminCalendar from '../components/AdminCalendar';
+import AdminUsers from '../components/AdminUsers';
+import LoginCard from '../components/LoginCard';
+import { registrationsText } from '../../functions/lib/backupText.js';
 import { DEFAULT_SETTINGS, DEFAULT_TIERS, orderedTiers, parseUtr, validateSettings, validateTierConfig, registrationsCsv } from '../../functions/lib/tournament.js';
 
 const SECTIONS = [
   { id: 'settings', label: 'Registration & privacy', short: 'Settings', icon: 'shield' },
   { id: 'tiers', label: 'Tier configuration', short: 'Tiers', icon: 'trophy' },
   { id: 'teams', label: 'Private registrations', short: 'Teams', icon: 'register' },
-  { id: 'league', label: 'League & results', short: 'League', icon: 'calendar' }
+  { id: 'calendar', label: 'Dates & schedule', short: 'Dates', icon: 'calendar' },
+  { id: 'league', label: 'League & results', short: 'League', icon: 'calendar' },
+  { id: 'admins', label: 'Administrators', short: 'Admins', icon: 'shield' }
 ];
 const draftFrom = data => ({
   settings: { ...(data?.settings || DEFAULT_SETTINGS) },
@@ -31,7 +39,7 @@ export default function Admin() {
   const { teams, loading, error: readError } = useRegistrations();
   const [draft, setDraft] = useState(() => draftFrom(data)), [dirty, setDirty] = useState(false), [busy, setBusy] = useState(false);
   const [error, setError] = useState(''), [message, setMessage] = useState(''), [summary, setSummary] = useState(null);
-  const [query, setQuery] = useState(''), [filter, setFilter] = useState('all'), [reveal, setReveal] = useState(true), [newId, setNewId] = useState(''), [tab, setTab] = useState('settings'), [editing, setEditing] = useState(null);
+  const [query, setQuery] = useState(''), [filter, setFilter] = useState('all'), [reveal, setReveal] = useState(true), [issued, setIssued] = useState(null), [captainOnly, setCaptainOnlyState] = useState(() => localStorage.getItem('traice.admin.captainOnly') === '1'), [newId, setNewId] = useState(''), [tab, setTab] = useState('settings'), [editing, setEditing] = useState(null);
 
   useEffect(() => {
     if (data && !dirty && (data.configRevision || 0) >= draft.expectedRevision) setDraft(draftFrom(data));
@@ -55,6 +63,7 @@ export default function Admin() {
       setMessage('Rules saved. Public name visibility updates immediately; recalculate tiers if ranges changed.');
     });
   }
+  function setCaptainOnly(value) { setCaptainOnlyState(value); localStorage.setItem('traice.admin.captainOnly', value ? '1' : '0'); }
   function reload() { setDraft(draftFrom(data)); setDirty(false); setError(''); }
   function recalculate() {
     return action(async () => { setSummary(await service.recalculate()); setMessage('Tier recalculation completed.'); });
@@ -76,11 +85,11 @@ export default function Admin() {
   const saveTeam = async payload => { await service.updateTeam(payload); setEditing(null); setMessage('Team updated.'); };
   function withdraw(team) {
     if (!window.confirm(`Withdraw ${team.captain.firstName}’s team? Its unplayed fixtures are removed and its results stop counting.`)) return;
-    return action(async () => { const r = await service.withdrawTeam({ teamId: team.teamId }); setMessage(`${team.captain.firstName}’s team withdrawn${r.removedFixtures ? `; ${r.removedFixtures} unplayed fixtures removed` : ''}.`); });
+    return action(async () => { const r = await service.withdrawTeam({ teamId: team.teamId }); setMessage(`${team.captain.firstName}’s team withdrawn${r.removedFixtures ? `; ${r.removedFixtures} unplayed fixtures removed` : ''}.${r.promoted?.length ? ` Moved up from the waitlist: ${r.promoted.map(p => `${p.captainFirstName}’s team`).join(', ')}. Message them on WhatsApp.` : ''}`); });
   }
-  function newCaptainCode(team) {
-    if (!window.confirm(`Issue a new captain code for ${team.captain.firstName}’s team? The old code stops working; devices already linked keep access.`)) return;
-    return action(async () => { const r = await service.resetCaptainCode({ teamId: team.teamId }); setMessage(`New captain code for ${team.captain.firstName}’s team: ${r.captainCode}. Send it to the captain; it isn’t shown again.`); });
+  function resetLogin(team) {
+    if (!window.confirm(`Reset the login for ${team.captain.firstName}’s team? A new password is created, the old one stops working, and the captain is signed out on every device.`)) return;
+    return action(async () => { const r = await service.resetCaptainLogin({ teamId: team.teamId }); setIssued({ teamId: team.teamId, label: `${team.captain.firstName}’s team`, login: { username: r.username, password: r.password } }); });
   }
   function generateFixtures(tier) {
     const existing = Object.values(data?.fixtures?.[tier.id] || {});
@@ -94,21 +103,38 @@ export default function Admin() {
     if (hasResults && !window.confirm(`Replace the ${tier.name} playoffs? Their results will be deleted.`)) return;
     return attempt(async () => { await service.generatePlayoffs({ tierId: tier.id, seeds }); setMessage(`${tier.name} playoffs created.`); });
   }
-  const saveRules = rules => attempt(async () => { await service.saveLeagueRules(rules); setMessage('League rules saved. Rules cards, standings and playoffs now use them.'); });
+  const saveRules = rules => attempt(async () => { const r = await service.saveLeagueRules(rules); setMessage(`League rules saved. Rules cards, standings and playoffs now use them.${r?.promoted?.length ? ` Moved up from the waitlist: ${r.promoted.map(p => `${p.captainFirstName}’s team`).join(', ')}. Message them on WhatsApp.` : ''}`); });
   const renameSeason = name => attempt(async () => { await service.manageSeason({ action: 'rename', name }); setMessage('Season renamed.'); });
   const archiveSeason = (name, confirm) => attempt(async () => { await service.manageSeason({ action: 'archive', name, confirm }); setMessage(`Season saved to the history. ${name} has started; registration is open to new teams.`); });
   function review(tierId, fixtureId, approve) {
     return action(async () => { await service.reviewResult({ tierId, fixtureId, approve }); setMessage(approve ? 'Result approved. Standings are updated.' : 'Submission rejected. The captains can submit again.'); });
   }
+  // A full copy of what the admin can read (private registrations + the public tournament data), saved as a JSON file on this device.
+  function exportBackup() {
+    const { fixtures, tiers, settings, tierConfig, leagueRules, calendar, earlyBird, schedules, season, seasons } = data || {};
+    const blob = new Blob([JSON.stringify({ backedUpAt: new Date().toISOString(), registrations: teams, settings, tierConfig, leagueRules, calendar, earlyBird, schedules, fixtures, tiers, season, seasons }, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob), link = document.createElement('a');
+    link.href = url; link.download = `traice-backup-${new Date().toISOString().slice(0, 10)}.json`; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  function backupNow() {
+    return action(async () => { const r = await service.backupNow(); setMessage(`Backed up ${r.teams} team(s) to ${r.bucket}: ${r.json}`); });
+  }
+  function exportText() {
+    const blob = new Blob([registrationsText(teams, data?.tierConfig || {})], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob), link = document.createElement('a');
+    link.href = url; link.download = `traice-registrations-${new Date().toISOString().slice(0, 10)}.txt`; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
   function exportCsv() {
-    const blob = new Blob(['﻿' + registrationsCsv(teams, data?.tierConfig || {})], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['﻿' + registrationsCsv(teams, data?.tierConfig || {}, { captainOnly })], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob), link = document.createElement('a');
     link.href = url; link.download = `traice-registrations-${new Date().toISOString().slice(0, 10)}.csv`; link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   const q = query.toLowerCase().trim();
-  const filtered = Object.values(teams).filter(t => (filter === 'all' || listedIn(t).includes(filter)) && [t.teamId, t.captain.firstName, t.ace1.fullName, t.ace2.fullName].some(v => v.toLowerCase().includes(q)));
+  const filtered = Object.values(teams).filter(t => (filter === 'all' || listedIn(t).includes(filter)) && (captainOnly ? [t.teamId, t.captain.firstName] : [t.teamId, t.captain.firstName, t.ace1.fullName, t.ace2.fullName]).some(v => v.toLowerCase().includes(q)));
   const liveTiers = orderedTiers(data?.tierConfig || {});
   const groups = [...liveTiers.map(t => ({ id: t.id, name: t.name })), { id: 'unassigned', name: 'Unassigned' }];
   const tally = id => Object.values(teams).filter(t => listedIn(t).includes(id)).length;
@@ -143,6 +169,13 @@ export default function Admin() {
       </div>
       <Message error>{error || readError}</Message>
       <Message>{message}</Message>
+      {issued && (
+        <section className="card issued-login" aria-live="polite">
+          <LoginCard login={issued.login} teamLabel={issued.label} title={`New login for ${issued.label}`} />
+          <p className="small">Send this to the captain now. It is shown only once and is gone when you close it.</p>
+          <button type="button" className="secondary small" onClick={() => setIssued(null)}>Done, I’ve sent it</button>
+        </section>
+      )}
 
       <div className="admin-layout">
         <nav className="admin-nav" aria-label="Dashboard sections">
@@ -192,6 +225,8 @@ export default function Admin() {
             </fieldset>
           </form>
 
+          <EarlyBirdAdmin service={service} saved={data?.earlyBird} disabled={busy || !connected || !data} />
+
           <section className="recalculate pane pane-tiers">
             <div>
               <h3>Keep every team in the right tier.</h3>
@@ -213,9 +248,13 @@ export default function Admin() {
               </select>
             </div>
             <button className="secondary" disabled={loading || !!readError} onClick={exportCsv}>Export private CSV ↓</button>
+            <button className="secondary" disabled={loading || !!readError} onClick={exportBackup}>Download full backup ↓</button>
+            <button className="secondary" disabled={loading || !!readError} onClick={exportText}>Save as text file ↓</button>
+            <button className="secondary" disabled={busy || !connected} onClick={backupNow}>Back up now (cloud)</button>
           </div>
-          <label className="checkbox pane pane-teams"><input type="checkbox" checked={reveal} onChange={e => setReveal(e.target.checked)} /><span>Reveal Ace names in admin cards</span></label>
-          <p className="small note pane pane-teams">{filtered.length} of {total} registrations. Exports include all registrations and private names, regardless of the current filter.</p>
+          <label className="checkbox pane pane-teams"><input type="checkbox" checked={captainOnly} onChange={e => setCaptainOnly(e.target.checked)} /><span>Captain only: hide the other players (cards, search and export)</span></label>
+          <label className="checkbox pane pane-teams"><input type="checkbox" checked={reveal} disabled={captainOnly} onChange={e => setReveal(e.target.checked)} /><span>Reveal Ace names in admin cards</span></label>
+          <p className="small note pane pane-teams">{filtered.length} of {total} registrations. Exports include all registrations{captainOnly ? ' (captains only)' : ' and private names'}, regardless of the current filter.</p>
           {loading && <Message>Loading private registrations…</Message>}
           {!loading && !filtered.length && <Message>No registrations match.</Message>}
           {groups.map(group => {
@@ -228,10 +267,11 @@ export default function Admin() {
                   ? <TeamEditForm key={team.teamId} registration={team} tierConfig={data?.tierConfig} onSave={saveTeam} onCancel={() => setEditing(null)} />
                   : (
                     <div className="team-admin" key={team.teamId}>
-                      <TeamCard team={team} tierName={group.name} tierId={group.id} privateView masked={masked} />
+                      <TeamCard team={team} tierName={group.name} tierId={group.id} privateView masked={masked} captainOnly={captainOnly} />
+                      {data?.tiers?.[group.id]?.waitlist?.[team.teamId] && <p className="small note waitlist-badge"><span className="pill">Waitlist</span> #{Object.values(data.tiers[group.id].waitlist).filter(w => w.registeredAt <= team.registeredAt).length} in {group.name}. Not in the draw until a place opens.</p>}
                       <div className="card-actions">
                         <button type="button" className="secondary small" disabled={busy} onClick={() => setEditing(team.teamId)}>Edit</button>
-                        <button type="button" className="secondary small" disabled={busy} onClick={() => newCaptainCode(team)}>New captain code</button>
+                        <button type="button" className="secondary small" disabled={busy} onClick={() => resetLogin(team)}>Reset login</button>
                         <button type="button" className="danger" disabled={busy} onClick={() => withdraw(team)}>Withdraw</button>
                       </div>
                     </div>
@@ -240,7 +280,10 @@ export default function Admin() {
             );
           })}
 
-          <SectionTitle id="league" num="04">League &amp; results</SectionTitle>
+          <SectionTitle id="calendar" num="04">Dates &amp; schedule</SectionTitle>
+          <AdminCalendar service={service} saved={data?.calendar} tiers={liveTiers.map(t => ({ id: t.id, name: t.name, teams: Object.keys(data?.tiers?.[t.id]?.teams || {}).length }))} disabled={busy || !connected || !data?.settings} />
+
+          <SectionTitle id="league" num="05">League &amp; results</SectionTitle>
           <p className="small note pane pane-league">Every league rule is set here. Create each tier’s round-robin schedule once its teams are final, then map the playoffs. Captains submit scores from the League page; they count once you approve them. You can also enter or correct any result there.</p>
           <div className="league-admin pane pane-league">
             <LeagueRulesCard rules={data?.leagueRules} busy={busy || !connected || !data?.settings} onSave={saveRules} />
@@ -265,8 +308,12 @@ export default function Admin() {
             })}
             <Link className="secondary" to="/league">Open the League page ↗</Link>
           </div>
+
+          <SectionTitle id="admins" num="06">Administrators</SectionTitle>
+          <AdminUsers service={service} disabled={busy || !connected || !data?.settings} />
         </div>
       </div>
+      <FirebasePanel service={service} data={data} />
     </section>
   );
 }

@@ -5,6 +5,8 @@ import { RulesAccessProvider, useRulesAccess } from './hooks/useRulesAccess';
 import { usePwa } from './hooks/usePwa';
 import { Message } from './components/UI';
 import { Icon } from './components/Icons';
+import { EarlyBirdBar } from './components/EarlyBird';
+import { diagnose } from './services/diagnose.js';
 
 const Rules = lazy(() => import('./pages/Rules'));
 const Register = lazy(() => import('./pages/Register'));
@@ -16,9 +18,13 @@ const Team = lazy(() => import('./pages/Team'));
 const Players = lazy(() => import('./pages/Players'));
 const Player = lazy(() => import('./pages/Player'));
 const History = lazy(() => import('./pages/History'));
+const Champions = lazy(() => import('./pages/Champions'));
+const CaptainLogin = lazy(() => import('./pages/CaptainLogin'));
+const Partners = lazy(() => import('./pages/Partners'));
+const Status = lazy(() => import('./pages/Status'));
 
 const FRIENDLY_ERROR = 'We can’t reach the tournament right now. Please check your connection and try again shortly.';
-const SCREENS = { '/': 'rules', '/register': 'register', '/tiers': 'tiers', '/league': 'league', '/players': 'players', '/admin/login': 'login', '/admin': 'admin' };
+const SCREENS = { '/': 'rules', '/register': 'register', '/tiers': 'tiers', '/league': 'league', '/players': 'players', '/champions': 'champions', '/partners': 'partners', '/admin/login': 'login', '/captain': 'login', '/admin': 'admin' };
 
 function StatusPill({ mode, connected, online }) {
   const state = !online ? 'offline' : connected ? 'live' : 'connecting';
@@ -38,7 +44,7 @@ function NotFound() {
 }
 
 function Layout() {
-  const { service, connected, error, user } = useTournament();
+  const { service, connected, error, user, savedAt } = useTournament();
   const { accepted } = useRulesAccess();
   const { canInstall, install, online, updated } = usePwa();
   const path = useLocation().pathname, screen = SCREENS[path] || (path.startsWith('/team/') ? 'team' : path.startsWith('/player/') ? 'player' : path.startsWith('/history') ? 'history' : 'other');
@@ -63,21 +69,34 @@ function Layout() {
             <NavLink to="/tiers"><Icon name="trophy" /><span>Tier list</span></NavLink>
             <NavLink to="/league"><Icon name="calendar" /><span>League</span></NavLink>
             <NavLink to="/players"><Icon name="users" /><span>Players</span></NavLink>
+            <NavLink to="/partners" aria-label="Find a partner"><Icon name="partner" /><span className="tab-long">Find a partner</span><span className="tab-short">Partner</span></NavLink>
+            <NavLink to="/champions"><Icon name="trophy" /><span>Champions</span></NavLink>
             <NavLink className="admin-tab" to={user?.admin ? '/admin' : '/admin/login'}><Icon name="shield" /><span>Admin</span></NavLink>
           </nav>
           <div className="topbar-actions">
             <StatusPill mode={service.mode} connected={connected} online={online} />
             <NavLink className="chip-button admin-chip" to={user?.admin ? '/admin' : '/admin/login'} aria-label="Admin"><Icon name="shield" size={16} /></NavLink>
-            {canInstall && <button type="button" className="chip-button" onClick={install}><Icon name="download" size={16} /><span>Install app</span></button>}
-            {user?.admin && <button type="button" className="chip-button" disabled={loggingOut} onClick={logout}><Icon name="logout" size={16} /><span>{loggingOut ? 'Signing out…' : 'Sign out'}</span></button>}
+            {!user?.admin && <NavLink className="chip-button" to="/captain" aria-label={user?.captain ? 'My team' : 'Captain sign in'}><Icon name="user" size={16} /><span>{user?.captain ? 'My team' : 'Captain'}</span></NavLink>}
+            {canInstall && <button type="button" className="chip-button" aria-label="Install app" onClick={install}><Icon name="download" size={16} /><span>Install app</span></button>}
+            {(user?.admin || user?.captain) && <button type="button" className="chip-button" aria-label="Sign out" disabled={loggingOut} onClick={logout}><Icon name="logout" size={16} /><span>{loggingOut ? 'Signing out…' : 'Sign out'}</span></button>}
           </div>
         </div>
       </header>
 
+      <EarlyBirdBar />
       <main>
         {!online && <p className="banner offline" role="status"><Icon name="wifiOff" size={16} /> You’re offline. Saved pages still work; reconnect before registering.</p>}
+        {savedAt && <p className="banner offline" role="status"><Icon name="wifiOff" size={16} /> Showing data saved {new Date(savedAt).toLocaleString()}. It refreshes as soon as a connection is available.</p>}
         {updated && <p className="banner update" role="status"><Icon name="refresh" size={16} /> A new version is ready. <button type="button" onClick={() => location.reload()}>Reload</button></p>}
         <Message error>{shownError}</Message>
+        {error && shownError === FRIENDLY_ERROR && (
+          <details className="error-details">
+            <summary>Technical details (for the tournament admin)</summary>
+            <p><code>{error}</code></p>
+            <p><strong>Likely fix:</strong> {diagnose(error)}</p>
+            <p><Link to="/status">Run the full setup check →</Link></p>
+          </details>
+        )}
         <Suspense fallback={<div className="page-loading" aria-busy="true"><span className="spinner" /> Loading…</div>}>
           <Routes>
             <Route path="/" element={<Rules />} />
@@ -87,6 +106,10 @@ function Layout() {
             <Route path="/team/:teamId" element={<Team />} />
             <Route path="/players" element={<Players />} />
             <Route path="/player/:teamId/:role" element={<Player />} />
+            <Route path="/partners" element={<Partners />} />
+            <Route path="/status" element={<Status />} />
+            <Route path="/captain" element={<CaptainLogin />} />
+            <Route path="/champions" element={<Champions />} />
             <Route path="/history" element={<History />} />
             <Route path="/history/:seasonId" element={<History />} />
             <Route path="/admin/login" element={<Login />} />

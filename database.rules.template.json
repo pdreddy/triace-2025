@@ -1,0 +1,67 @@
+{
+  "_note": "Template for database.rules.json. Do not edit database.rules.json by hand: change this file, then run npm run rules:generate. The root node is placed at the configured database root and the Season 1 path is made publicly readable.",
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "__DB_ROOT__": {
+      ".read": "auth != null && auth.token.admin === true",
+      "settings": {
+        ".read": true
+      },
+      "tierConfig": {
+        ".read": true
+      },
+      "configRevision": {
+        ".read": true
+      },
+      "tiers": {
+        ".read": true
+      },
+      "registrations": {
+        ".read": "auth != null && auth.token.admin === true",
+        "$teamId": {
+          ".read": "auth != null && (data.child('ownerUid').val() === auth.uid || data.child('owners').child(auth.uid).val() === true)"
+        }
+      },
+      "fixtures": {
+        ".read": true
+      },
+      "teamsByOwner": {
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid"
+        }
+      },
+      "leagueRules": {
+        ".read": true
+      },
+      "season": {
+        ".read": true
+      },
+      "seasons": {
+        ".read": true
+      },
+      "schedules": {
+        ".read": true
+      },
+      "earlyBird": {
+        ".read": true
+      },
+      "calendar": {
+        ".read": true
+      },
+      "partnerPosts": {
+        ".read": true
+      },
+      "partnerPrivate": {
+        "$postId": {
+          ".read": "auth != null && (data.child('ownerUid').val() === auth.uid || auth.token.admin === true)"
+        }
+      },
+      "partnerByOwner": {
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid"
+        }
+      }
+    }
+  }
+}

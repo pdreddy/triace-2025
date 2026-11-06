@@ -103,6 +103,9 @@ export default function Tiers() {
             {view === 'cards'
               ? <div className="team-list">{teams.map(team => <TeamCard key={team.teamId} team={team} tierName={tier.name} tierId={tier.id} rank={ranks.get(team.teamId)} />)}</div>
               : teams.length > 0 && <Standings teams={teams} ranks={ranks} />}
+            {Object.keys(data?.tiers?.[tier.id]?.waitlist || {}).length > 0 && (
+              <p className="small note waitlist-public"><b>Waitlist ({Object.keys(data.tiers[tier.id].waitlist).length}):</b> {Object.values(data.tiers[tier.id].waitlist).sort((a, b) => a.registeredAt - b.registeredAt).map((w, i) => `${i + 1}. ${w.captainFirstName}’s team`).join(' · ')}. They move up if a team withdraws.</p>
+            )}
             {!teams.length && (
               <EmptyState title={members.length ? 'No teams match your search.' : 'No teams in this tier yet.'}>
                 {!members.length && <Link className="secondary" to="/register">Be the first to register</Link>}
