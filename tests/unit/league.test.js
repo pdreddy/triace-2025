@@ -332,7 +332,7 @@ test('a captain login owns the team on any device, survives recalculation, and t
 import { MAX_SINGLES_PERCENT, validateLeagueRules } from '../../functions/lib/tournament.js';
 test('the singles minimum is something every player of a three-player team can reach', () => {
   assert.equal(MAX_SINGLES_PERCENT, 33);
-  assert.equal(DEFAULT_LEAGUE_RULES.singlesMinPercent, 25);
+  assert.equal(DEFAULT_LEAGUE_RULES.singlesMinPercent, 30);
   for (let percent = 0; percent <= MAX_SINGLES_PERCENT; percent++) {
     for (let matchDays = 1; matchDays <= 40; matchDays++) {
       const each = Math.floor((matchDays * percent) / 100);
@@ -346,10 +346,10 @@ test('the singles minimum is something every player of a three-player team can r
 test('an impossible singles minimum can neither be saved nor applied', () => {
   for (const bad of [34, 40, 50, 100]) assert.throws(() => validateLeagueRules({ ...DEFAULT_LEAGUE_RULES, singlesMinPercent: bad }), /0–33%/, `${bad}`);
   assert.doesNotThrow(() => validateLeagueRules({ ...DEFAULT_LEAGUE_RULES, singlesMinPercent: 33 }));
-  assert.equal(rulesOf({}).singlesMinPercent, 25, 'nothing saved: the default');
+  assert.equal(rulesOf({}).singlesMinPercent, 30, 'nothing saved: the default');
   assert.equal(rulesOf({ leagueRules: { singlesMinPercent: 40 } }).singlesMinPercent, 33, 'an older saved 40% is capped');
-  assert.equal(rulesOf({ leagueRules: { singlesMinPercent: 30 } }).singlesMinPercent, 30);
-  // a team can really meet it: 8 match days at the default needs 2 singles days each (6 of the 8 singles matches)
+  assert.equal(rulesOf({ leagueRules: { singlesMinPercent: 28 } }).singlesMinPercent, 28);
+  // a team can really meet it: 8 match days at the default 30% need 2 singles days each (6 of the 8 singles matches)
   const state = league(2), id = Object.keys(state.registrations)[0];
-  assert.equal(singlesEligibility(id, state.fixtures.goat, rulesOf(state)).required, Math.floor((Object.values(state.fixtures.goat).length * 25) / 100));
+  assert.equal(singlesEligibility(id, state.fixtures.goat, rulesOf(state)).required, Math.floor((Object.values(state.fixtures.goat).length * 30) / 100));
 });

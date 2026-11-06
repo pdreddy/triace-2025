@@ -27,7 +27,7 @@ export function LeagueRulesCard({ rules = DEFAULT_LEAGUE_RULES, busy, onSave }) 
       <fieldset disabled={busy} className="rules-grid">
         <Field id="rule-gap" label="Singles/doubles gap before averaging (UTR)" type="number" min="0" max="16.5" step="0.01" required {...number('utrGapLimit')} />
         <Field id="rule-points" label="Points per encounter win" type="number" min="1" max="10" step="1" required {...number('pointsPerWin')} />
-        <Field id="rule-singles" label="Singles minimum (% of match days)" type="number" min="0" max="33" step="1" required {...number('singlesMinPercent')} hint="Max 33. One singles match per encounter is shared by three players, so a higher number cannot work for everyone. 25 recommended." />
+        <Field id="rule-singles" label="Singles minimum (% of match days)" type="number" min="0" max="33" step="1" required {...number('singlesMinPercent')} hint="Max 33. One singles match per encounter is shared by three players, so a higher number cannot work for everyone. Default 30." />
         <Field id="rule-threshold" label="Larger playoff above this many teams" type="number" min="2" max="64" step="1" required {...number('playoffThreshold')} />
         <div className="field"><label htmlFor="playoffSpotsLarge">Playoff spots above the threshold</label>{spots('playoffSpotsLarge')}</div>
         <div className="field"><label htmlFor="playoffSpotsSmall">Playoff spots at or below it</label>{spots('playoffSpotsSmall')}</div>
