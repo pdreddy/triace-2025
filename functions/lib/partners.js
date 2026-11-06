@@ -5,7 +5,7 @@
 import { ValidationError, playerUtr, normalizeWhatsAppPhone, rulesOf } from './tournament.js';
 
 export const KINDS = ['player', 'team'];                       // player: wants a team · team: a captain wants players
-export const LIMITS = { postsPerUser: 2, postsTotal: 300, interestsPerPost: 25, interestsPerUser: 20, note: 160, message: 200, name: 40, expireDays: 30 };
+export const LIMITS = { postsPerUser: 2, postsTotal: 300, interestsPerPost: 25, interestsPerUser: 20, note: 160, message: 200, name: 40, expireDays: 30, pickedDays: 14 };
 const DAY = 86400000;
 const ID = /^[A-Za-z0-9_-]{8,40}$/;
 const NAME = /^[\p{L}][\p{L} .'’-]{0,39}$/u;
@@ -47,8 +47,8 @@ export function validatePost(payload, settings, gap) {
 
 function prune(state, now) {
   for (const [id, post] of Object.entries(state.partnerPosts || {})) {
-    if (now - post.createdAt <= LIMITS.expireDays * 1.5 * DAY) continue;
-    removePost(state, id);
+    const stale = now - post.createdAt > LIMITS.expireDays * 1.5 * DAY, oldPick = post.status === 'picked' && now - (post.pickedAt || post.createdAt) > LIMITS.pickedDays * DAY;
+    if (stale || oldPick) removePost(state, id);
   }
 }
 function removePost(state, id) {
@@ -64,12 +64,12 @@ export function applyCreatePost(current, payload, uid, now = Date.now(), id) {
   const state = structuredClone(current);
   prune(state, now);
   assert(!state.partnerPosts?.[id], 'This post already exists.');
-  const mine = Object.keys(state.partnerByOwner?.[uid] || {}).filter(postId => state.partnerPosts?.[postId]);
+  const mine = Object.keys(state.partnerByOwner?.[uid] || {}).filter(postId => state.partnerPosts?.[postId] && state.partnerPosts[postId].status !== 'picked');   // a picked post frees the slot
   assert(mine.length < LIMITS.postsPerUser, `You can have ${LIMITS.postsPerUser} open posts at a time. Remove one first.`);
   assert(Object.keys(state.partnerPosts || {}).length < LIMITS.postsTotal, 'The board is full right now. Please try again later.');
   const { post, whatsapp } = validatePost(payload, current.settings, rulesOf(current).utrGapLimit);
   state.partnerPosts ||= {}; state.partnerPrivate ||= {}; state.partnerByOwner ||= {};
-  state.partnerPosts[id] = { id, ...post, createdAt: now, interested: 0 };
+  state.partnerPosts[id] = { id, ...post, status: 'open', createdAt: now, interested: 0 };
   state.partnerPrivate[id] = { ownerUid: uid, whatsapp, interests: {} };
   state.partnerByOwner[uid] ||= {}; state.partnerByOwner[uid][id] = true;
   return { state, result: { postId: id } };
@@ -82,6 +82,7 @@ export function applyExpressInterest(current, payload, uid, now = Date.now(), in
   assert(payload && typeof payload === 'object' && !Array.isArray(payload), 'Fill in the form.');
   const post = current?.partnerPosts?.[payload.postId], secret = current?.partnerPrivate?.[payload.postId];
   assert(post && secret, 'That post is no longer on the board.');
+  assert(post.status !== 'picked', 'This one has already been picked.');
   assert(secret.ownerUid !== uid, 'This is your own post.');
   assert(!Object.values(secret.interests || {}).some(i => i.uid === uid), 'You already showed interest in this post.');
   assert(Object.keys(secret.interests || {}).length < LIMITS.interestsPerPost, 'This post has enough replies already.');
@@ -103,5 +104,31 @@ export function applyClosePost(current, payload, uid, isAdmin = false) {
   assert(isAdmin, 'Only the admin can remove posts. Ask the tournament admin.');
   const state = structuredClone(current);
   removePost(state, payload.postId);
+  return { state, result: { postId: payload.postId } };
+}
+
+// Marked as picked: a player was taken by a team, or a team filled its spot. It stays on the board (as Picked) for a while.
+// The poster or the admin can do it; either can undo it with applyReopenPost.
+export function applyMarkPicked(current, payload, uid, isAdmin = false, now = Date.now()) {
+  const secret = current?.partnerPrivate?.[payload?.postId], post = current?.partnerPosts?.[payload?.postId];
+  assert(secret && post, 'That post is already gone.');
+  assert(isAdmin || (uid && secret.ownerUid === uid), 'Only the person who posted it, or the admin, can mark it as picked.');
+  assert(post.status !== 'picked', 'This post is already marked as picked.');
+  const pickedBy = text(payload?.pickedBy ?? '', LIMITS.name, 'Picked by');
+  const state = structuredClone(current);
+  Object.assign(state.partnerPosts[payload.postId], { status: 'picked', pickedAt: now, pickedBy });
+  return { state, result: { postId: payload.postId, pickedBy } };
+}
+
+export function applyReopenPost(current, payload, uid, isAdmin = false) {
+  const secret = current?.partnerPrivate?.[payload?.postId], post = current?.partnerPosts?.[payload?.postId];
+  assert(secret && post, 'That post is already gone.');
+  assert(isAdmin || (uid && secret.ownerUid === uid), 'Only the person who posted it, or the admin, can reopen it.');
+  assert(post.status === 'picked', 'This post is not marked as picked.');
+  const mine = Object.keys(current.partnerByOwner?.[secret.ownerUid] || {}).filter(id => current.partnerPosts?.[id] && current.partnerPosts[id].status !== 'picked');
+  assert(mine.length < LIMITS.postsPerUser, `They already have ${LIMITS.postsPerUser} open posts.`);
+  const state = structuredClone(current);
+  state.partnerPosts[payload.postId].status = 'open';
+  delete state.partnerPosts[payload.postId].pickedAt; delete state.partnerPosts[payload.postId].pickedBy;
   return { state, result: { postId: payload.postId } };
 }

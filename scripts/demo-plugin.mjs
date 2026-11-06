@@ -5,7 +5,7 @@ import { initialState, publicState, applyRegistration, applyConfiguration, apply
 import { applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult, applyManageSeason, applySetSchedule, applyMoveFixture, applyIssueChallenge, applyUpdateTeam, applyWithdrawTeam, applySetCaptainLogin } from '../functions/lib/league.js';
 import { newPassword, usernameAttempt, loginNames, captainUid, loginEmail, normalizePassword } from '../functions/lib/captainLogin.js';
 import { validateLegacySeason } from '../functions/lib/legacy.js';
-import { applyCreatePost, applyExpressInterest, applyClosePost } from '../functions/lib/partners.js';
+import { applyCreatePost, applyExpressInterest, applyClosePost, applyMarkPicked, applyReopenPost } from '../functions/lib/partners.js';
 const digest = value => createHash('sha256').update(value).digest();
 // Demo captain logins are kept in the demo state with a salted hash (never the password).
 const hashPassword = (password, salt = randomBytes(16).toString('hex')) => ({ salt, hash: scryptSync(normalizePassword(password), salt, 32).toString('hex') });
@@ -103,6 +103,8 @@ export function demoPlugin(env) {
         const newId = () => randomBytes(10).toString('hex');
         if (endpoint === '/partner-post') return signedIn ? send(200, await mutate(current => applyCreatePost(current, payload, session.uid, Date.now(), newId()))) : send(401, { error: 'Open the page again, then retry.' });
         if (endpoint === '/partner-interest') return signedIn ? send(200, await mutate(current => applyExpressInterest(current, payload, session.uid, Date.now(), newId()))) : send(401, { error: 'Open the page again, then retry.' });
+        if (endpoint === '/partner-picked') return signedIn ? send(200, await mutate(current => applyMarkPicked(current, payload, session.uid, admin))) : send(401, { error: 'Open the page again, then retry.' });
+        if (endpoint === '/partner-reopen') return signedIn ? send(200, await mutate(current => applyReopenPost(current, payload, session.uid, admin))) : send(401, { error: 'Open the page again, then retry.' });
         if (endpoint === '/partner-close') return signedIn ? send(200, await mutate(current => applyClosePost(current, payload, session.uid, admin))) : send(401, { error: 'Open the page again, then retry.' });
         if (endpoint === '/issue-challenge') return signedIn ? send(200, await mutate(current => applyIssueChallenge(current, payload, session.uid, admin))) : send(401, { error: 'Sign in first.' });
         if (endpoint === '/update-team') return signedIn ? send(200, await mutate(current => applyUpdateTeam(current, payload, session.uid, admin))) : send(401, { error: 'Sign in first.' });

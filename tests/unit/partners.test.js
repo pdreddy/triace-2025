@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { initialState, publicState } from '../../functions/lib/tournament.js';
-import { applyCreatePost, applyExpressInterest, applyClosePost, validatePost, LIMITS } from '../../functions/lib/partners.js';
+import { applyCreatePost, applyExpressInterest, applyClosePost, applyMarkPicked, applyReopenPost, validatePost, LIMITS } from '../../functions/lib/partners.js';
 
 const settings = initialState().settings, gap = 175;
 const player = (extra = {}) => ({ kind: 'player', firstName: 'Maya', singlesUtr: 625, doublesUtr: null, note: 'Free weekday evenings', whatsapp: '+1 (555) 010-2000', ...extra });
@@ -116,4 +116,49 @@ test('old posts are cleaned up when anyone posts', () => {
   assert.equal(next.partnerPosts.post_000001, undefined);
   assert.ok(next.partnerPosts.post_000002);
   assert.deepEqual(next.partnerByOwner.u1, {});
+});
+
+test('a post can be marked as picked, publicly, by the poster or the admin', () => {
+  const state = post(initialState(), player()).state;
+  assert.equal(state.partnerPosts.post_000001.status, 'open');
+  const picked = applyMarkPicked(state, { postId: 'post_000001', pickedBy: ' Ravi’s team ' }, 'u1', false, 5000).state.partnerPosts.post_000001;
+  assert.deepEqual([picked.status, picked.pickedBy, picked.pickedAt], ['picked', 'Ravi’s team', 5000]);
+  assert.equal(publicState(applyMarkPicked(state, { postId: 'post_000001', pickedBy: 'Ravi’s team' }, 'u1').state).partnerPosts.post_000001.pickedBy, 'Ravi’s team', 'shown to everyone');
+  assert.equal(applyMarkPicked(state, { postId: 'post_000001' }, 'someone', true).state.partnerPosts.post_000001.status, 'picked', 'the admin can');
+  assert.equal(applyMarkPicked(state, { postId: 'post_000001' }, 'u1').state.partnerPosts.post_000001.pickedBy, '', 'who picked is optional');
+  assert.throws(() => applyMarkPicked(state, { postId: 'post_000001', pickedBy: 'x' }, 'u2'), /Only the person who posted it, or the admin/);
+  assert.throws(() => applyMarkPicked(state, { postId: 'nope' }, 'u1'), /already gone/);
+  assert.throws(() => applyMarkPicked(state, { postId: 'post_000001', pickedBy: 'see http://x.example' }, 'u1'), /cannot contain links/);
+  assert.throws(() => applyMarkPicked(state, { postId: 'post_000001', pickedBy: 'x'.repeat(41) }, 'u1'), /at most 40/);
+  const once = applyMarkPicked(state, { postId: 'post_000001' }, 'u1').state;
+  assert.throws(() => applyMarkPicked(once, { postId: 'post_000001' }, 'u1'), /already marked as picked/);
+});
+
+test('nobody can show interest in a picked post, and the poster’s slot is freed', () => {
+  let state = post(initialState(), player(), 'u1', 'post_000001').state;
+  state = post(state, team(), 'u1', 'post_000002').state;
+  assert.throws(() => post(state, player(), 'u1', 'post_000003'), /2 open posts/);
+  state = applyMarkPicked(state, { postId: 'post_000001', pickedBy: 'Ravi' }, 'u1').state;
+  assert.throws(() => applyExpressInterest(state, interest(), 'u2', 2000, 'int_0000001'), /already been picked/);
+  assert.ok(post(state, player(), 'u1', 'post_000003'), 'a picked post no longer counts as open');
+});
+
+test('a picked post can be reopened by the poster or the admin', () => {
+  const picked = applyMarkPicked(post(initialState(), player()).state, { postId: 'post_000001', pickedBy: 'Ravi' }, 'u1', false, 5000).state;
+  const reopened = applyReopenPost(picked, { postId: 'post_000001' }, 'u1').state.partnerPosts.post_000001;
+  assert.deepEqual([reopened.status, reopened.pickedBy, reopened.pickedAt], ['open', undefined, undefined]);
+  assert.equal(applyReopenPost(picked, { postId: 'post_000001' }, 'x', true).state.partnerPosts.post_000001.status, 'open');
+  assert.throws(() => applyReopenPost(picked, { postId: 'post_000001' }, 'u2'), /Only the person who posted it, or the admin/);
+  assert.throws(() => applyReopenPost(post(initialState(), player()).state, { postId: 'post_000001' }, 'u1'), /not marked as picked/);
+  let full = post(post(picked, player(), 'u1', 'post_000002').state, team(), 'u1', 'post_000003').state;   // two new open posts
+  assert.throws(() => applyReopenPost(full, { postId: 'post_000001' }, 'u1'), /already have 2 open posts/);
+});
+
+test('picked posts disappear from the board after two weeks', () => {
+  const picked = applyMarkPicked(post(initialState(), player(), 'u1', 'post_000001', 1000).state, { postId: 'post_000001', pickedBy: 'Ravi' }, 'u1', false, 2000).state;
+  const soon = post(picked, player(), 'u2', 'post_000002', 2000 + 13 * 86400000).state;
+  assert.ok(soon.partnerPosts.post_000001, 'still shown inside the two weeks');
+  const later = post(picked, player(), 'u2', 'post_000002', 2000 + LIMITS.pickedDays * 86400000 + 1).state;
+  assert.equal(later.partnerPosts.post_000001, undefined);
+  assert.equal(later.partnerPrivate.post_000001, undefined, 'the private side goes too');
 });

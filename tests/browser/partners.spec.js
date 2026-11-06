@@ -121,3 +121,59 @@ test('partner board: a team with two players looks for a third, and posts are ch
   await admin.locator('.partner-card', { hasText: 'Ravi' }).getByRole('button', { name: 'Remove' }).click();
   await expect(admin.locator('.partner-card', { hasText: 'Ravi' })).toHaveCount(0);
 });
+
+test('partner board: a picked player is shown publicly with who picked them, then can be reopened', async ({ browser }) => {
+  const poster = await (await browser.newContext()).newPage();
+  await post(poster, { name: 'Pickme', singles: '6.50', whatsapp: '+15550107000', note: 'Weekday evenings' });
+  await expect(poster.getByText('Posted.')).toBeVisible();
+
+  const visitor = await (await browser.newContext()).newPage();
+  await visitor.goto('/partners');
+  const card = visitor.locator('.partner-card', { hasText: 'Pickme' });
+  await expect(card.getByRole('button', { name: 'I’m interested' })).toBeVisible();
+  await expect(card.getByRole('button', { name: 'Mark as picked' })).toHaveCount(0);          // only the poster or the admin
+
+  // the poster marks it picked and says by whom
+  const mine = poster.locator('.partner-card', { hasText: 'Pickme' });
+  await mine.getByRole('button', { name: 'Mark as picked' }).click();
+  await mine.getByLabel(/Picked by which team/).fill('Ravi’s team');
+  await mine.getByRole('button', { name: 'Show as picked' }).click();
+  await expect(poster.getByText('Marked as picked by Ravi’s team.')).toBeVisible();
+  await expect(mine).toContainText('Picked');
+  await expect(mine).toContainText('Joined a team: Ravi’s team');
+
+  // everyone sees it under Picked, no longer under Players, and cannot show interest
+  await visitor.reload();
+  await expect(visitor.locator('.partner-card', { hasText: 'Pickme' })).toHaveCount(0);       // not in the Players list any more
+  await visitor.getByRole('tab', { name: /^Picked/ }).click();
+  const pickedCard = visitor.locator('.partner-card', { hasText: 'Pickme' });
+  await expect(pickedCard).toBeVisible();
+  await expect(pickedCard).toContainText('Joined a team: Ravi’s team');
+  await expect(pickedCard.getByRole('button', { name: 'I’m interested' })).toHaveCount(0);
+  const publicData = await (await visitor.request.get('/api/public')).json();
+  const record = Object.values(publicData.partnerPosts).find(p => p.firstName === 'Pickme');
+  expect([record.status, record.pickedBy]).toEqual(['picked', 'Ravi’s team']);
+  expect(JSON.stringify(publicData)).not.toContain('5550107000');
+
+  // a mistake: the poster reopens it and it is back on the board
+  await mine.getByRole('button', { name: 'Reopen' }).click();
+  await expect(poster.getByText('Reopened.')).toBeVisible();
+  await visitor.reload();
+  await expect(visitor.locator('.partner-card', { hasText: 'Pickme' }).getByRole('button', { name: 'I’m interested' })).toBeVisible();
+
+  // clean up as admin
+  const admin = await (await browser.newContext()).newPage();
+  await admin.goto('/admin/login');
+  await admin.getByLabel('Username or email').fill('reddi2026');
+  await admin.getByLabel('Password', { exact: true }).fill(password);
+  await admin.getByRole('button', { name: 'Sign in ↗', exact: true }).click();
+  await expect(admin).toHaveURL(/\/admin$/);
+  await admin.goto('/partners');
+  admin.on('dialog', d => d.accept());
+  const adminCard = admin.locator('.partner-card', { hasText: 'Pickme' });
+  await adminCard.getByRole('button', { name: 'Mark as picked' }).click();                    // the admin can mark any post
+  await adminCard.getByRole('button', { name: 'Show as picked' }).click();
+  await expect(adminCard).toContainText('Picked');
+  await adminCard.getByRole('button', { name: 'Remove' }).click();
+  await expect(admin.locator('.partner-card', { hasText: 'Pickme' })).toHaveCount(0);
+});

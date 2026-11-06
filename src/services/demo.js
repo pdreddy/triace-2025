@@ -29,6 +29,8 @@ export function createDemoService() {
     createPartnerPost: payload => request('partner-post', payload),
     expressInterest: payload => request('partner-interest', payload),
     closePartnerPost: payload => request('partner-close', payload),
+    markPartnerPicked: payload => request('partner-picked', payload),
+    reopenPartnerPost: payload => request('partner-reopen', payload),
     subscribeMyPartnerPosts: (uid, callback) => poll('partner-mine', callback, () => callback({})),
     saveEarlyBird: payload => request('early-bird', payload),
     saveLeagueRules: payload => request('league-rules', payload),

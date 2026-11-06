@@ -93,6 +93,8 @@ export function createFirebaseService() {
     createPartnerPost: withError(async payload => (await httpsCallable(functions, 'createPartnerPost')(payload)).data),
     expressInterest: withError(async payload => (await httpsCallable(functions, 'expressInterest')(payload)).data),
     closePartnerPost: withError(async payload => (await httpsCallable(functions, 'closePartnerPost')(payload)).data),
+    markPartnerPicked: withError(async payload => (await httpsCallable(functions, 'markPartnerPicked')(payload)).data),
+    reopenPartnerPost: withError(async payload => (await httpsCallable(functions, 'reopenPartnerPost')(payload)).data),
     // The poster's private side of their own posts: who replied. Ids come from partnerByOwner, then each post is read on its own.
     subscribeMyPartnerPosts(uid, callback) {
       const posts = {}, offs = new Map();

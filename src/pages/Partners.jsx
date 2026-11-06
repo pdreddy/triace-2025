@@ -61,18 +61,25 @@ function InterestForm({ post, service, onDone }) {
 
 function PostCard({ post, secret, mine, admin, service, onMessage }) {
   const [open, setOpen] = useState(false), [contact, setContact] = useState(() => loadContacts()[post.id] || null), [busy, setBusy] = useState(false);
-  const team = post.kind === 'team';
+  const [picking, setPicking] = useState(false), [pickedBy, setPickedBy] = useState('');
+  const team = post.kind === 'team', picked = post.status === 'picked', canManage = mine || admin;
   async function remove() {
     if (!window.confirm('Remove this post?')) return;
     setBusy(true);
     try { await service.closePartnerPost({ postId: post.id }); onMessage('Post removed.'); } catch (e) { onMessage(e.message); setBusy(false); }
   }
+  async function act(fn, done) {
+    setBusy(true);
+    try { await fn(); onMessage(done); setPicking(false); setPickedBy(''); } catch (e) { onMessage(e.message); } finally { setBusy(false); }
+  }
+  const markPicked = () => act(() => service.markPartnerPicked({ postId: post.id, pickedBy }), pickedBy.trim() ? `Marked as picked by ${pickedBy.trim()}.` : 'Marked as picked.');
+  const reopen = () => act(() => service.reopenPartnerPost({ postId: post.id }), 'Reopened. It is back on the board.');
   return (
-    <article className={`partner-card ${team ? 'team' : 'player'}${mine ? ' mine' : ''}`} aria-label={`${post.firstName}: ${team ? 'team needs a player' : 'available to join a team'}`}>
+    <article className={`partner-card ${team ? 'team' : 'player'}${mine ? ' mine' : ''}${picked ? ' picked' : ''}`} aria-label={`${post.firstName}: ${team ? 'team needs a player' : 'available to join a team'}`}>
       <header>
-        <span className="pill">{team ? `Team needs ${post.needs} more` : 'Available to join a team'}</span>
+        {picked ? <span className="pill picked-pill"><Icon name="check" size={14} /> Picked</span> : <span className="pill">{team ? `Team needs ${post.needs} more` : 'Available to join a team'}</span>}
         {mine && <span className="pill mine-pill">Your post</span>}
-        <small>{ago(post.createdAt)}</small>
+        <small>{picked ? `picked ${ago(post.pickedAt)}` : ago(post.createdAt)}</small>
       </header>
       <div className="partner-main">
         <div>
@@ -83,13 +90,22 @@ function PostCard({ post, secret, mine, admin, service, onMessage }) {
       </div>
       {team && (post.wantMin != null || post.wantMax != null) && <p className="partner-want">Looking for UTR {post.wantMin != null ? formatUtr(post.wantMin) : 'any'} – {post.wantMax != null ? formatUtr(post.wantMax) : 'any'}</p>}
       {post.note && <p className="partner-note">{post.note}</p>}
-      {mine ? <Replies secret={secret} post={post} /> : contact ? (
+      {picked && <p className="partner-picked">{team ? 'Spot filled' : 'Joined a team'}{post.pickedBy ? <>: <b>{post.pickedBy}</b></> : ''}</p>}
+      {picking && (
+        <div className="pick-form">
+          <Field id={`pick-${post.id}`} label={team ? 'Who was picked? (optional)' : 'Picked by which team? (optional)'} maxLength={LIMITS.name} value={pickedBy} onChange={e => setPickedBy(e.target.value)} placeholder={team ? 'e.g. Sam' : 'e.g. Ravi’s team'} hint="Shown to everyone on the board." />
+          <div className="card-actions"><button type="button" className="button small" disabled={busy} onClick={markPicked}>Show as picked</button><button type="button" className="secondary small" onClick={() => setPicking(false)}>Cancel</button></div>
+        </div>
+      )}
+      {mine ? <Replies secret={secret} post={post} /> : picked ? null : contact ? (
         <p className="partner-contact"><Icon name="check" size={16} /> Details sent. <a href={waLink(contact.contact, `Hi ${contact.firstName}, I saw your Triace post and I'm interested.`)} target="_blank" rel="noopener noreferrer">Message {contact.firstName} on WhatsApp</a></p>
       ) : open ? (
         <InterestForm post={post} service={service} onDone={r => { setContact({ firstName: r.firstName, contact: r.contact }); setOpen(false); onMessage(`Sent. ${r.firstName} will see your name and number; you can message them on WhatsApp now.`); }} />
       ) : null}
       <footer>
-        {!mine && !contact && !open && <button type="button" className="button small" onClick={() => setOpen(true)}>I’m interested</button>}
+        {!picked && canManage && !picking && <button type="button" className="secondary small" disabled={busy} onClick={() => setPicking(true)}>Mark as picked</button>}
+        {picked && canManage && <button type="button" className="secondary small" disabled={busy} onClick={reopen}>Reopen</button>}
+        {!picked && !mine && !contact && !open && <button type="button" className="button small" onClick={() => setOpen(true)}>I’m interested</button>}
         {open && <button type="button" className="secondary small" onClick={() => setOpen(false)}>Cancel</button>}
         {admin && <button type="button" className="danger small" disabled={busy} onClick={remove}>Remove</button>}
         {mine && !admin && <small className="partner-hint">Only the admin can remove posts. It also disappears by itself after {LIMITS.expireDays} days.</small>}
@@ -151,12 +167,15 @@ export default function Partners() {
 
   const posts = useMemo(() => Object.values(data?.partnerPosts || {}).filter(p => Date.now() - p.createdAt < LIMITS.expireDays * DAY), [data?.partnerPosts]);
   const range = useMemo(() => { try { return [toUtr(from), toUtr(to)]; } catch { return [null, null]; } }, [from, to]);
-  const shown = posts
+  const isPicked = p => p.status === 'picked';
+  const open = posts.filter(p => !isPicked(p)), pickedPosts = posts.filter(p => isPicked(p) && Date.now() - (p.pickedAt || p.createdAt) < LIMITS.pickedDays * DAY).sort((a, b) => (b.pickedAt || 0) - (a.pickedAt || 0));
+  const inRange = p => (range[0] == null || p.utr >= range[0]) && (range[1] == null || p.utr <= range[1]);
+  const shown = open
     .filter(p => p.kind === (tab === 'teams' ? 'team' : 'player'))
-    .filter(p => (range[0] == null || p.utr >= range[0]) && (range[1] == null || p.utr <= range[1]))
+    .filter(inRange)
     .sort((a, b) => (sort === 'utr' ? b.utr - a.utr : b.createdAt - a.createdAt));
   const myIds = new Set(Object.keys(mine)), myPosts = posts.filter(p => myIds.has(p.id)).sort((a, b) => b.createdAt - a.createdAt);
-  const count = kind => posts.filter(p => p.kind === kind).length;
+  const count = kind => open.filter(p => p.kind === kind).length;
 
   return (
     <section className="page partners-screen">
@@ -176,9 +195,10 @@ export default function Partners() {
         <div className="segmented labelled" role="tablist" aria-label="Partner board">
           <button type="button" role="tab" aria-selected={tab === 'players'} onClick={() => setTab('players')}>Players ({count('player')})</button>
           <button type="button" role="tab" aria-selected={tab === 'teams'} onClick={() => setTab('teams')}>Teams ({count('team')})</button>
+          <button type="button" role="tab" aria-selected={tab === 'picked'} onClick={() => setTab('picked')}>Picked ({pickedPosts.length})</button>
           <button type="button" role="tab" aria-selected={tab === 'mine'} onClick={() => setTab('mine')}>My posts ({myPosts.length})</button>
         </div>
-        {tab !== 'mine' && (
+        {tab !== 'mine' && tab !== 'picked' && (
           <div className="toolbar-controls partner-filters">
             <Field id="f-from" label="UTR from" inputMode="decimal" placeholder="0.00" value={from} onChange={e => setFrom(e.target.value)} />
             <Field id="f-to" label="UTR to" inputMode="decimal" placeholder="16.50" value={to} onChange={e => setTo(e.target.value)} />
@@ -188,9 +208,12 @@ export default function Partners() {
       </div>
 
       {!data && <div className="skeleton-list" aria-busy="true">{[0, 1].map(i => <div key={i} className="skeleton-card" />)}</div>}
-      {data && tab !== 'mine' && (shown.length
+      {data && tab === 'picked' && (pickedPosts.length
+        ? <div className="partner-list">{pickedPosts.map(p => <PostCard key={p.id} post={p} mine={myIds.has(p.id)} secret={mine[p.id]} admin={admin} service={service} onMessage={setMessage} />)}</div>
+        : <EmptyState icon="users" title="Nobody has been picked yet.">When a player joins a team, or a team fills its spot, it shows here for {LIMITS.pickedDays} days.</EmptyState>)}
+      {data && tab !== 'mine' && tab !== 'picked' && (shown.length
         ? <div className="partner-list">{shown.map(p => <PostCard key={p.id} post={p} mine={myIds.has(p.id)} secret={mine[p.id]} admin={admin} service={service} onMessage={setMessage} />)}</div>
-        : <EmptyState icon="users" title={tab === 'teams' ? 'No team is looking for players yet.' : 'Nobody is available yet.'}>{posts.length ? 'Nobody matches this UTR range.' : 'Be the first: post to the board and teams will find you.'}</EmptyState>)}
+        : <EmptyState icon="users" title={tab === 'teams' ? 'No team is looking for players yet.' : 'Nobody is available yet.'}>{open.length ? 'Nobody matches this UTR range.' : 'Be the first: post to the board and teams will find you.'}</EmptyState>)}
       {data && tab === 'mine' && (myPosts.length
         ? <div className="partner-list">{myPosts.map(p => <PostCard key={p.id} post={p} mine secret={mine[p.id]} admin={admin} service={service} onMessage={setMessage} />)}</div>
         : <EmptyState icon="users" title="You have no posts.">Post to the board and replies will appear here. Use the same phone or browser to see them.</EmptyState>)}

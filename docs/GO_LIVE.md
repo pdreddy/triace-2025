@@ -36,7 +36,7 @@ All of this is in the browser, on the **Admin** page (sign in at `/admin/login`)
 | A captain lost their login | Admin → **Private registrations** → the team's card → **Reset login** (shown once; send it to the captain) |
 | League rules (points, playoff spots, challenge rule), season name, schedule dates, create fixtures, approve scores, playoffs, close a season | Admin → **League & results** |
 | Scores | Captains: **Captain** sign-in, then **League → Fixtures**. Admin: enter or approve in **League & results** |
-| **Partner board** (players looking for a team, teams needing a player) | The public **Partners** page. **Only the admin can remove posts**: signed in as admin you see a **Remove** button on every post. Posters cannot remove their own, so posts also disappear on their own after 30 days. Poster and replier numbers are private (only the poster and the admin can read them) |
+| **Partner board** (players looking for a team, teams needing a player) | The public **Partners** page. **Only the admin can remove posts**: signed in as admin you see a **Remove** button on every post. Posters cannot remove their own, so posts also disappear on their own after 30 days. The poster or the admin can mark a post **Picked** (and say by whom), which shows it publicly under the Picked tab for 14 days and frees the poster's slot. Poster and replier numbers are private (only the poster and the admin can read them) |
 | Season 1 history in the database | Admin → **Firebase & data paths** → **Copy Season 1 into Firebase** (once) |
 | Season 1 winners, squads, Super Six details | `src/data/season1-table.json`, then deploy (these are code files) |
 | Firebase project, database paths | `.env` / `functions/.env` (see README), then deploy |

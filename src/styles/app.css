@@ -1453,3 +1453,14 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
 .credential-card .pattern-note { margin: 0; color: var(--soft); }
 .credential-card .pattern-note b { color: #fff; }
 .credential-card output.password { letter-spacing: .12em; }
+
+/* Partner board: picked */
+.partner-card.picked { border-color: #7ee08a77; background: linear-gradient(165deg, #12302a, var(--surface)); }
+.partner-card.picked .partner-main h3, .partner-card.picked .partner-utr b { opacity: .85; }
+.partner-card .picked-pill { display: inline-flex; align-items: center; gap: 5px; background: var(--good); }
+.partner-picked { margin: 0; padding: 8px 12px; border-radius: var(--r); background: #7ee08a1f; color: #bff5c6; font-weight: 700; }
+.partner-picked b { color: #fff; }
+.pick-form { display: grid; gap: 10px; padding: 12px; border-radius: var(--r); border: 1px solid #7ee08a66; background: #0b172466; }
+.pick-form .field { margin: 0; }
+
+@media (max-width: 760px) { .partners-screen .segmented button { font-size: 13px; letter-spacing: .02em; padding-inline: 4px; white-space: nowrap; } }
