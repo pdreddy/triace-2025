@@ -76,7 +76,7 @@ export default function Team() {
 
       {records.map(({ tier, row, fixtures }) => (
         <section key={tier.id} className="tier-group">
-          <div className="tier-head"><div><h2>{tier.name} fixtures</h2>{row && <span>Form {row.form.join(' ') || '—'} · {row.matchesWon}–{row.matchesLost} matches</span>}</div></div>
+          <div className="tier-head"><div><h2>{tier.name} fixtures</h2>{row && <span>Form {row.form.join(' ') || '—'} · {row.matchesWon}–{row.matchesLost} courts</span>}</div></div>
           {!fixtures.length && <EmptyState icon="calendar" title="No fixtures yet." />}
           {fixtures.length > 0 && (() => {
             const check = singlesEligibility(teamId, data.fixtures?.[tier.id], data.leagueRules), pct = data.leagueRules?.singlesMinPercent ?? 40;
