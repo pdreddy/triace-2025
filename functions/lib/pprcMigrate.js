@@ -17,6 +17,8 @@ export const SOURCES = [
   { club: 'triace', season: 's1', path: 'TriAceDBNEW_Play', stage: 'po' },
   { club: 'triace', season: 's1', path: 'TriAceDBSUPER6', stage: 'po' }
 ];
+// A decision of this value means "not a real player": that name is left unrated and never asked about again.
+export const IGNORE = '__ignore__';
 export const CLUBS = {
   koc: { name: 'KOC', seasons: { s1: 'Season 1', s2: 'Season 2', s3: 'Season 3' } },
   triace: { name: 'Triace', seasons: { s1: 'Season 1' } }
@@ -105,9 +107,10 @@ export function buildMultiClub(data, { overrides = {}, createMissing = true, sou
     master[id] ||= { id, name: String(name).trim().replace(/\s+/g, ' '), nameKey: nameKey(name), clubs: {}, seed, seedSource: 'override' };
     return id;
   };
-  const resolvedOverrides = {}, scopedOverrides = {};
+  const resolvedOverrides = {}, scopedOverrides = {}, ignored = new Set();
   for (const [raw, value] of Object.entries(overrides)) {
     if (!value) continue;
+    if (value === IGNORE) { ignored.add(raw.includes('::') ? `${nameKey(raw.split('::')[0])}::${nameKey(raw.split('::')[1])}` : nameKey(raw)); continue; }
     const [team, name] = raw.includes('::') ? raw.split('::') : [null, raw];
     if (team) scopedOverrides[`${nameKey(team)}::${nameKey(name)}`] = idForDecision(value); else resolvedOverrides[raw] = idForDecision(value);
   }
@@ -165,6 +168,7 @@ export function buildMultiClub(data, { overrides = {}, createMissing = true, sou
   const learn = (slot, id) => { slot.set(id); (rosters.get(slot.team) || rosters.set(slot.team, new Set()).get(slot.team)).add(id); };
   const pending = [];
   for (const slot of slots) { // pass 1: no guessing
+    if (ignored.has(`${nameKey(slot.teamName)}::${nameKey(slot.rawName)}`) || ignored.has(nameKey(slot.rawName))) { report.names.how.ignored = (report.names.how.ignored || 0) + 1; continue; }
     const scoped = scopedOverrides[`${nameKey(slot.teamName)}::${nameKey(slot.rawName)}`];
     const r = scoped ? { id: scoped, how: 'override' } : resolveName(registry, slot.rawName);
     if (r.id) { learn(slot, r.id); report.names.how[r.how] = (report.names.how[r.how] || 0) + 1; } else pending.push(slot);

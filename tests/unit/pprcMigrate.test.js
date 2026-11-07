@@ -123,3 +123,13 @@ test('Super 6 is a Triace season 1 playoff, not a season of its own', () => {
   assert.deepEqual(Object.keys(tree.clubs.triace.seasons), ['s1']);
   assert.equal(tree.clubs.triace.seasons.s1.matches['triace-s1-s6'].stage, 'po');
 });
+
+test('a name marked as not a real player is ignored and no longer asked about', () => {
+  const data = exportData();
+  data.TriAceDBNEW.x4 = { ts: day(23), t1: 'Team E', t2: 'Team F', g1: 8, g2: 1, s1: 1, s2: 0, lines: [line('S1', 'singles', ['P1'], ['Dinkar'], 8, 1, { winnerTeamNum: 1 })] };
+  assert.ok(buildMultiClub(data).report.decisions.some(d => d.raw === 'P1'));
+  const { report, tree } = buildMultiClub(data, { overrides: { 'Team E::P1': '__ignore__' } });
+  assert.ok(!report.decisions.some(d => d.raw === 'P1'));
+  assert.equal(tree.clubs.triace.seasons.s1.matches['triace-s1-x4'].courts[0].home, undefined, 'the court stays but is not rated');
+  assert.equal(report.names.how.ignored, 1);
+});
