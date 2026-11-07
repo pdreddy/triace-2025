@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, acceptRulesFast } from './fixtures.js';
 import fs from 'node:fs';
 import { buildMultiClub } from '../../functions/lib/pprcMigrate.js';
 
@@ -64,12 +64,7 @@ test('PPRC pages explain when the data cannot be read', async ({ page }) => {
 // withdraws it afterwards instead of leaving later specs without room.
 const withdraw = (page, teamId) => page.request.post('/api/withdraw-team', { data: { teamId } });
 
-async function acceptRules(page) {
-  await page.goto('/');
-  for (let i = 0; i < 9; i++) await page.getByRole('button', { name: 'Next rule card' }).click();
-  await page.getByRole('checkbox', { name: /read all sections/ }).check();
-  await page.getByRole('button', { name: 'Agree to rules' }).click();
-}
+const acceptRules = acceptRulesFast;
 
 test('registration finds players already in PPRC, links them, and carries their ratings', async ({ page }) => {
   const tree = fixture();

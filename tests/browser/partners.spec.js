@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures.js';
 
 const password = 'local-e2e-test-password';
 async function post(page, { kind = 'player', name, singles, doubles = '', whatsapp, note = '', needs = '1', wantMin = '', wantMax = '' }) {

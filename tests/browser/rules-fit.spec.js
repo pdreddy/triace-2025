@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures.js';
 
 // No rule card may scroll at any common screen size (phones, tablets, laptops, desktops).
 const SIZES = [[320, 568], [360, 640], [375, 667], [390, 844], [414, 896], [430, 932], [768, 1024], [820, 1180], [1024, 768], [1180, 820], [1280, 720], [1366, 768], [1440, 900], [1920, 1080]];

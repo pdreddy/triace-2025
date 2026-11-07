@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, acceptRulesFast } from './fixtures.js';
 
 async function adminLogin(page) {
   await page.goto('/admin/login');
@@ -90,13 +90,7 @@ test('League has Schedule and Score entry tabs', async ({ page }) => {
 
 // ---- Early bird ----
 const localDay = offset => { const d = new Date(); d.setDate(d.getDate() + offset); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
-async function acceptRules(page) {
-  await page.goto('/');
-  for (let i = 0; i < 9; i++) await page.getByRole('button', { name: 'Next rule card' }).click();
-  await page.getByRole('checkbox', { name: /read all sections/ }).check();
-  await page.getByRole('button', { name: 'Agree to rules' }).click();
-  await expect(page.getByRole('link', { name: 'Register team ↗' })).toBeVisible();
-}
+const acceptRules = acceptRulesFast;
 async function savePlan(page, { enabled = true, opens, ends, fee }) {
   const box = page.getByLabel('Show the early bird to visitors');
   if ((await box.isChecked()) !== enabled) await box.setChecked(enabled);

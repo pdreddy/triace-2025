@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures.js';
 
 // A stand-in for the Web Audio API that counts the sounds the page asks for.
 const FAKE_AUDIO = () => {

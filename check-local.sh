@@ -2,7 +2,7 @@
 # One file to check Triace on your own machine: fetch the code, install, test, build, and optionally open the app.
 #
 #   bash check-local.sh                      fetch + install + unit tests + build
-#   bash check-local.sh --browser            ...and the browser tests (downloads Chromium the first time)
+#   bash check-local.sh --browser            ...and the browser tests (about 3 minutes; downloads Chromium the first time)
 #   bash check-local.sh --demo               ...and start the app at http://127.0.0.1:3000 (Ctrl+C to stop)
 #   bash check-local.sh --export export.json ...and a PPRC migration dry run on your database export (sends nothing)
 #   With --demo the app starts with sample registered teams and, if you gave --export, your real PPRC players and
@@ -61,7 +61,13 @@ fi
 cd "$DIR" || exit 1
 echo "At $(git log --oneline -1)"
 
-step "Install" bash -c 'npm ci --no-audit --no-fund && npm --prefix functions ci --no-audit --no-fund' || summary
+# Install only when the lock files changed since the last install (it is the slowest part of a repeat run).
+install() {
+  local sum; sum=$(cat package-lock.json functions/package-lock.json | { shasum 2>/dev/null || sha1sum; } | cut -d' ' -f1)
+  if [ -d node_modules ] && [ -d functions/node_modules ] && [ "$(cat node_modules/.install-hash 2>/dev/null)" = "$sum" ]; then echo "Packages are up to date, skipping the install."; return 0; fi
+  npm ci --no-audit --no-fund && npm --prefix functions ci --no-audit --no-fund && echo "$sum" > node_modules/.install-hash
+}
+step "Install" install || summary
 step "Unit tests (rules, scoring, PPRC, registration)" npm test
 step "Build" npm run build
 

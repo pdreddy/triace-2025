@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures.js';
 
 // Every page must feel right in an installed phone app: no sideways scrolling, inputs that don't make iOS zoom, tappable controls.
 const ROUTES = ['/', '/tiers', '/league', '/players', '/champions', '/partners', '/status', '/history', '/history/s1', '/captain', '/admin/login', '/team/none', '/no-such-page'];

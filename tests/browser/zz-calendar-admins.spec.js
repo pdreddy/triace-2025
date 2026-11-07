@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures.js';
 // Named zz- so it runs last: it leaves teams, fixtures and dates behind in the shared demo state, which other specs do not expect.
 
 async function adminLogin(page, user = 'reddi2026', password = 'local-e2e-test-password') {
