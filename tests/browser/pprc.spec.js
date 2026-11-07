@@ -1,4 +1,4 @@
-import { test, expect, acceptRulesFast } from './fixtures.js';
+import { test, expect, acceptRulesFast , showEverything } from './fixtures.js';
 import fs from 'node:fs';
 import { buildMultiClub } from '../../functions/lib/pprcMigrate.js';
 
@@ -117,7 +117,7 @@ test('registration still works when the shared player list cannot be read', asyn
 });
 
 async function login(page) {
-  await page.goto('/admin/login');
+  await showEverything(page);await page.goto('/admin/login');
   await page.getByLabel('Username or email').fill('reddi2026');
   await page.getByLabel('Password', { exact: true }).fill('local-e2e-test-password');
   await page.getByRole('button', { name: 'Sign in ↗', exact: true }).click();

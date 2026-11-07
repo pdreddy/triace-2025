@@ -14,3 +14,9 @@ export async function acceptRulesFast(page) {
   await page.goto('/');
   await expect(page.getByRole('link', { name: 'Register team ↗' })).toBeVisible();
 }
+
+// The admin page now shows one section at a time (and the teams as a table). Specs written for the long page ask for
+// everything at once, with the team cards, on screens wider than a phone; the layout spec and the phone test do not.
+export async function showEverything(page) {
+  await page.addInitScript(() => { try { if (window.innerWidth > 700) { localStorage.setItem('traice.admin.tab', 'all'); localStorage.setItem('traice.admin.teamsView', 'cards'); } } catch { /* storage blocked */ } });
+}

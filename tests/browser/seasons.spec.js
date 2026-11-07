@@ -1,7 +1,7 @@
-import { test, expect, acceptRulesFast } from './fixtures.js';
+import { test, expect, acceptRulesFast , showEverything } from './fixtures.js';
 
 async function adminLogin(page) {
-  await page.goto('/admin/login');
+  await showEverything(page);await page.goto('/admin/login');
   await page.getByLabel(/username/i).fill('reddi2026');
   await page.getByLabel(/password/i).fill('local-e2e-test-password');
   await page.getByRole('button', { name: /sign in|log in/i }).click();
@@ -158,6 +158,6 @@ test('setup check page: in the demo it says there is no Firebase to check, and o
   await expect(page.getByText('Everything checked is working')).toBeVisible();
   await expect(page.getByText('there is no Firebase to check')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Copy report' })).toBeEnabled();
-  await page.goto('/admin/login');
+  await showEverything(page);await page.goto('/admin/login');
   await expect(page.getByRole('link', { name: 'Setup check' })).toBeVisible();
 });

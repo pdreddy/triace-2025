@@ -1,8 +1,8 @@
-import { test, expect } from './fixtures.js';
+import { test, expect , showEverything } from './fixtures.js';
 // Named zz- so it runs last: it leaves teams, fixtures and dates behind in the shared demo state, which other specs do not expect.
 
 async function adminLogin(page, user = 'reddi2026', password = 'local-e2e-test-password') {
-  await page.goto('/admin/login');
+  await showEverything(page);await page.goto('/admin/login');
   await page.getByLabel(/username/i).fill(user);
   await page.getByLabel(/password/i).fill(password);
   await page.getByRole('button', { name: /sign in|log in/i }).click();

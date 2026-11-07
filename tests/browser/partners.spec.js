@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures.js';
+import { test, expect , showEverything } from './fixtures.js';
 
 const password = 'local-e2e-test-password';
 async function post(page, { kind = 'player', name, singles, doubles = '', whatsapp, note = '', needs = '1', wantMin = '', wantMax = '' }) {
@@ -68,7 +68,7 @@ test('partner board: a player posts, a captain replies, numbers are swapped but 
 
   // the admin can remove any post
   const admin = await (await browser.newContext()).newPage();
-  await admin.goto('/admin/login');
+  await showEverything(admin);await admin.goto('/admin/login');
   await admin.getByLabel('Username or email').fill('reddi2026');
   await admin.getByLabel('Password', { exact: true }).fill(password);
   await admin.getByRole('button', { name: 'Sign in ↗', exact: true }).click();
@@ -110,7 +110,7 @@ test('partner board: a team with two players looks for a third, and posts are ch
   await expect(own).toContainText('Only the admin can remove posts');
   await expect(own.getByRole('button', { name: 'Remove' })).toHaveCount(0);
   const admin = await (await browser.newContext()).newPage();
-  await admin.goto('/admin/login');
+  await showEverything(admin);await admin.goto('/admin/login');
   await admin.getByLabel('Username or email').fill('reddi2026');
   await admin.getByLabel('Password', { exact: true }).fill(password);
   await admin.getByRole('button', { name: 'Sign in ↗', exact: true }).click();
@@ -163,7 +163,7 @@ test('partner board: a picked player is shown publicly with who picked them, the
 
   // clean up as admin
   const admin = await (await browser.newContext()).newPage();
-  await admin.goto('/admin/login');
+  await showEverything(admin);await admin.goto('/admin/login');
   await admin.getByLabel('Username or email').fill('reddi2026');
   await admin.getByLabel('Password', { exact: true }).fill(password);
   await admin.getByRole('button', { name: 'Sign in ↗', exact: true }).click();

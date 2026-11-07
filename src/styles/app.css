@@ -788,15 +788,27 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
 .team-players em { font-family: var(--display); font-size: 22px; font-style: normal; font-weight: 700; color: var(--lime); }
 
 /* ---------- 11. Admin ---------- */
-.admin-tabs { display: none; }
+/* The admin shows one section at a time at every width; the "All sections" tab shows everything. */
+.admin-tabs { display: flex; gap: 6px; margin-bottom: 14px; overflow-x: auto; scrollbar-width: none; max-width: 100%; }
+.admin-tabs::-webkit-scrollbar { display: none; }
+.admin-tabs button { flex: 0 0 auto; padding: 0 16px; min-height: 44px; border-radius: 999px; font-family: var(--display); font-size: 16px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--soft); background: var(--surface); border: 1px solid var(--line); cursor: pointer; }
+.admin-tabs button[aria-selected=true] { color: var(--ink); background: var(--lime); border-color: var(--lime); }
+.admin[data-tab=overview] .pane:not(.pane-overview),
+.admin[data-tab=teams] .pane:not(.pane-teams),
+.admin[data-tab=pprc] .pane:not(.pane-pprc),
+.admin[data-tab=calendar] .pane:not(.pane-calendar),
+.admin[data-tab=league] .pane:not(.pane-league),
+.admin[data-tab=setup] .pane:not(.pane-settings):not(.pane-tiers),
+.admin[data-tab=admins] .pane:not(.pane-admins) { display: none; }
+.admin[data-tab=all] .pane-overview { display: none; }
 .admin-save-bar { position: sticky; top: -20px; z-index: 6; display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 16px; padding: 10px 12px 10px 16px; border-radius: var(--r); background: #0e2033f2; border: 1px solid var(--line-2); backdrop-filter: blur(10px); }
 .admin-save-bar span { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
 .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
 .dot.good { background: var(--good); }
 .dot.warn { background: var(--warn); box-shadow: 0 0 10px var(--warn); }
-.admin-layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 24px; align-items: start; }
+.admin-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; align-items: start; }
 .admin-body { min-width: 0; }
-.admin-nav { position: sticky; top: 60px; display: flex; flex-direction: column; gap: 4px; }
+.admin-nav { display: none; }
 .admin-nav a { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--r-sm); font-size: 14px; font-weight: 600; color: var(--soft); }
 .admin-nav a:hover { color: var(--lime); background: var(--surface); }
 .section-title { display: flex; align-items: center; gap: 12px; margin: 8px 0 14px; scroll-margin-top: 70px; }
@@ -1045,16 +1057,6 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
   .admin .page-head p:not(.eyebrow), .admin .page-head .secondary { display: none; }
   .admin .stat-row { display: flex; margin: 0 calc(-1 * var(--gutter)) 10px; padding: 0 var(--gutter); overflow-x: auto; scrollbar-width: none; }
   .admin .stat { flex: 0 0 auto; min-width: 104px; }
-  .admin-tabs { display: flex; gap: 6px; margin-bottom: 10px; overflow-x: auto; scrollbar-width: none; }
-  .admin-tabs button { flex: 1 0 auto; padding: 0 14px; min-height: 42px; border-radius: 999px; font-family: var(--display); font-size: 16px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); background: var(--surface); border: 1px solid var(--line-2); }
-  .admin-tabs button[aria-selected=true] { color: var(--ink); background: var(--lime); border-color: var(--lime); }
-  .admin[data-tab=settings] .pane:not(.pane-settings),
-  .admin[data-tab=tiers] .pane:not(.pane-tiers),
-  .admin[data-tab=teams] .pane:not(.pane-teams),
-  .admin[data-tab=league] .pane:not(.pane-league),
-  .admin[data-tab=calendar] .pane:not(.pane-calendar),
-  .admin[data-tab=pprc] .pane:not(.pane-pprc),
-  .admin[data-tab=admins] .pane:not(.pane-admins) { display: none; }
   .admin-save-bar { top: -12px; padding: 8px 8px 8px 12px; }
   .tier-editors, .admin-tools, .recalculate { grid-template-columns: 1fr; }
   .stats { grid-template-columns: repeat(2, 1fr); }
@@ -1509,3 +1511,41 @@ td > a, .fixture-team, .team-card h3 a { display: inline-flex; align-items: cent
 .pprc-badge.nr { background: #eef1f4; color: var(--muted); }
 .pane-pprc td > div { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .pane-pprc input { max-width: 100%; min-width: 0; }
+
+/* Overview */
+.overview { display: grid; gap: 16px; }
+.overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+.overview-card h3, .overview-attention h3, .overview-actions h3 { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+.overview-card .big { font-family: var(--display); font-size: 44px; line-height: 1; margin: 0 0 8px; }
+.overview-card .big small { font-size: 16px; color: var(--muted); font-family: inherit; }
+.overview-card .big.good { color: var(--lime); }
+.overview-card .big.warn { color: #f5a524; }
+.tier-counts { display: grid; gap: 4px; margin: 0 0 8px; padding: 0; list-style: none; }
+.tier-counts li { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; }
+.overview-attention ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.overview-attention li { display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); }
+.overview-attention li:first-child { border-top: 0; }
+.overview-attention li b { font-family: var(--display); font-size: 26px; color: var(--lime); }
+
+/* Teams table */
+.view-switch { display: inline-flex; gap: 0; margin: 4px 0 12px; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.view-switch button { min-height: 40px; padding: 0 18px; border: 0; background: var(--surface); color: var(--soft); font-weight: 700; cursor: pointer; }
+.view-switch button.on { background: var(--lime); color: var(--ink); }
+.team-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.team-table th { text-align: left; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.team-table td { padding: 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.team-table .num { text-align: right; }
+.team-table .row-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.pill.warn { background: rgba(245, 165, 36, .16); color: #f5a524; }
+@media (max-width: 760px) {
+  .team-table thead { display: none; }
+  .team-table, .team-table tbody { display: block; }
+  .team-table tr { display: grid; grid-template-columns: 1fr; gap: 4px; padding: 12px; margin-bottom: 10px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
+  .team-table td { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border: 0; text-align: right; }
+  .team-table td::before { content: attr(data-label); color: var(--muted); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; text-align: left; }
+  .team-table td.row-actions { justify-content: flex-start; padding-top: 8px; }
+  .team-table td.row-actions::before { content: none; }
+  .team-table .row-actions button, .admin button, .admin select, .admin input[type=search] { min-height: 44px; }
+  .overview-attention li { grid-template-columns: 36px 1fr; }
+  .overview-attention li button { grid-column: 1 / -1; }
+}

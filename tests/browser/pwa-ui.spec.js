@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures.js';
+import { test, expect , showEverything } from './fixtures.js';
 
 // Every page must feel right in an installed phone app: no sideways scrolling, inputs that don't make iOS zoom, tappable controls.
 const ROUTES = ['/', '/tiers', '/league', '/players', '/champions', '/partners', '/status', '/history', '/history/s1', '/captain', '/admin/login', '/team/none', '/no-such-page'];
@@ -54,7 +54,7 @@ test('the top bar fits at tablet, laptop and desktop widths, with the Find a par
 });
 
 test('signed in as admin with the install button showing, the top bar still fits and Sign out stays visible', async ({ page }) => {
-  await page.goto('/admin/login');
+  await showEverything(page);await page.goto('/admin/login');
   await page.getByLabel('Username or email').fill('reddi2026');
   await page.getByLabel('Password', { exact: true }).fill('local-e2e-test-password');
   await page.getByRole('button', { name: 'Sign in ↗', exact: true }).click();

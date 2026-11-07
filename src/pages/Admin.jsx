@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useTournament, useRegistrations } from '../hooks/useTournament';
-import { Field, Message, TeamCard, Stat } from '../components/UI';
+import { Field, Message, TeamCard } from '../components/UI';
 import { Icon } from '../components/Icons';
 import AdminPprc from '../components/AdminPprc';
+import AdminOverview from '../components/AdminOverview';
+import AdminTeams from '../components/AdminTeams';
 import { FixtureCard, teamIndex } from '../components/League';
 import { LeagueRulesCard, PlayoffPlanner, ScheduleForm, SeasonCard } from '../components/AdminLeague';
 import { TeamEditForm } from '../components/TeamTools';
@@ -15,15 +17,19 @@ import LoginCard from '../components/LoginCard';
 import { registrationsText } from '../../functions/lib/backupText.js';
 import { DEFAULT_SETTINGS, DEFAULT_TIERS, orderedTiers, parseUtr, validateSettings, validateTierConfig, registrationsCsv } from '../../functions/lib/tournament.js';
 
+// One section at a time. "setup" holds Registration & privacy, Tiers and the early bird; "all" shows everything on one long page.
 const SECTIONS = [
-  { id: 'settings', label: 'Registration & privacy', short: 'Settings', icon: 'shield' },
-  { id: 'tiers', label: 'Tier configuration', short: 'Tiers', icon: 'trophy' },
-  { id: 'teams', label: 'Private registrations', short: 'Teams', icon: 'register' },
-  { id: 'calendar', label: 'Dates & schedule', short: 'Dates', icon: 'calendar' },
-  { id: 'league', label: 'League & results', short: 'League', icon: 'calendar' },
-  { id: 'pprc', label: 'PPRC players', short: 'PPRC', icon: 'users' },
-  { id: 'admins', label: 'Administrators', short: 'Admins', icon: 'shield' }
+  { id: 'overview', label: 'Overview', short: 'Overview' },
+  { id: 'teams', label: 'Teams', short: 'Teams' },
+  { id: 'pprc', label: 'PPRC players', short: 'PPRC' },
+  { id: 'calendar', label: 'Dates & schedule', short: 'Dates' },
+  { id: 'league', label: 'League & results', short: 'League' },
+  { id: 'setup', label: 'Setup', short: 'Setup' },
+  { id: 'admins', label: 'Administrators', short: 'Admins' },
+  { id: 'all', label: 'All sections', short: 'All' }
 ];
+const TAB_KEY = 'traice.admin.tab', VIEW_KEY = 'traice.admin.teamsView';
+const savedChoice = (key, allowed, fallback) => { try { const v = localStorage.getItem(key); return allowed.includes(v) ? v : fallback; } catch { return fallback; } };
 const draftFrom = data => ({
   settings: { ...(data?.settings || DEFAULT_SETTINGS) },
   tierConfig: structuredClone(data?.settings ? data.tierConfig || {} : DEFAULT_TIERS),
@@ -41,7 +47,7 @@ export default function Admin() {
   const { teams, loading, error: readError } = useRegistrations();
   const [draft, setDraft] = useState(() => draftFrom(data)), [dirty, setDirty] = useState(false), [busy, setBusy] = useState(false);
   const [error, setError] = useState(''), [message, setMessage] = useState(''), [summary, setSummary] = useState(null);
-  const [query, setQuery] = useState(''), [filter, setFilter] = useState('all'), [reveal, setReveal] = useState(true), [issued, setIssued] = useState(null), [captainOnly, setCaptainOnlyState] = useState(() => localStorage.getItem('traice.admin.captainOnly') === '1'), [newId, setNewId] = useState(''), [tab, setTab] = useState('settings'), [editing, setEditing] = useState(null);
+  const [query, setQuery] = useState(''), [filter, setFilter] = useState('all'), [reveal, setReveal] = useState(true), [issued, setIssued] = useState(null), [captainOnly, setCaptainOnlyState] = useState(() => localStorage.getItem('traice.admin.captainOnly') === '1'), [newId, setNewId] = useState(''), [tab, setTabState] = useState(() => savedChoice(TAB_KEY, SECTIONS.map(x => x.id), 'overview')), [editing, setEditing] = useState(null), [teamsView, setTeamsViewState] = useState(() => savedChoice(VIEW_KEY, ['table', 'cards'], 'table'));
 
   useEffect(() => {
     if (data && !dirty && (data.configRevision || 0) >= draft.expectedRevision) setDraft(draftFrom(data));
@@ -66,6 +72,8 @@ export default function Admin() {
     });
   }
   const linkPprc = links => action(async () => { const r = await service.linkPprc({ links }); setMessage(`PPRC: ${r.linked} linked, ${r.unlinked} unlinked. Public tier lists are updated.`); });
+  function setTab(id) { setTabState(id); try { localStorage.setItem(TAB_KEY, id); } catch { /* storage blocked */ } window.scrollTo?.({ top: 0 }); }
+  function setTeamsView(value) { setTeamsViewState(value); try { localStorage.setItem(VIEW_KEY, value); } catch { /* storage blocked */ } }
   function setCaptainOnly(value) { setCaptainOnlyState(value); localStorage.setItem('traice.admin.captainOnly', value ? '1' : '0'); }
   function reload() { setDraft(draftFrom(data)); setDirty(false); setError(''); }
   function recalculate() {
@@ -155,18 +163,11 @@ export default function Admin() {
         <Link to="/tiers" className="secondary">View public lineup ↗</Link>
       </header>
 
-      <div className="stat-row">
-        <Stat value={loading ? '…' : total} label="Registrations" tone="accent" />
-        {liveTiers.slice(0, 2).map(t => <Stat key={t.id} value={loading ? '…' : tally(t.id)} label={t.name} />)}
-        <Stat value={live ? (live.registrationEnabled ? 'Open' : 'Closed') : '—'} label="Registration" tone={live?.registrationEnabled ? 'good' : 'warn'} />
-        <Stat value={live ? (live.aceNameMaskingEnabled ? 'On' : 'Off') : '—'} label="Ace-name masking" />
-      </div>
-
       <div className="admin-tabs" role="tablist" aria-label="Dashboard sections">
-        {SECTIONS.map(s => <button key={s.id} type="button" role="tab" aria-selected={tab === s.id} onClick={() => setTab(s.id)}>{s.short}</button>)}
+        {SECTIONS.map(x => <button key={x.id} type="button" role="tab" aria-selected={tab === x.id} onClick={() => setTab(x.id)}>{x.short}</button>)}
       </div>
 
-      <div className="admin-save-bar">
+      <div className="admin-save-bar pane pane-settings pane-tiers">
         <span><i className={`dot ${dirty ? 'warn' : 'good'}`} aria-hidden="true" />{dirty ? 'Unsaved rule changes' : 'Rules are up to date'}</span>
         <button className="button small" type="submit" form="tournament-configuration" disabled={busy || !connected || !data || !dirty}>{busy ? 'Saving…' : 'Save rule changes ↗'}</button>
       </div>
@@ -181,11 +182,9 @@ export default function Admin() {
       )}
 
       <div className="admin-layout">
-        <nav className="admin-nav" aria-label="Dashboard sections">
-          {SECTIONS.map(s => <a key={s.id} href={`#admin-${s.id}`}><Icon name={s.icon} size={18} />{s.label}</a>)}
-        </nav>
-
         <div className="admin-body">
+          <AdminOverview data={data} teams={teams} loading={loading} tiers={liveTiers} go={setTab} busy={busy || !connected} onExport={exportCsv} onBackup={backupNow} />
+
           <form id="tournament-configuration" onSubmit={save} aria-label="Tournament configuration">
             <fieldset disabled={busy || !connected || !data}>
               <SectionTitle id="settings" num="01">Registration &amp; privacy</SectionTitle>
@@ -258,9 +257,14 @@ export default function Admin() {
           <label className="checkbox pane pane-teams"><input type="checkbox" checked={captainOnly} onChange={e => setCaptainOnly(e.target.checked)} /><span>Captain only: hide the other players (cards, search and export)</span></label>
           <label className="checkbox pane pane-teams"><input type="checkbox" checked={reveal} disabled={captainOnly} onChange={e => setReveal(e.target.checked)} /><span>Reveal Ace names in admin cards</span></label>
           <p className="small note pane pane-teams">{filtered.length} of {total} registrations. Exports include all registrations{captainOnly ? ' (captains only)' : ' and private names'}, regardless of the current filter.</p>
+          <div className="view-switch pane pane-teams" role="group" aria-label="How to list the teams">
+            <button type="button" className={teamsView === 'table' ? 'on' : ''} aria-pressed={teamsView === 'table'} onClick={() => setTeamsView('table')}>Table</button>
+            <button type="button" className={teamsView === 'cards' ? 'on' : ''} aria-pressed={teamsView === 'cards'} onClick={() => setTeamsView('cards')}>Cards</button>
+          </div>
           {loading && <Message>Loading private registrations…</Message>}
           {!loading && !filtered.length && <Message>No registrations match.</Message>}
-          {groups.map(group => {
+          {teamsView === 'table' && filtered.length > 0 && <AdminTeams teams={filtered} tiers={liveTiers} data={data} masked={masked} captainOnly={captainOnly} editing={editing} setEditing={setEditing} onSave={saveTeam} onResetLogin={resetLogin} onWithdraw={withdraw} busy={busy} />}
+          {teamsView === 'cards' && groups.map(group => {
             const list = filtered.filter(t => listedIn(t).includes(group.id));
             if (!list.length) return null;
             return (
@@ -312,13 +316,13 @@ export default function Admin() {
             <Link className="secondary" to="/league">Open the League page ↗</Link>
           </div>
 
-          <SectionTitle id="pprc" num="05">PPRC players</SectionTitle>
+          <SectionTitle id="pprc" num="06">PPRC players</SectionTitle>
           <AdminPprc teams={teams} busy={busy || !connected} onLink={linkPprc} publicByDefault={data?.settings?.aceNameMaskingEnabled === false} />
-          <SectionTitle id="admins" num="06">Administrators</SectionTitle>
+          <SectionTitle id="admins" num="07">Administrators</SectionTitle>
           <AdminUsers service={service} disabled={busy || !connected || !data?.settings} />
         </div>
       </div>
-      <FirebasePanel service={service} data={data} />
+      <div className="pane pane-settings"><FirebasePanel service={service} data={data} /></div>
     </section>
   );
 }
