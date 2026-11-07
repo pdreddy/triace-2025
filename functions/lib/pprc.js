@@ -38,7 +38,8 @@ export function createRegistry(entries = [], overrides = {}) {
 // part of exactly one player (so "Sashi R" finds "Sashi Raju", "Krishna" finds a unique Krishna).
 // Several candidates is `ambiguous`, never a guess; no candidate is `unknown`.
 // `roster` (optional ids) narrows the candidates first, e.g. the two teams playing the match.
-export function resolveName(registry, raw, { roster } = {}) {
+// `preferred` (optional Set of ids) settles what is left when exactly one preferred player fits.
+export function resolveName(registry, raw, { roster, preferred } = {}) {
   const key = nameKey(raw);
   if (!key) return { id: null, how: 'unknown', candidates: [] };
   if (registry.overrides[key]) return { id: registry.overrides[key], how: 'override', candidates: [] };
@@ -49,6 +50,9 @@ export function resolveName(registry, raw, { roster } = {}) {
   if (inRoster.length === 1) return { id: inRoster[0], how: 'roster', candidates: [] };
   const all = matches(registry.list);
   if (all.length === 1) return { id: all[0], how: 'tokens', candidates: [] };
+  // `preferred` (the cleanest list, e.g. KOC season 3): a name that fits exactly one of them goes to that person.
+  const best = preferred ? all.filter(id => preferred.has(id)) : [];
+  if (best.length === 1) return { id: best[0], how: 'preferred', candidates: all };
   return { id: null, how: all.length ? 'ambiguous' : 'unknown', candidates: all };
 }
 

@@ -9,6 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { buildMultiClub, reportText } from '../functions/lib/pprcMigrate.js';
+import { renderDecisionPage } from './name-decisions-page.mjs';
 
 const csvLine = cells => cells.map(c => (/[",\n]/.test(String(c)) ? `"${String(c).replace(/"/g, '""')}"` : String(c))).join(',');
 function parseCsv(text) {
@@ -40,10 +41,15 @@ fs.writeFileSync(path.join(out, 'report.json'), JSON.stringify(report, null, 1))
 
 const people = tree.pprcMaster.players, rows = new Map();
 for (const d of report.decisions) {
-  const key = `${d.team}\u0000${d.raw}`, row = rows.get(key) || { ...d, count: 0 };
-  row.count++; rows.set(key, row);
+  const key = `${d.team}\u0000${d.raw}`, row = rows.get(key) || { ...d, count: 0, examples: [] };
+  row.count++; if (row.examples.length < 3) row.examples.push(d.ctx); rows.set(key, row);
 }
 const sorted = [...rows.values()].sort((a, b) => a.team.localeCompare(b.team) || b.count - a.count);
 fs.writeFileSync(path.join(out, 'name-decisions.csv'), [csvLine(['raw', 'team', 'matches', 'kind', 'candidates', 'decision']), ...sorted.map(d => csvLine([d.raw, d.team, d.count, d.kind, d.candidates.map(id => people[id]?.name || id).join(' | '), '']))].join('\n') + '\n');
+const page = renderDecisionPage({
+  rows: sorted.map(d => ({ raw: d.raw, team: d.team, count: d.count, kind: d.kind, candidates: d.candidates.map(id => people[id]?.name || id), examples: d.examples })),
+  players: Object.values(people).map(p => p.name).sort((a, b) => a.localeCompare(b))
+});
+fs.writeFileSync(path.join(out, 'name-decisions.html'), page);
 console.log(reportText(report).split('\n').slice(0, 30).join('\n'));
-console.log(`\n${sorted.length} names need a decision (see name-decisions.csv).\nWritten to ${out}: multiclub.json, report.md, report.json, name-decisions.csv (nothing was sent to Firebase).`);
+console.log(`\n${sorted.length} names need a decision (see name-decisions.csv).\nWritten to ${out}: multiclub.json, report.md, report.json, name-decisions.csv, name-decisions.html (nothing was sent to Firebase).`);

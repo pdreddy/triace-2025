@@ -120,3 +120,12 @@ test('history view: latest ten, then older matches grouped by year', () => {
   assert.deepEqual(splitHistory(entries.slice(0, 3)), { recent: splitHistory(entries.slice(0, 3)).recent, years: [] });
   assert.deepEqual(splitHistory(undefined), { recent: [], years: [] });
 });
+
+test('a preferred list settles a name only when exactly one preferred player fits', () => {
+  const r = registry();
+  assert.equal(resolveName(r, 'Vinod', { preferred: new Set(['p_vinod_a']) }).id, 'p_vinod_a');
+  assert.equal(resolveName(r, 'Vinod', { preferred: new Set(['p_vinod_a']) }).how, 'preferred');
+  assert.equal(resolveName(r, 'Vinod', { preferred: new Set(['p_vinod_a', 'p_vinod_m']) }).how, 'ambiguous');
+  assert.equal(resolveName(r, 'Vinod', { preferred: new Set(['p_dinkar']) }).how, 'ambiguous');
+  assert.equal(resolveName(r, 'Vinod', { roster: ['p_vinod_m'], preferred: new Set(['p_vinod_a']) }).id, 'p_vinod_m', 'the team beats the preferred list');
+});
