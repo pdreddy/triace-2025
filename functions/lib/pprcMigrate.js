@@ -15,11 +15,11 @@ export const SOURCES = [
   { club: 'triace', season: 's1', path: 'TriAceDB' },
   { club: 'triace', season: 's1', path: 'TriAceDB2' },
   { club: 'triace', season: 's1', path: 'TriAceDBNEW_Play', stage: 'po' },
-  { club: 'triace', season: 'super6', path: 'TriAceDBSUPER6' }
+  { club: 'triace', season: 's1', path: 'TriAceDBSUPER6', stage: 'po' }
 ];
 export const CLUBS = {
   koc: { name: 'KOC', seasons: { s1: 'Season 1', s2: 'Season 2', s3: 'Season 3' } },
-  triace: { name: 'Triace', seasons: { s1: 'Season 1', super6: 'Super 6' } }
+  triace: { name: 'Triace', seasons: { s1: 'Season 1' } }
 };
 
 const at = (data, path) => path.split('/').reduce((node, part) => (node == null ? node : node[part]), data);
@@ -35,7 +35,7 @@ const looksLikeFullName = key => { const parts = key.split(' '); return parts.le
 const dupKey = m => [m.t1, m.t2, m.g1, m.g2, m.s1, m.s2].join('|');
 
 // ---------- The player master ----------
-export function buildMaster(data) {
+export function buildMaster(data, notes = {}) {
   const players = {}; // id -> record
   const upsert = (name, patch) => {
     const key = nameKey(name); if (!key) return null;
@@ -52,6 +52,26 @@ export function buildMaster(data) {
     players[id].seed = { singles: s.singles ?? num(p.verifiedSinglesUtr) ?? num(p.singlesUtr), doubles: s.doubles ?? num(p.verifiedDoublesUtr) ?? num(p.doublesUtr) };
     players[id].seedSource ||= 'koc_s3/playerRatings';
   }
+  // Everyone named on a team roster or in an auction is a real person even if they were never graded. Adding
+  // them with their full names is what lets a first name in an old match find its owner.
+  const rosterNames = new Set();
+  const addRoster = (name, seed) => {
+    const key = nameKey(name); if (!key || key.split(' ').length < 2 || /^player \d+$/.test(key)) return;
+    rosterNames.add(name);
+    if (players[playerIdFor(key)]) return;
+    // The same person under a shorter or reordered name (e.g. "Satish Orugunta", "Noufal Mohamed") is an alias, not a new person.
+    const tokens = key.split(' '), covers = (a, b) => a.every(x => b.some(y => y.startsWith(x)));
+    const same = Object.values(players).filter(p => { const t = p.nameKey.split(' '); return covers(tokens, t) || covers(t, tokens); });
+    if (same.length === 1) { same[0].aliases = [...new Set([...(same[0].aliases || []), String(name).trim()])]; return; }
+    if (same.length > 1) { (notes.similarRoster ||= {})[name] = same.map(p => p.nameKey).join(' / '); return; }
+    const near = Object.values(players).find(p => p.nameKey.length >= 8 && editDistance(p.nameKey, key) <= 2);
+    if (near) { (notes.similarRoster ||= {})[name] = near.nameKey; return; }
+    upsert(name, { seed: seed || {}, seedSource: 'roster', clubs: { koc: true }, fromRoster: true });
+  };
+  for (const t of Object.values(data.koc_s2?.teams || {})) for (const p of t.players || []) addRoster(p.name);
+  for (const t of Object.values(data.koc_s3?.teams || {})) for (const p of t.players || []) addRoster(p.name);
+  for (const a of Object.values(data.auctions || {})) for (const t of a.teams || []) for (const p of t.players || []) addRoster(p.Name);
+  for (const a of Object.values(data.auctionsdata || {})) for (const p of a.cfgPlayers || []) addRoster(p.Name, { singles: num(p.s), doubles: num(p.d) });
   // Claimed profiles only contribute the old id, never contact details.
   for (const [k, v] of Object.entries(data.ratingsMaster || {})) {
     const id = playerIdFor(v?.name || k);
@@ -73,18 +93,24 @@ function courtWinner(line, match) {
 }
 
 export function buildMultiClub(data, { overrides = {}, createMissing = true, sources = SOURCES, params = PPRC_PARAMS } = {}) {
-  const master = buildMaster(data);
-  // An override is either an existing player id, or { name, singles?, doubles? } for a person who is not in the master yet.
-  const resolvedOverrides = {};
+  const notes = {}, master = buildMaster(data, notes);
+  // An override is an existing player id, a full name (an existing person, or a new one), or { name, singles?, doubles? }.
+  // Key it by the name as written, or "<team>::<name>" to settle that name only for one team (e.g. "Team A4::Vinod").
+  const idForDecision = value => {
+    const name = typeof value === 'string' ? value : value.name;
+    if (typeof value === 'string' && master[value]) return value;
+    const id = playerIdFor(name), seed = typeof value === 'object' ? { singles: num(value.singles), doubles: num(value.doubles) } : {};
+    master[id] ||= { id, name: String(name).trim().replace(/\s+/g, ' '), nameKey: nameKey(name), clubs: {}, seed, seedSource: 'override' };
+    return id;
+  };
+  const resolvedOverrides = {}, scopedOverrides = {};
   for (const [raw, value] of Object.entries(overrides)) {
     if (!value) continue;
-    if (typeof value === 'string') { resolvedOverrides[raw] = value; continue; }
-    const id = playerIdFor(value.name);
-    master[id] ||= { id, name: String(value.name).trim().replace(/\s+/g, ' '), nameKey: nameKey(value.name), clubs: {}, seed: { singles: num(value.singles), doubles: num(value.doubles) }, seedSource: 'override' };
-    resolvedOverrides[raw] = id;
+    const [team, name] = raw.includes('::') ? raw.split('::') : [null, raw];
+    if (team) scopedOverrides[`${nameKey(team)}::${nameKey(name)}`] = idForDecision(value); else resolvedOverrides[raw] = idForDecision(value);
   }
-  const registry = createRegistry(Object.values(master).map(p => ({ id: p.id, name: p.name })), resolvedOverrides);
-  const report = { sources: [], names: { how: {}, unresolved: {}, ambiguous: {}, similar: {}, provisional: [] }, courts: { total: 0, rated: 0, skipped: {} }, seasons: {} };
+  const registry = createRegistry(Object.values(master).map(p => ({ id: p.id, name: p.name, aliases: p.aliases })), resolvedOverrides);
+  const report = { sources: [], names: { how: {}, unresolved: {}, ambiguous: {}, similar: {}, provisional: [] }, decisions: [], courts: { total: 0, rated: 0, skipped: {} }, seasons: {} };
   const tree = { clubs: {} };
   for (const [club, def] of Object.entries(CLUBS)) tree.clubs[club] = { meta: { name: def.name }, seasons: Object.fromEntries(Object.entries(def.seasons).map(([s, label]) => [s, { meta: { label }, matches: {} }])) };
 
@@ -110,7 +136,7 @@ export function buildMultiClub(data, { overrides = {}, createMissing = true, sou
           homeGames: num(line.g1) ?? 0, awayGames: num(line.g2) ?? 0, winner: courtWinner(line, m) || undefined,
           score: (line.sets || []).map(x => `${x.team1}-${x.team2}`).join(' ') || undefined
         };
-        for (const sideName of ['home', 'away']) names[sideName].forEach((rawName, k) => slots.push({ rawName, team: team(sideName), club: src.club, season: src.season, set: id => { court.ids[sideName][k] = id; } }));
+        for (const sideName of ['home', 'away']) names[sideName].forEach((rawName, k) => slots.push({ rawName, team: team(sideName), teamName: sideName === 'home' ? m.t1 : m.t2, club: src.club, season: src.season, set: id => { court.ids[sideName][k] = id; } }));
         return court;
       });
       const canonical = {
@@ -122,28 +148,40 @@ export function buildMultiClub(data, { overrides = {}, createMissing = true, sou
       ratedMatches.push(canonical); stat.imported++;
     }
   }
+  // Known rosters by team name (KOC only): seasons 2 and 3 and every auction.
+  const known = new Map();
+  const knownAdd = (teamName, names) => {
+    const k = nameKey(teamName); if (!k) return;
+    const set = known.get(k) || known.set(k, new Set()).get(k);
+    for (const n of names) { const id = resolveName(registry, n).id; if (id) set.add(id); }
+  };
+  for (const t of [...Object.values(data.koc_s2?.teams || {}), ...Object.values(data.koc_s3?.teams || {})]) knownAdd(t.name, (t.players || []).map(p => p.name));
+  for (const a of Object.values(data.auctions || {})) for (const t of a.teams || []) knownAdd(t.name, (t.players || []).map(p => p.Name));
+  const rosterFor = slot => { const learned = rosters.get(slot.team) || new Set(); if (slot.club !== 'koc') return [...learned]; return [...new Set([...learned, ...(known.get(slot.team.split('/').pop()) || [])])]; };
   const learn = (slot, id) => { slot.set(id); (rosters.get(slot.team) || rosters.set(slot.team, new Set()).get(slot.team)).add(id); };
   const pending = [];
   for (const slot of slots) { // pass 1: no guessing
-    const r = resolveName(registry, slot.rawName);
+    const scoped = scopedOverrides[`${nameKey(slot.teamName)}::${nameKey(slot.rawName)}`];
+    const r = scoped ? { id: scoped, how: 'override' } : resolveName(registry, slot.rawName);
     if (r.id) { learn(slot, r.id); report.names.how[r.how] = (report.names.how[r.how] || 0) + 1; } else pending.push(slot);
   }
   const stillPending = [];
   for (const slot of pending) { // pass 2: the team's own players decide
-    const r = resolveName(registry, slot.rawName, { roster: [...(rosters.get(slot.team) || [])] });
+    const r = resolveName(registry, slot.rawName, { roster: rosterFor(slot) });
     if (r.id) { learn(slot, r.id); report.names.how[r.how] = (report.names.how[r.how] || 0) + 1; } else stillPending.push({ slot, r });
   }
   const allKeys = () => Object.values(master).map(p => p.nameKey);
   for (const { slot, r } of stillPending) { // pass 3: create a person only for a clear, new full name
     const key = nameKey(slot.rawName), known = resolveName(registry, slot.rawName); // someone created a moment ago may now match
     if (known.id) { learn(slot, known.id); report.names.how[known.how] = (report.names.how[known.how] || 0) + 1; continue; }
-    if (r.how === 'ambiguous') { const e = report.names.ambiguous[slot.rawName] ||= { count: 0, candidates: r.candidates, in: {} }; e.count++; e.in[`${slot.club}/${slot.season}`] = (e.in[`${slot.club}/${slot.season}`] || 0) + 1; report.names.how.ambiguous = (report.names.how.ambiguous || 0) + 1; continue; }
+    if (r.how === 'ambiguous') { report.decisions.push({ raw: slot.rawName, team: slot.teamName, kind: 'ambiguous', candidates: r.candidates }); const e = report.names.ambiguous[slot.rawName] ||= { count: 0, candidates: r.candidates, in: {} }; e.count++; e.in[`${slot.club}/${slot.season}`] = (e.in[`${slot.club}/${slot.season}`] || 0) + 1; report.names.how.ambiguous = (report.names.how.ambiguous || 0) + 1; continue; }
     const similar = looksLikeFullName(key) ? allKeys().find(k => k.length >= 8 && editDistance(k, key) <= 2) : null;
     if (createMissing && looksLikeFullName(key) && !similar) {
       const id = playerIdFor(key);
       if (!master[id]) { master[id] = { id, name: String(slot.rawName).trim().replace(/\s+/g, ' '), nameKey: key, clubs: {}, seed: {}, provisional: true }; registry.add({ id, name: master[id].name }); report.names.provisional.push(master[id].name); }
       learn(slot, id); report.names.how.created = (report.names.how.created || 0) + 1; continue;
     }
+    report.decisions.push({ raw: slot.rawName, team: slot.teamName, kind: similar ? 'similar' : 'unknown', candidates: similar ? [playerIdFor(similar)] : [] });
     const bucket = similar ? report.names.similar : report.names.unresolved;
     const e = bucket[slot.rawName] ||= { count: 0, in: {}, ...(similar ? { closeTo: similar } : {}) }; e.count++; e.in[`${slot.club}/${slot.season}`] = (e.in[`${slot.club}/${slot.season}`] || 0) + 1;
     report.names.how.unresolved = (report.names.how.unresolved || 0) + 1;
@@ -160,7 +198,13 @@ export function buildMultiClub(data, { overrides = {}, createMissing = true, sou
     for (const id of teams[t.id].players) if (master[id]) master[id].clubs.koc = true;
   }
   tree.clubs.koc.seasons.s3.teams = teams;
-  tree.clubs.koc.seasons.s2.meta.note = 'No season 2 match data exists in the export.';
+  const teams2 = {};
+  for (const t of Object.values(data.koc_s2?.teams || {})) {
+    teams2[t.id] = { id: t.id, name: t.name, abbreviation: t.abbreviation, group: t.group, players: (t.players || []).map(p => resolveName(registry, p.name).id).filter(Boolean) };
+    for (const id of teams2[t.id].players) if (master[id]) master[id].clubs.koc = true;
+  }
+  tree.clubs.koc.seasons.s2.teams = teams2;
+  tree.clubs.koc.seasons.s2.meta.note = 'Teams and schedule only: the export has no season 2 match results.';
 
   // One rating run over every club and season, in time order.
   const seeds = Object.fromEntries(Object.values(master).map(p => [p.id, { singles: p.seed?.singles, doubles: p.seed?.doubles }]));
@@ -188,6 +232,7 @@ export function buildMultiClub(data, { overrides = {}, createMissing = true, sou
     nameIndex, ratings: rated.ratings, ratingHistory, recent
   };
   report.players = { total: Object.keys(master).length, provisional: report.names.provisional.length, rated: Object.values(rated.ratings).filter(r => r.played.singles + r.played.doubles > 0).length };
+  report.names.similarRoster = notes.similarRoster || {};
   report.skippedCourts = rated.skipped;
   return { tree, report };
 }
@@ -202,8 +247,10 @@ export function reportText(report) {
   const amb = Object.entries(report.names.ambiguous).sort((a, b) => b[1].count - a[1].count), unk = Object.entries(report.names.unresolved).sort((a, b) => b[1].count - a[1].count);
   lines.push('', `## Needs a decision: ambiguous names (${amb.length})`, ...amb.map(([n, v]) => `- "${n}" ×${v.count}: ${v.candidates.join(', ')}`));
   lines.push('', `## Needs a decision: unknown single names (${unk.length})`, ...unk.map(([n, v]) => `- "${n}" ×${v.count}`));
+  const simR = Object.entries(report.names.similarRoster || {});
   const sim = Object.entries(report.names.similar || {});
   lines.push('', `## Possible misspellings: not created, point them at the right person in overrides.json (${sim.length})`, ...sim.map(([n, v]) => `- "${n}" ×${v.count} looks like ${v.closeTo}`));
+  lines.push('', `## Roster names that look like an existing person (not added, check they are the same) (${simR.length})`, ...simR.map(([n, k]) => `- "${n}" looks like ${k}`));
   lines.push('', `## New people created from match names (${report.names.provisional.length})`, ...[...new Set(report.names.provisional)].map(n => `- ${n}`));
   return lines.join('\n');
 }

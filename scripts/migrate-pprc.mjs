@@ -1,22 +1,49 @@
 // Dry run: reads a Realtime Database export and writes the multi-club tree and a report to a local folder.
-// It never talks to Firebase. Usage: node scripts/migrate-pprc.mjs <export.json> <out-dir> [overrides.json]
-// overrides.json maps a name as written in old matches to an existing player id, or to a new person:
-//   { "Vinod A": "p_vinod_aripaka", "Kalam": { "name": "Abdul Kalam", "singles": 4.5 } }
-// Empty values are ignored, so overrides.todo.json (written next to the report) can be filled in and passed back as is.
+// It never talks to Firebase.
+//   node scripts/migrate-pprc.mjs <export.json> <out-dir> [decisions.csv | overrides.json]
+//
+// Names it cannot settle are written to name-decisions.csv (raw name, team, how often, candidates, decision).
+// Type the player's full name in the `decision` column and run again with that file. A decision applies to
+// that name for that team only; leave `team` empty for "this name always means this person".
+// overrides.json also works: { "Team A4::Vinod": "Vinod Aripaka", "Kalam": { "name": "Kalam Shaik", "singles": 4.5 } }.
 import fs from 'node:fs';
 import path from 'node:path';
 import { buildMultiClub, reportText } from '../functions/lib/pprcMigrate.js';
 
-const [input, out, overridesFile] = process.argv.slice(2);
-if (!input || !out) { console.error('Usage: node scripts/migrate-pprc.mjs <export.json> <out-dir> [overrides.json]'); process.exit(1); }
+const csvLine = cells => cells.map(c => (/[",\n]/.test(String(c)) ? `"${String(c).replace(/"/g, '""')}"` : String(c))).join(',');
+function parseCsv(text) {
+  const rows = []; let row = [], cell = '', quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quoted) { if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; } else if (ch === '"') quoted = false; else cell += ch; }
+    else if (ch === '"') quoted = true; else if (ch === ',') { row.push(cell); cell = ''; } else if (ch === '\n') { row.push(cell); rows.push(row); row = []; cell = ''; } else if (ch !== '\r') cell += ch;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows;
+}
+function loadDecisions(file) {
+  const text = fs.readFileSync(file, 'utf8');
+  if (file.endsWith('.json')) return JSON.parse(text);
+  const [head, ...rows] = parseCsv(text), col = name => head.indexOf(name), out = {};
+  for (const r of rows) { const decision = (r[col('decision')] || '').trim(); if (decision) out[r[col('team')] ? `${r[col('team')]}::${r[col('raw')]}` : r[col('raw')]] = decision; }
+  return out;
+}
+
+const [input, out, decisionsFile] = process.argv.slice(2);
+if (!input || !out) { console.error('Usage: node scripts/migrate-pprc.mjs <export.json> <out-dir> [decisions.csv | overrides.json]'); process.exit(1); }
 const data = JSON.parse(fs.readFileSync(input, 'utf8'));
-const overrides = overridesFile ? JSON.parse(fs.readFileSync(overridesFile, 'utf8')) : {};
-const { tree, report } = buildMultiClub(data, { overrides });
+const { tree, report } = buildMultiClub(data, { overrides: decisionsFile ? loadDecisions(decisionsFile) : {} });
 fs.mkdirSync(out, { recursive: true });
 fs.writeFileSync(path.join(out, 'multiclub.json'), JSON.stringify(tree));
 fs.writeFileSync(path.join(out, 'report.md'), reportText(report));
 fs.writeFileSync(path.join(out, 'report.json'), JSON.stringify(report, null, 1));
-const todo = Object.fromEntries([...Object.keys(report.names.ambiguous), ...Object.keys(report.names.unresolved), ...Object.keys(report.names.similar)].sort().map(n => [n, '']));
-fs.writeFileSync(path.join(out, 'overrides.todo.json'), JSON.stringify(todo, null, 1));
+
+const people = tree.pprcMaster.players, rows = new Map();
+for (const d of report.decisions) {
+  const key = `${d.team}\u0000${d.raw}`, row = rows.get(key) || { ...d, count: 0 };
+  row.count++; rows.set(key, row);
+}
+const sorted = [...rows.values()].sort((a, b) => a.team.localeCompare(b.team) || b.count - a.count);
+fs.writeFileSync(path.join(out, 'name-decisions.csv'), [csvLine(['raw', 'team', 'matches', 'kind', 'candidates', 'decision']), ...sorted.map(d => csvLine([d.raw, d.team, d.count, d.kind, d.candidates.map(id => people[id]?.name || id).join(' | '), '']))].join('\n') + '\n');
 console.log(reportText(report).split('\n').slice(0, 30).join('\n'));
-console.log(`\nWritten to ${out}: multiclub.json, report.md, report.json, overrides.todo.json (nothing was sent to Firebase).`);
+console.log(`\n${sorted.length} names need a decision (see name-decisions.csv).\nWritten to ${out}: multiclub.json, report.md, report.json, name-decisions.csv (nothing was sent to Firebase).`);

@@ -18,7 +18,7 @@ clubs/<club>/
   seasons/<season>/
     meta/  teams/  matches/<matchId>      matches reference players by id; the typed names are kept for traceability
 ```
-Clubs and seasons in the first migration: `koc` s1, s2 (no data exists), s3; `triace` s1 and `super6`.
+Clubs and seasons in the first migration: `koc` s1, s2 (teams and schedule only, no results), s3; `triace` s1 (round robin plus the playoffs, including Super 6).
 
 ## The rating algorithm (`functions/lib/pprc.js`)
 One function, `computePprc({ players, matches })`, rates every court from every club in time order.
@@ -43,12 +43,18 @@ The Triace player page shows the ten and opens a year only when it is clicked.
 
 ## Migrating the old databases (dry run)
 ```bash
-node scripts/migrate-pprc.mjs <export.json> <out-dir> [overrides.json]
+node scripts/migrate-pprc.mjs <export.json> <out-dir> [decisions.csv | overrides.json]
 ```
-Writes `multiclub.json` (the tree above), `report.md`, `report.json` and `overrides.todo.json`. It never
-contacts Firebase. Names in old matches are resolved exactly, then by unique name parts, then from the
-team's own known players. Anything ambiguous or unknown is listed, not guessed: fill `overrides.todo.json`
-with a player id (or `{ "name": "Full Name", "singles": 4.5 }` for someone new) and run again.
-Sources: KOC2DB (preferred, full names), KOC2DBPONEW, KOC2DBPO → KOC s1; `koc_s3/matches` (approved only) →
-KOC s3; TriAceDBNEW, TriAceDB, TriAceDB2, TriAceDBNEW_Play → Triace s1; TriAceDBSUPER6 → Triace super6.
-Duplicates (the same match under two paths) are dropped, keeping the first source.
+Writes `multiclub.json` (the tree above), `report.md`, `report.json` and `name-decisions.csv`. It never contacts Firebase.
+
+**Names.** Old matches often have only a first name. They are resolved in this order: your decision, exact name or
+alias, a unique match on name parts, then the team's own known players (its other matches, and the KOC season 2/3
+rosters and auction teams). Roster and auction names are added as people, and a shorter or reordered version of someone
+already known is stored as an alias rather than a second person. Anything still ambiguous or unknown is **not guessed**:
+it goes to `name-decisions.csv` (raw name, team, number of matches, candidates). Type the player's full name in the
+`decision` column and run again with that file. A decision applies to that name for that team only (leave `team` empty
+for a name that always means one person). A full name that is not in the master creates a new person.
+
+Sources: KOC2DB (preferred, full names), KOC2DBPONEW, KOC2DBPO → KOC s1; KOC season 2 teams from `koc_s2`;
+`koc_s3/matches` (approved only) → KOC s3; TriAceDBNEW, TriAceDB, TriAceDB2 → Triace s1; TriAceDBNEW_Play and
+TriAceDBSUPER6 → Triace s1 playoffs. Duplicates (the same match under two paths) are dropped, keeping the first source.

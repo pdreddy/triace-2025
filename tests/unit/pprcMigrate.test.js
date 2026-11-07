@@ -87,3 +87,39 @@ test('the report lists what needs a decision', () => {
   const text = reportText(buildMultiClub(exportData()).report);
   for (const part of ['## Players', '## Matches by source', 'ambiguous names', 'unknown single names', 'Possible misspellings', '"Vinod"']) assert.ok(text.includes(part), part);
 });
+
+test('a decision typed as a full name settles a name for one team only', () => {
+  const data = exportData();
+  data.TriAceDBNEW.x3 = { ts: day(22), t1: 'Team C', t2: 'Team D', g1: 8, g2: 1, s1: 1, s2: 0, lines: [line('S1', 'singles', ['Vinod'], ['Dinkar'], 8, 1, { winnerTeamNum: 1 })] };
+  const { tree, report } = buildMultiClub(data, { overrides: { 'Team A::Vinod': 'Vinod Punati', 'Team C::Vinod': 'p_vinod_aripaka', Kalam: 'Kalam Shaik' } });
+  const x2 = tree.clubs.triace.seasons.s1.matches['triace-s1-x2'].courts[0], x3 = tree.clubs.triace.seasons.s1.matches['triace-s1-x3'].courts[0];
+  assert.deepEqual(x3.home, ['p_vinod_aripaka'], 'Team C’s Vinod is Aripaka');
+  assert.equal(x2.home && x2.home[0], 'p_vinod_punati', 'Team A’s Vinod is Punati: the same first name, a different person');
+  assert.ok(!report.decisions.some(d => d.raw === 'Vinod'), 'nothing left to decide for Vinod');
+  const rows = buildMultiClub(exportData()).report.decisions.filter(d => d.raw === 'Vinod');
+  assert.deepEqual(rows.map(d => [d.team, d.kind]), [['Team A', 'ambiguous']], 'undecided names are listed with their team');
+  const created = buildMultiClub(data, { overrides: { 'Team A::Vinod': 'Brand New Person' } }).tree.pprcMaster.players;
+  assert.equal(created.p_brand_new_person.name, 'Brand New Person', 'an unknown full name becomes a new person');
+});
+
+test('roster names become people, and shorter or reordered versions of known people are aliases, not duplicates', () => {
+  const data = exportData();
+  data.koc_s2 = { teams: { a: { id: 'a', name: 'Old Team', abbreviation: 'OT', group: 'A', players: [{ name: 'Kalam Shaik' }, { name: 'Vinod Punati' }, { name: 'Dinkar Bhardwaj' }, { name: 'Bhardwaj Dinkar' }, { name: 'Player 3' }, { name: 'Yogesh' }] } } };
+  const { tree } = buildMultiClub(data);
+  const m = tree.pprcMaster;
+  assert.ok(m.players.p_kalam_shaik, 'a roster-only player is added with a full name');
+  assert.ok(!m.players.p_bhardwaj_dinkar, 'a reordered name is not a second person');
+  assert.ok(m.players.p_dinkar_bhardwaj.aliases.includes('Bhardwaj Dinkar'));
+  assert.ok(!Object.keys(m.players).some(id => id.includes('player_3') || id === 'p_yogesh'), 'placeholders and single names are skipped');
+  const court = tree.clubs.triace.seasons.s1.matches['triace-s1-x2'].courts[0];
+  assert.deepEqual(court.names.away, ['Kalam'], 'Kalam now resolves to Kalam Shaik');
+  assert.deepEqual(tree.clubs.koc.seasons.s2.teams.a.players.slice(0, 2), ['p_kalam_shaik', 'p_vinod_punati']);
+});
+
+test('Super 6 is a Triace season 1 playoff, not a season of its own', () => {
+  const data = exportData();
+  data.TriAceDBSUPER6 = { s6: { ts: day(30), t1: 'Team A', t2: 'Team B', g1: 8, g2: 1, s1: 1, s2: 0, lines: [line('S1', 'singles', ['Dinkar Bhardwaj'], ['Rajesh Mishra'], 8, 1, { winnerTeamNum: 1 })] } };
+  const { tree } = buildMultiClub(data);
+  assert.deepEqual(Object.keys(tree.clubs.triace.seasons), ['s1']);
+  assert.equal(tree.clubs.triace.seasons.s1.matches['triace-s1-s6'].stage, 'po');
+});
