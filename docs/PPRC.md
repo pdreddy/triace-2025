@@ -61,3 +61,5 @@ TriAceDBSUPER6 → Triace s1 playoffs. Duplicates (the same match under two path
 
 Confirmed decisions live in `scripts/migration/name-decisions.json` (keys are `Team::Name`, or a bare name for "always this person").
 Names are compared ignoring capitalisation, so "Durga" and "DURGA" are one name and one row in the fixer page.
+A decision that gives a single name (e.g. "Shivaji") creates a profile flagged `needsFullName`; give it a full name later
+and re-run, and the same id and history carry over only if the name key is unchanged, so rename by adding the old name as an alias.

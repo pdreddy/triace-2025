@@ -133,3 +133,13 @@ test('a name marked as not a real player is ignored and no longer asked about', 
   assert.equal(tree.clubs.triace.seasons.s1.matches['triace-s1-x4'].courts[0].home, undefined, 'the court stays but is not rated');
   assert.equal(report.names.how.ignored, 1);
 });
+
+test('a single-name decision creates a profile flagged as needing a full name', () => {
+  const { tree } = buildMultiClub(exportData(), { overrides: { 'Team A::Vinod': 'Shivaji', Kalam: 'Kalam Shaik' } });
+  const m = tree.pprcMaster;
+  assert.equal(m.players.p_shivaji.name, 'Shivaji');
+  assert.equal(m.players.p_shivaji.needsFullName, true);
+  assert.equal(m.players.p_kalam_shaik.needsFullName, undefined);
+  assert.equal(m.nameIndex.shivaji, 'p_shivaji');
+  assert.ok(m.ratings.p_shivaji, 'the profile has a rating record from the start');
+});

@@ -104,7 +104,7 @@ export function buildMultiClub(data, { overrides = {}, createMissing = true, sou
     const name = typeof value === 'string' ? value : value.name;
     if (typeof value === 'string' && master[value]) return value;
     const id = playerIdFor(name), seed = typeof value === 'object' ? { singles: num(value.singles), doubles: num(value.doubles) } : {};
-    master[id] ||= { id, name: String(name).trim().replace(/\s+/g, ' '), nameKey: nameKey(name), clubs: {}, seed, seedSource: 'override' };
+    master[id] ||= { id, name: String(name).trim().replace(/\s+/g, ' '), nameKey: nameKey(name), clubs: {}, seed, seedSource: 'override', ...(nameKey(name).split(' ').length < 2 ? { needsFullName: true } : {}) };
     return id;
   };
   const resolvedOverrides = {}, scopedOverrides = {}, ignored = new Set();
