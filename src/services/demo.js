@@ -48,6 +48,7 @@ export function createDemoService() {
     issueChallenge: payload => request('issue-challenge', payload),
     updateTeam: payload => request('update-team', payload),
     linkPprc: payload => request('link-pprc', payload),
+    syncPprcUtr: payload => request('sync-pprc-utr', payload),
     withdrawTeam: payload => request('withdraw-team', payload),
     resetCaptainLogin: payload => request('reset-captain-login', payload),
     async captainLogin(username, password) { await request('captain-login', { username, password }); await refreshAuth(); },

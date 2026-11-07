@@ -96,6 +96,50 @@ function courtWinner(line, match) {
   return g1 === g2 ? null : g1 > g2 ? 'home' : 'away';
 }
 
+// Everything that follows from the players and the matches: every rating, the history (stored by calendar year so a
+// profile can load the latest ten and open one year at a time), the latest ten, the years list and the search list.
+// Used by the migration and by the server when UTRs are uploaded, so both always give the same result.
+//   master:  { [id]: { id, name, clubs, seed: { singles, doubles } } }
+//   matches: canonical matches ({ id, club, season, stage, ts, home: { name }, away: { name }, courts: [...] })
+export function deriveMaster({ master, matches, params = PPRC_PARAMS }) {
+  const seeds = Object.fromEntries(Object.values(master).map(p => [p.id, { singles: p.seed?.singles, doubles: p.seed?.doubles }]));
+  const rated = computePprc({ players: seeds, matches, params });
+  // Every history entry says which game it was: the club (KOC, Triace), season, league or playoffs, the date, who
+  // played with and against, so a profile reads as a plain list without further lookups.
+  const byMatch = new Map(matches.map(m => [m.id, m])), nameOf = id => master[id]?.name || id;
+  const describe = (pid, e) => {
+    const m = byMatch.get(e.matchId), court = m?.courts.find(c => c.label === e.court && [...(c.home || []), ...(c.away || [])].includes(pid));
+    const side = court?.home?.includes(pid) ? 'home' : 'away', competition = CLUBS[e.club]?.name || e.club, seasonLabel = CLUBS[e.club]?.seasons[e.season] || e.season, stageLabel = e.stage === 'po' ? 'Playoffs' : 'League';
+    return {
+      ...e, competition, seasonLabel, stageLabel, title: `${competition} · ${seasonLabel} · ${stageLabel}`, date: new Date(e.ts).toISOString().slice(0, 10),
+      team: m?.[side]?.name || null, opponentTeam: m?.[side === 'home' ? 'away' : 'home']?.name || null,
+      partnerName: e.partner ? nameOf(e.partner) : null, opponentNames: e.opponents.map(nameOf)
+    };
+  };
+  for (const [pid, entries] of Object.entries(rated.history)) rated.history[pid] = entries.map(e => describe(pid, e));
+  const ratingHistory = {}, recent = {};
+  for (const [pid, entries] of Object.entries(rated.history)) {
+    if (!entries.length) continue;
+    recent[pid] = splitHistory(entries).recent;
+    for (const [i, e] of [...entries].sort((a, b) => a.ts - b.ts).entries()) {
+      const year = new Date(e.ts).getUTCFullYear();
+      ((ratingHistory[pid] ||= {})[year] ||= {})[safeKey(`${e.matchId}_${String(i).padStart(3, '0')}`)] = e;
+    }
+  }
+  const r = id => rated.ratings[id];
+  return {
+    ratings: rated.ratings, ratingHistory, recent, skipped: rated.skipped,
+    // Matches per year for each player (all of them, the latest ten included), so a profile can list the years without loading them.
+    historyYears: Object.fromEntries(Object.entries(ratingHistory).map(([pid, years]) => [pid, Object.fromEntries(Object.entries(years).map(([y, items]) => [y, Object.keys(items).length]))])),
+    // A small list for search boxes, so a page does not have to download every profile.
+    playerList: Object.fromEntries(Object.values(master).map(p => [p.id, {
+      name: p.name, overall: r(p.id).overall, singles: r(p.id).singles, doubles: r(p.id).doubles, utr: { singles: r(p.id).seed.singles, doubles: r(p.id).seed.doubles },
+      played: r(p.id).played.singles + r(p.id).played.doubles,
+      clubs: Object.keys(p.clubs || {}).concat(rated.history[p.id].some(e => e.club === 'triace') ? ['triace'] : []).filter((c, i, a) => a.indexOf(c) === i)
+    }]))
+  };
+}
+
 export function buildMultiClub(data, { overrides = {}, createMissing = true, sources = SOURCES, params = PPRC_PARAMS } = {}) {
   const notes = {}, master = buildMaster(data, notes);
   // An override is an existing player id, a full name (an existing person, or a new one), or { name, singles?, doubles? }.
@@ -217,47 +261,20 @@ export function buildMultiClub(data, { overrides = {}, createMissing = true, sou
   }
   tree.clubs.koc.seasons.s3.teams = teams;
 
-  // One rating run over every club and season, in time order.
-  const seeds = Object.fromEntries(Object.values(master).map(p => [p.id, { singles: p.seed?.singles, doubles: p.seed?.doubles }]));
-  const rated = computePprc({ players: seeds, matches: ratedMatches, params });
+  // One rating run over every club and season (see deriveMaster).
+  const derived = deriveMaster({ master, matches: ratedMatches, params });
+  const rated = { skipped: derived.skipped, ratings: derived.ratings };
   for (const m of ratedMatches) for (const c of m.courts) { report.courts.total++; }
   report.courts.skipped = rated.skipped.reduce((o, s) => ({ ...o, [s.reason]: (o[s.reason] || 0) + 1 }), {});
   report.courts.rated = report.courts.total - rated.skipped.length;
   for (const m of ratedMatches) { const s = report.seasons[`${m.club}/${m.season}`] ||= { matches: 0, courts: 0 }; s.matches++; s.courts += m.courts.length; }
 
-  // Stored by calendar year so a player's page can load the latest ten and open one year at a time.
-  // Every history entry says which game it was: the club (KOC, Triace), season, league or playoffs, the date, who
-  // played with and against, so a profile reads as a plain list without further lookups.
-  const byMatch = new Map(ratedMatches.map(m => [m.id, m])), nameOf = id => master[id]?.name || id;
-  const describe = (pid, e) => {
-    const m = byMatch.get(e.matchId), court = m?.courts.find(c => c.label === e.court && [...(c.home || []), ...(c.away || [])].includes(pid));
-    const side = court?.home?.includes(pid) ? 'home' : 'away', competition = CLUBS[e.club]?.name || e.club, seasonLabel = CLUBS[e.club]?.seasons[e.season] || e.season, stageLabel = e.stage === 'po' ? 'Playoffs' : 'League';
-    return {
-      ...e, competition, seasonLabel, stageLabel, title: `${competition} · ${seasonLabel} · ${stageLabel}`, date: new Date(e.ts).toISOString().slice(0, 10),
-      team: m?.[side]?.name || null, opponentTeam: m?.[side === 'home' ? 'away' : 'home']?.name || null,
-      partnerName: e.partner ? nameOf(e.partner) : null, opponentNames: e.opponents.map(nameOf)
-    };
-  };
-  for (const [pid, entries] of Object.entries(rated.history)) rated.history[pid] = entries.map(e => describe(pid, e));
-  const ratingHistory = {}, recent = {};
-  for (const [pid, entries] of Object.entries(rated.history)) {
-    if (!entries.length) continue;
-    const view = splitHistory(entries);
-    recent[pid] = view.recent;
-    for (const [i, e] of [...entries].sort((a, b) => a.ts - b.ts).entries()) {
-      const year = new Date(e.ts).getUTCFullYear();
-      ((ratingHistory[pid] ||= {})[year] ||= {})[safeKey(`${e.matchId}_${String(i).padStart(3, '0')}`)] = e;
-    }
-  }
   const nameIndex = Object.fromEntries(Object.values(master).map(p => [p.nameKey, p.id]));
   tree.pprcMaster = {
     meta: { algorithm: params, builtFrom: sources.map(s => s.path), players: Object.keys(master).length },
     players: Object.fromEntries(Object.values(master).map(({ id, ...p }) => [id, p])),
-    nameIndex, ratings: rated.ratings, ratingHistory, recent,
-    // Matches per year for each player (all of them, the latest ten included), so a profile can list the years without loading them.
-    historyYears: Object.fromEntries(Object.entries(ratingHistory).map(([pid, years]) => [pid, Object.fromEntries(Object.entries(years).map(([y, items]) => [y, Object.keys(items).length]))])),
-    // A small list for search boxes, so a page does not have to download every profile.
-    playerList: Object.fromEntries(Object.values(master).map(p => [p.id, { name: p.name, overall: rated.ratings[p.id].overall, singles: rated.ratings[p.id].singles, doubles: rated.ratings[p.id].doubles, utr: { singles: rated.ratings[p.id].seed.singles, doubles: rated.ratings[p.id].seed.doubles }, played: rated.ratings[p.id].played.singles + rated.ratings[p.id].played.doubles, clubs: Object.keys(p.clubs || {}).concat(rated.history[p.id].some(e => e.club === 'triace') ? ['triace'] : []).filter((c, i, a) => a.indexOf(c) === i) }]))
+    nameIndex, ratings: derived.ratings, ratingHistory: derived.ratingHistory, recent: derived.recent,
+    historyYears: derived.historyYears, playerList: derived.playerList
   };
   report.players = { total: Object.keys(master).length, provisional: report.names.provisional.length, rated: Object.values(rated.ratings).filter(r => r.played.singles + r.played.doubles > 0).length };
   report.names.similarRoster = notes.similarRoster || {};

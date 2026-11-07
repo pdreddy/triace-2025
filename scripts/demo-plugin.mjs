@@ -1,6 +1,7 @@
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
 import path from 'node:path';
+import { applyUtrUpdates, validateUtrUpdates } from '../functions/lib/pprcSync.js';
 import { initialState, publicState, applyRegistration, applyConfiguration, applyEarlyBird, applyRecalculation, applyLeagueRules, applyCalendar, guard, isOwner, ValidationError } from '../functions/lib/tournament.js';
 import { applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult, applyManageSeason, applySetSchedule, applyMoveFixture, applyIssueChallenge, applyUpdateTeam, applyLinkPprc, applyWithdrawTeam, applySetCaptainLogin, applyAutoSchedule, applyAddBuffer } from '../functions/lib/league.js';
 import { adminEmail, validateAdminUsername, newAdminPassword, checkRemoval } from '../functions/lib/admins.js';
@@ -124,6 +125,18 @@ export function demoPlugin(env) {
         if (endpoint === '/partner-close') return signedIn ? send(200, await mutate(current => applyClosePost(current, payload, session.uid, admin))) : send(401, { error: 'Open the page again, then retry.' });
         if (endpoint === '/issue-challenge') return signedIn ? send(200, await mutate(current => applyIssueChallenge(current, payload, session.uid, admin))) : send(401, { error: 'Sign in first.' });
         if (endpoint === '/update-team') return signedIn ? send(200, await mutate(current => applyUpdateTeam(current, payload, session.uid, admin))) : send(401, { error: 'Sign in first.' });
+        if (endpoint === '/sync-pprc-utr') {
+          if (!admin) return send(403, { error: 'Administrator access is required.' });
+          let tree;
+          try { tree = JSON.parse(await readFile(treeFile, 'utf8')); } catch { return send(404, { error: 'No local PPRC data. Run: bash check-local.sh --export <your-export.json> --demo' }); }
+          let result;
+          try { result = applyUtrUpdates({ pprcMaster: tree.pprcMaster, clubs: tree.clubs }, validateUtrUpdates(payload?.updates)); } catch (error) { return send(400, { error: error.message }); }
+          Object.assign(tree.pprcMaster.players, result.changedPlayers); Object.assign(tree.pprcMaster.nameIndex, result.newIndex);
+          tree.pprcMaster.utrHistory ||= {}; for (const [id, h] of Object.entries(result.utrHistory)) tree.pprcMaster.utrHistory[id] = { ...(tree.pprcMaster.utrHistory[id] || {}), ...h };
+          Object.assign(tree.pprcMaster, result.derived);
+          await writeFile(treeFile, JSON.stringify(tree));
+          return send(200, result.summary);
+        }
         if (endpoint === '/link-pprc') return signedIn ? send(200, await mutate(current => applyLinkPprc(current, payload, admin))) : send(401, { error: 'Sign in first.' });
         if (endpoint === '/withdraw-team') {
           if (!signedIn) return send(401, { error: 'Sign in first.' });

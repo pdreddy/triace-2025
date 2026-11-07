@@ -71,6 +71,11 @@ export default function Admin() {
       setMessage('Rules saved. Public name visibility updates immediately; recalculate tiers if ranges changed.');
     });
   }
+  const syncUtr = async updates => {
+    let summary = null;
+    await action(async () => { summary = await service.syncPprcUtr({ updates }); setMessage(`PPRC updated: ${summary.updated} UTRs changed, ${summary.created} players added, ${summary.reRated} ratings moved.`); });
+    return summary;
+  };
   const linkPprc = links => action(async () => { const r = await service.linkPprc({ links }); setMessage(`PPRC: ${r.linked} linked, ${r.unlinked} unlinked. Public tier lists are updated.`); });
   function setTab(id) { setTabState(id); try { localStorage.setItem(TAB_KEY, id); } catch { /* storage blocked */ } window.scrollTo?.({ top: 0 }); }
   function setTeamsView(value) { setTeamsViewState(value); try { localStorage.setItem(VIEW_KEY, value); } catch { /* storage blocked */ } }
@@ -317,7 +322,7 @@ export default function Admin() {
           </div>
 
           <SectionTitle id="pprc" num="06">PPRC players</SectionTitle>
-          <AdminPprc teams={teams} busy={busy || !connected} onLink={linkPprc} publicByDefault={data?.settings?.aceNameMaskingEnabled === false} />
+          <AdminPprc teams={teams} busy={busy || !connected} onLink={linkPprc} onSync={syncUtr} publicByDefault={data?.settings?.aceNameMaskingEnabled === false} />
           <SectionTitle id="admins" num="07">Administrators</SectionTitle>
           <AdminUsers service={service} disabled={busy || !connected || !data?.settings} />
         </div>

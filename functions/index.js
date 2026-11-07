@@ -8,6 +8,8 @@ import { randomUUID, randomInt } from 'node:crypto';
 import { applyCreatePost, applyExpressInterest, applyClosePost, applyMarkPicked, applyReopenPost } from './lib/partners.js';
 import { applyRegistration, applyEarlyBird, applyConfiguration, applyRecalculation, applyLeagueRules, applyCalendar, bootstrapState, ValidationError } from './lib/tournament.js';
 import { applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult, applyManageSeason, applySetSchedule, applyMoveFixture, applyIssueChallenge, applyUpdateTeam, applyLinkPprc, applyWithdrawTeam, applySetCaptainLogin, applyAutoSchedule, applyAddBuffer } from './lib/league.js';
+import { applyUtrUpdates, validateUtrUpdates } from './lib/pprcSync.js';
+import { clean } from './lib/pprcImport.js';
 import { adminEmail, adminUsername, validateAdminUsername, newAdminPassword, checkRemoval } from './lib/admins.js';
 import { getAuth } from 'firebase-admin/auth';
 import { usernameAttempt, newPassword, loginNames, captainUid, loginEmail } from './lib/captainLogin.js';
@@ -106,6 +108,26 @@ export const setSchedule = onCall(options, async request => { requireAuth(reques
 export const moveFixture = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyMoveFixture(state, request.data)); });
 export const issueChallenge = onCall(options, async request => { requireAuth(request); return mutate(state => applyIssueChallenge(state, request.data, request.auth.uid, isAdmin(request))); });
 export const updateTeam = onCall(options, async request => { requireAuth(request); return mutate(state => applyUpdateTeam(state, request.data, request.auth.uid, isAdmin(request))); });
+// Admin: update PPRC players' UTRs from a file (the browser has already matched the names), then re-rate everyone from the
+// stored matches. Writes only under pprcMaster (and an import log); never touches clubs or traice2_0.
+export const syncPprcUtr = onCall({ ...options, timeoutSeconds: 120, memory: '512MiB' }, async request => {
+  requireAuth(request, true);
+  let updates;
+  try { updates = validateUtrUpdates(request.data?.updates); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
+  const db = getDatabase(), read = async path => (await db.ref(path).get()).val() || {};
+  const [players, nameIndex, ratings, clubs] = await Promise.all([read('pprcMaster/players'), read('pprcMaster/nameIndex'), read('pprcMaster/ratings'), read('pprcClubs')]);
+  if (!Object.keys(players).length) throw new HttpsError('failed-precondition', 'The PPRC list has not been imported yet.');
+  let result;
+  try { result = applyUtrUpdates({ pprcMaster: { players, nameIndex, ratings }, clubs }, updates); } catch (error) { throw new HttpsError('failed-precondition', error.message); }
+  const writes = {};
+  for (const [id, player] of Object.entries(result.changedPlayers)) writes[`pprcMaster/players/${id}`] = player;
+  for (const [key, id] of Object.entries(result.newIndex)) writes[`pprcMaster/nameIndex/${key}`] = id;
+  for (const [id, history] of Object.entries(result.utrHistory)) for (const [at, value] of Object.entries(history)) writes[`pprcMaster/utrHistory/${id}/${at}`] = value;
+  await db.ref().update(clean(writes));
+  for (const [node, value] of Object.entries(result.derived)) await db.ref(`pprcMaster/${node}`).set(clean(value));
+  await db.ref(`importLog/${Date.now()}`).set({ at: Date.now(), source: 'utr upload', by: request.auth.uid, ...result.summary });
+  return result.summary;
+});
 export const linkPprc = onCall(options, async request => { requireAuth(request); return mutate(state => applyLinkPprc(state, request.data, isAdmin(request))); });
 export const withdrawTeam = onCall(options, async request => {
   requireAuth(request);

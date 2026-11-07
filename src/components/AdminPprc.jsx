@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { matchPlayers, nameKey } from '../../functions/lib/pprc.js';
+import { parseUtrFile, planUtrUpload } from '../../functions/lib/pprcSync.js';
 import { PPRC_VERIFIED_AFTER, publicPprc } from '../../functions/lib/tournament.js';
 import { PprcBadge } from './UI';
 import { fetchPlayer, fetchPlayerList } from '../services/pprc';
@@ -12,9 +13,10 @@ const figures = (id, rating) => ({ id, overall: rating.overall, singles: rating.
 
 // Admin: check each registered player against the shared PPRC list, link them, refresh the figures, and export the
 // players who are not in PPRC yet so they can be created there.
-export default function AdminPprc({ teams, busy, onLink, publicByDefault = false }) {
+export default function AdminPprc({ teams, busy, onLink, onSync, publicByDefault = false }) {
   const [list, setList] = useState(null), [error, setError] = useState(''), [working, setWorking] = useState(''), [note, setNote] = useState('');
   const [search, setSearch] = useState({}), [fullNames, setFullNames] = useState({});
+  const [upload, setUpload] = useState({ name: '', errors: [], plan: null }), [syncing, setSyncing] = useState(false);
   const [view, setView] = useState('registered'), [allQuery, setAllQuery] = useState(''), [allClub, setAllClub] = useState('all');
   useEffect(() => { fetchPlayerList().then(setList).catch(e => setError(e.message)); }, []);
   const byId = useMemo(() => new Map((list || []).map(p => [p.id, p])), [list]);
@@ -27,6 +29,29 @@ export default function AdminPprc({ teams, busy, onLink, publicByDefault = false
 
   const linkedIds = useMemo(() => new Set(linked.map(r => r.link.id)), [linked]);
   const everyone = useMemo(() => (list || []).filter(p => (allClub === 'all' || (p.clubs || []).includes(allClub)) && (!allQuery.trim() || nameKey(p.name).includes(nameKey(allQuery)))).sort((a, b) => (b.overall || 0) - (a.overall || 0)), [list, allClub, allQuery]);
+  async function chooseFile(event) {
+    const file = event.target.files?.[0]; event.target.value = '';
+    if (!file) return;
+    const parsed = parseUtrFile(await file.text(), file.name);
+    setNote('');
+    setUpload({ name: file.name, errors: parsed.errors, plan: parsed.rows.length ? planUtrUpload(parsed.rows, list || []) : null });
+  }
+  async function applyUpload() {
+    if (!upload.plan?.updates.length || !onSync) return;
+    setSyncing(true);
+    try {
+      const summary = await onSync(upload.plan.updates);
+      if (summary) {
+        setNote(`PPRC updated: ${summary.updated} UTRs changed, ${summary.created} players added, ${summary.reRated} ratings moved (largest move ${summary.biggestChange}). Press “Refresh linked” to update the Triace badges.`);
+        setUpload({ name: '', errors: [], plan: null });
+        fetchPlayerList().then(setList).catch(e => setError(e.message));
+      }
+    } finally { setSyncing(false); }
+  }
+  function downloadTemplate() {
+    const url = URL.createObjectURL(new Blob(['name,singles,doubles\nFirst Last,6.50,6.80\n'], { type: 'text/csv' }));
+    Object.assign(document.createElement('a'), { href: url, download: 'pprc-utr-template.csv' }).click();
+  }
   const suggestions = row => {
     if (!list || row.link) return [];
     const typed = search[row.key]?.trim(), pool = typed ? matchPlayers(list, typed, 5) : matchPlayers(list, row.name, 3);
@@ -77,7 +102,43 @@ export default function AdminPprc({ teams, busy, onLink, publicByDefault = false
       <div className="view-switch" role="group" aria-label="Which players to show">
         <button type="button" className={view === 'registered' ? 'on' : ''} aria-pressed={view === 'registered'} onClick={() => setView('registered')}>Registered in Triace ({rows.length})</button>
         <button type="button" className={view === 'all' ? 'on' : ''} aria-pressed={view === 'all'} onClick={() => setView('all')}>All PPRC players{list ? ` (${list.length})` : ''}</button>
+        <button type="button" className={view === 'upload' ? 'on' : ''} aria-pressed={view === 'upload'} onClick={() => setView('upload')}>Update UTR from a file</button>
       </div>
+      {view === 'upload' && (
+        <div data-testid="pprc-upload">
+          <p className="small">Upload a CSV or JSON file of players' UTRs whenever you have new ones. Each name is matched to a PPRC player (or added if it is a new full name), you see exactly what would change, and nothing is saved until you press Apply. Every PPRC rating is then recalculated from the stored matches. Columns: <code>name</code> (or <code>first name</code> and <code>last name</code>), <code>singles</code>, <code>doubles</code>. A UTR export from the UTR site works as it is.</p>
+          <div className="card-actions">
+            <label className="button small secondary" style={{ cursor: 'pointer' }}>Choose a CSV or JSON file<input type="file" accept=".csv,.json,.txt,text/csv,application/json" onChange={chooseFile} aria-label="UTR file" style={{ display: 'none' }} /></label>
+            <button type="button" className="text-link" onClick={downloadTemplate}>Download a template</button>
+          </div>
+          {upload.name && <p className="small"><b>{upload.name}</b>{upload.plan ? ` · ${upload.plan.items.length} rows read` : ''}</p>}
+          {upload.errors.length > 0 && <ul className="small warn-text" data-testid="pprc-upload-errors">{upload.errors.slice(0, 20).map((e, i) => <li key={i}>{e.line ? `Line ${e.line}: ` : ''}{e.message}</li>)}{upload.errors.length > 20 && <li>… and {upload.errors.length - 20} more</li>}</ul>}
+          {upload.plan && (
+            <>
+              <p className="small" data-testid="pprc-upload-counts"><b>{upload.plan.counts.update}</b> to update · <b>{upload.plan.counts.new}</b> new players · {upload.plan.counts.same} already the same · {upload.plan.counts.ambiguous} ambiguous · {upload.plan.counts.skip} skipped</p>
+              <div className="table-wrap">
+                <table className="standings">
+                  <thead><tr><th scope="col">Line</th><th scope="col">In the file</th><th scope="col">Matched to</th><th scope="col">Result</th><th scope="col" className="num">UTR S / D now</th><th scope="col" className="num">New S / D</th></tr></thead>
+                  <tbody>
+                    {upload.plan.items.map(i => (
+                      <tr key={`${i.line}-${i.name}`} data-status={i.status}>
+                        <td>{i.line}</td><td>{i.name}</td><td>{i.matched || (i.status === 'new' ? 'New player' : i.candidates ? i.candidates.join(', ') : '—')}</td>
+                        <td><span className={`pill${i.status === 'update' || i.status === 'new' ? '' : ' warn'}`}>{{ update: 'Update', new: 'New', same: 'Same', ambiguous: 'Ambiguous', skip: 'Skipped' }[i.status]}</span>{i.note ? <span className="small muted"> {i.note}</span> : null}</td>
+                        <td className="num">{i.before ? two(i.before.singles, i.before.doubles) : '—'}</td>
+                        <td className="num">{i.after ? two(i.after.singles, i.after.doubles) : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="card-actions">
+                <button type="button" className="button small" disabled={busy || syncing || !onSync || !upload.plan.updates.length} onClick={applyUpload}>{syncing ? 'Updating…' : `Apply ${upload.plan.updates.length} ${upload.plan.updates.length === 1 ? 'change' : 'changes'}`}</button>
+                <button type="button" className="secondary small" disabled={syncing} onClick={() => setUpload({ name: '', errors: [], plan: null })}>Cancel</button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
       {view === 'all' && (
         <div data-testid="pprc-all">
           <div className="toolbar">

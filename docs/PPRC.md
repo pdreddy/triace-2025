@@ -120,3 +120,11 @@ GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json node scripts/import-triace-play
 Players already in PPRC are marked as playing in Triace; new players with a full name are created and seeded from their
 UTR; anyone with only a first name is skipped until you give a full name in the admin panel. Deploy the new `linkPprc`
 Cloud Function (`firebase deploy --only functions`) before using the panel on the live site.
+
+## Uploading UTRs (admin → PPRC → "Update UTR from a file")
+Upload a CSV or JSON file (`name` or `first name` + `last name`, `singles`, `doubles`; a UTR export works as is). The page
+matches each name to a PPRC player, previews what changes (update / new / same / ambiguous / skipped) and saves nothing
+until you press Apply. Apply calls the `syncPprcUtr` function, which stores the new UTRs (with history under
+`pprcMaster/utrHistory`), adds new full-name players, and recalculates every rating from the stored matches. Afterwards
+press "Refresh linked" so Triace's stored badges update. Deploy functions after pulling: `./deploy.sh --no-hosting --skip-browser-tests`.
+The full player list and each profile are public at `/pprc` and `/pprc/<id>`.

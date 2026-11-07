@@ -161,6 +161,7 @@ export function createFirebaseService() {
     moveFixture: withError(async payload => (await httpsCallable(functions, 'moveFixture')(payload)).data),
     issueChallenge: withError(async payload => (await httpsCallable(functions, 'issueChallenge')(payload)).data),
     updateTeam: withError(async payload => (await httpsCallable(functions, 'updateTeam')(payload)).data),
+    syncPprcUtr: withError(async payload => (await httpsCallable(functions, 'syncPprcUtr')(payload)).data),
     linkPprc: withError(async payload => (await httpsCallable(functions, 'linkPprc')(payload)).data),
     withdrawTeam: withError(async payload => (await httpsCallable(functions, 'withdrawTeam')(payload)).data),
     resetCaptainLogin: withError(async payload => (await httpsCallable(functions, 'resetCaptainLogin')(payload)).data),
