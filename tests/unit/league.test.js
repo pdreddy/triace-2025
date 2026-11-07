@@ -437,3 +437,11 @@ test('the demo seed registers sample teams from PPRC players, links most of them
   assert.deepEqual(buildDemoState(null, { teams: 4 }).summary.linked, 0, 'without PPRC data the teams are made up and nothing is linked');
   assert.ok(buildDemoState(null, { teams: 4 }).summary.teams >= 2);
 });
+
+test('the demo seed keeps an existing demo\'s settings when it only fills an empty state', () => {
+  const base = initialState(); base.settings = { ...base.settings, aceNameMaskingEnabled: false };
+  const { state, summary } = buildDemoState(null, { teams: 4, base });
+  assert.ok(summary.teams >= 2);
+  assert.equal(state.settings.aceNameMaskingEnabled, false, 'the demo\'s own settings survive');
+  assert.equal(base.registrations && Object.keys(base.registrations).length, 0, 'the state passed in is not changed');
+});

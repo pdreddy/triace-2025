@@ -15,9 +15,10 @@ function playersFrom(tree, count) {
     .sort((a, b) => b.overall - a.overall);
 }
 
-export function buildDemoState(tree, { teams = 8, now = Date.now() } = {}) {
+// `base` is the demo's existing state (so its settings are kept); without one the defaults are used.
+export function buildDemoState(tree, { teams = 8, now = Date.now(), base = null } = {}) {
   const pool = playersFrom(tree, teams * 3), n = pool.length;
-  let state = initialState();
+  let state = base?.settings ? structuredClone(base) : initialState();
   const created = [], links = [];
   for (let i = 0; i < teams && i + 2 * Math.floor(n / 3) < n; i++) {
     const picks = [pool[i], pool[i + Math.floor(n / 3)], pool[i + 2 * Math.floor(n / 3)]];
