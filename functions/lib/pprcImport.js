@@ -85,3 +85,36 @@ export function planTriacePlayers(entries, master = {}) {
   }
   return { writes, summary };
 }
+
+// ---------- Writing (works with any object that has the Realtime Database admin shape: ref(path).once/update/set/remove) ----------
+export class ImportRefused extends Error {}
+
+// Imports the migration tree. Refuses to touch a section that already has data unless `replace`, and before replacing
+// hands what is there to `saveBackup(existing)` (which returns where it was saved). Returns what was done.
+export async function runImport(db, tree, { only, replace = false, now = Date.now(), source = 'multiclub.json', saveBackup = () => null, progress = () => {} } = {}) {
+  const plan = planImport(tree, { only });
+  if (plan.problems.length) throw new ImportRefused(`Problems:\n${plan.problems.slice(0, 20).join('\n')}`);
+  const existing = {};
+  for (const section of plan.sections) existing[section] = (await db.ref(section).once('value')).val();
+  const occupied = plan.sections.filter(s => existing[s] != null);
+  if (occupied.length && !replace) throw new ImportRefused(`Already has data: ${occupied.join(', ')}. Nothing was written. Use --replace to overwrite (a backup is saved first).`);
+  let backup = null;
+  if (occupied.length) {
+    backup = saveBackup(Object.fromEntries(occupied.map(s => [s, existing[s]])));
+    for (const s of occupied) await db.ref(s).remove();
+  }
+  let written = 0;
+  const total = Object.keys(plan.paths).length;
+  for (const batch of batches(plan.paths, 200)) { await db.ref().update(clean(batch)); written += Object.keys(batch).length; progress(written, total); }
+  await db.ref(`importLog/${now}`).set({ at: now, sections: plan.sections, stats: plan.stats, source });
+  return { plan, written, replaced: occupied, backup };
+}
+
+// Adds the Triace registrations to the shared player list (see planTriacePlayers).
+export async function runTriaceImport(db, entries, { now = Date.now() } = {}) {
+  const [nameIndex, playerList] = await Promise.all([db.ref('pprcMaster/nameIndex').once('value'), db.ref('pprcMaster/playerList').once('value')]);
+  const { writes, summary } = planTriacePlayers(entries, { nameIndex: nameIndex.val() || {}, playerList: playerList.val() || {} });
+  if (Object.keys(writes).length) await db.ref().update(clean(writes));
+  await db.ref(`importLog/${now}`).set({ at: now, source: 'triace registrations', created: summary.created.length, marked: summary.marked.length, skipped: summary.skipped.length });
+  return { writes, summary };
+}
