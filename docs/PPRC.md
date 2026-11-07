@@ -128,3 +128,9 @@ until you press Apply. Apply calls the `syncPprcUtr` function, which stores the 
 `pprcMaster/utrHistory`), adds new full-name players, and recalculates every rating from the stored matches. Afterwards
 press "Refresh linked" so Triace's stored badges update. Deploy functions after pulling: `./deploy.sh --no-hosting --skip-browser-tests`.
 The full player list and each profile are public at `/pprc` and `/pprc/<id>`.
+
+## Profile badges
+A profile shows the verified seal (more than 5 rated courts, otherwise NR), the club seasons played (KOC S2, KOC S3,
+Triace S1) and earned badges: club star (top 3 of verified players in KOC or Triace), top 10, doubles or singles specialist,
+5-court streak, unbeaten in singles or doubles, multi-club. Season badges come from `ratings/<id>/seasons`, written by the
+migration; until it is re-run they are taken from the latest ten matches. See `functions/lib/pprcBadges.js`.

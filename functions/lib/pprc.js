@@ -185,6 +185,16 @@ export function computePprc({ players, matches, params = PPRC_PARAMS, asOf }) {
     }
   }
 
+  // Courts, wins and losses per club season, e.g. { koc_s3: { club, season, courts, wins, losses } }.
+  function seasonsOf(entries) {
+    const out = {};
+    for (const h of entries) {
+      const x = out[`${h.club}_${h.season}`] ||= { club: h.club, season: h.season, courts: 0, wins: 0, losses: 0 };
+      x.courts++; x[h.won ? 'wins' : 'losses']++;
+    }
+    return out;
+  }
+
   function buildRatings() {
     const out = {};
     for (const id of ids) {
@@ -195,6 +205,7 @@ export function computePprc({ players, matches, params = PPRC_PARAMS, asOf }) {
         seed: { singles: round(seed[id].singles), doubles: round(seed[id].doubles) },
         reliability: { singles: round(ws / (ws + k)), doubles: round(wd / (wd + k)) },
         played: played[id], wins: record[id].singles.wins + record[id].doubles.wins, losses: record[id].singles.losses + record[id].doubles.losses,
+        seasons: seasonsOf(history[id]),
         record: record[id], lastPlayed: history[id].length ? Math.max(...history[id].map(h => h.ts)) : null, version: params.version
       };
     }

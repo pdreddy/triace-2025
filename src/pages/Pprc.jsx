@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { EmptyState, Stat } from '../components/UI';
+import { EmptyState, Stat, VerifiedSeal } from '../components/UI';
+import { clubRanks, isVerified, playerBadges, courtsPlayed } from '../../functions/lib/pprcBadges.js';
 import { fetchPlayer, fetchPlayerList, fetchYear } from '../services/pprc';
 
 const signed = v => (Math.abs(v) < 0.005 ? '0.00' : `${v > 0 ? '+' : '−'}${Math.abs(v).toFixed(2)}`);
@@ -79,7 +80,8 @@ export function PprcHistory({ playerId, state }) {
 
 export function PprcPlayer() {
   const { playerId } = useParams();
-  const [state, setState] = useState({ loading: true, player: null, error: '' });
+  const [state, setState] = useState({ loading: true, player: null, error: '' }), [ranks, setRanks] = useState({});
+  useEffect(() => { fetchPlayerList().then(list => setRanks(clubRanks(list, playerId))).catch(() => setRanks({})); }, [playerId]);
   useEffect(() => { fetchPlayer(playerId).then(player => setState({ loading: false, player, error: '' })).catch(e => setState({ loading: false, player: null, error: e.message })); }, [playerId]);
   if (state.loading) return <div className="page-loading" aria-busy="true"><span className="spinner" /> Loading player…</div>;
   if (state.error) return <section className="page"><EmptyState icon="user" title="Could not load this player.">{state.error}</EmptyState></section>;
@@ -90,13 +92,18 @@ export function PprcPlayer() {
   const recentByYear = recent.reduce((o, h) => ({ ...o, [new Date(h.ts).getUTCFullYear()]: (o[new Date(h.ts).getUTCFullYear()] || 0) + 1 }), {});
   const olderYears = Object.entries(years).map(([year, total]) => ({ year: Number(year), count: total - (recentByYear[year] || 0) })).filter(y => y.count > 0).sort((a, b) => b.year - a.year);
   const total = rating.wins + rating.losses;
+  const verified = isVerified(rating), badges = playerBadges({ rating, info, recent, rank: ranks });
   const games = [...new Set(Object.values(years).length ? recent.map(h => h.competition) : [])];
   return (
     <section className="page player-screen">
       <header className="team-hero">
         <div>
           <p className="eyebrow">PPRC player · {Object.keys(info.clubs || {}).map(clubName).join(' · ') || 'No club'}</p>
-          <h1>{info.name}</h1>
+          <h1>{info.name}{verified && <span className="verified-name" title={`PPRC verified: ${courtsPlayed(rating)} rated courts (more than 5)`}><VerifiedSeal /> <span className="sr-only">PPRC verified</span></span>}</h1>
+          <ul className="badge-row" aria-label="Badges" data-testid="pprc-badges">
+            <li className={`badge ${verified ? 'verified' : 'nr'}`} title={verified ? 'More than 5 rated courts' : 'Not rated yet: 5 or fewer rated courts'}>{verified ? <><VerifiedSeal /> Verified</> : 'NR · not rated yet'}</li>
+            {badges.map(b => <li key={b.key} className={`badge ${b.kind}${b.club ? ` club-${b.club}` : ''}`} title={b.title}>{b.label}</li>)}
+          </ul>
           <p className="team-hero-utr"><b>{rating.overall.toFixed(2)}</b> PPRC rating <span className="muted">· singles {rating.singles.toFixed(2)} · doubles {rating.doubles.toFixed(2)}</span></p>
           <p className="small muted">UTR (starting point) singles {rating.seed.singles.toFixed(2)} · doubles {rating.seed.doubles.toFixed(2)}{rating.reliability ? ` · reliability singles ${Math.round(rating.reliability.singles * 100)}% · doubles ${Math.round(rating.reliability.doubles * 100)}%` : ''}</p>
           {info.needsFullName && <p className="small warn-text">Only a first name is known so far.</p>}
@@ -141,7 +148,7 @@ export function PprcDirectory() {
             {rows.map((p, i) => (
               <li key={p.id}>
                 <span className="history-result">{i + 1}</span>
-                <div><Link to={`/pprc/${p.id}`}><b>{p.name}</b></Link> <span className="muted">· {(p.clubs || []).map(clubName).join(' · ')} · {p.played} {p.played === 1 ? 'match' : 'matches'}</span></div>
+                <div><Link to={`/pprc/${p.id}`}><b>{p.name}</b></Link>{p.played > 5 && <span className="verified-name" title="PPRC verified"><VerifiedSeal /></span>} <span className="muted">· {(p.clubs || []).map(clubName).join(' · ')} · {p.played} {p.played === 1 ? 'match' : 'matches'}</span></div>
                 <em title="PPRC singles / doubles">{pair(p.singles, p.doubles)}</em><small className="muted" title="UTR singles / doubles">UTR {pair(p.utr?.singles, p.utr?.doubles)}</small>
               </li>
             ))}
