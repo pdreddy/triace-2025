@@ -137,11 +137,11 @@ export function publicPprc(team) {
   const links = team.pprcLinks;
   if (!links || !Object.keys(links).length) return null;
   // A player's PPRC profile id is shown only when the admin chose to make that link public (the profile carries the full name).
-  return Object.fromEntries(['captain', 'ace1', 'ace2'].filter(role => links[role]).map(role => [role, { ...(links[role].matches > PPRC_VERIFIED_AFTER ? { verified: true, rating: links[role].overall } : { verified: false }), ...(links[role].public ? { id: links[role].id } : {}) }]));
+  return Object.fromEntries(['captain', 'ace1', 'ace2'].filter(role => links[role]).map(role => [role, { ...(links[role].matches > PPRC_VERIFIED_AFTER ? { verified: true, rating: links[role].overall, singles: links[role].singles, doubles: links[role].doubles } : { verified: false }), ...(links[role].public ? { id: links[role].id } : {}) }]));
 }
 export function publicRecord(team, settings = DEFAULT_SETTINGS) {
   const pprc = publicPprc(team);
-  return { teamId: team.teamId, captainFirstName: team.captain.firstName, captainUtr: team.captain.utr, ace1Utr: team.ace1.utr, ace2Utr: team.ace2.utr, ...(!settings.aceNameMaskingEnabled && team.rulesAccepted === true ? { ace1Name: team.ace1.fullName, ace2Name: team.ace2.fullName } : {}), combinedUtr: team.combinedUtr, assignedTier: team.assignedTier, registeredAt: team.registeredAt, ...(pprc ? { pprc } : {}) };
+  return { teamId: team.teamId, captainFirstName: team.captain.firstName, captainUtr: team.captain.utr, ace1Utr: team.ace1.utr, ace2Utr: team.ace2.utr, ...(!settings.aceNameMaskingEnabled && team.rulesAccepted === true ? { ace1Name: team.ace1.fullName, ace2Name: team.ace2.fullName } : {}), combinedUtr: team.combinedUtr, assignedTier: team.assignedTier, registeredAt: team.registeredAt, utrs: { captain: { singles: team.captain.singlesUtr, doubles: team.captain.doublesUtr ?? null }, ace1: { singles: team.ace1.singlesUtr, doubles: team.ace1.doublesUtr ?? null }, ace2: { singles: team.ace2.singlesUtr, doubles: team.ace2.doublesUtr ?? null } }, ...(pprc ? { pprc } : {}) };
 }
 export function initialState() { return { settings: { ...DEFAULT_SETTINGS }, tierConfig: structuredClone(DEFAULT_TIERS), configRevision: 1, registrations: {}, tiers: {} }; }
 // First visitor may trigger this through the callable backend. Preserve any existing tournament

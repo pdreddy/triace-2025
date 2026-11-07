@@ -21,22 +21,28 @@ pprcClubs/<club>/
 The club history is stored under `pprcClubs`, never under `clubs`: the project's own `clubs` node holds the live KOC season data and admin settings (including a password), so the import never reads, writes or exposes it, and it must not be made publicly readable.
 Clubs and seasons in the first migration: `koc` s2 and s3 (there is no KOC season 1 data); `triace` s1 (round robin plus the playoffs, including Super 6).
 
-## The rating algorithm (`functions/lib/pprc.js`)
-One function, `computePprc({ players, matches })`, rates every court from every club in time order.
-- Start from the player's seed UTR (singles and doubles separately); a missing seed uses the other
-  discipline, then 3.5. Ratings stay between 1.0 and 16.5.
-- For each court the expected share of games comes from the rating gap (logistic, spread 0.75; doubles
-  use the pair average). The actual score is 80% game share and 20% win/loss. Tiebreak points are not
-  games; a match tiebreak counts as one.
-- Change = K × boost × (actual − expected). K is 0.30 singles, 0.24 doubles. Newer players move faster
-  (boost 2.5× at their first court, fading with a half-life of about 6 courts).
-- A win never lowers a rating and a loss never raises it. Doubles partners move by the same amount.
-- `overall` blends singles and doubles, with the seeds counting as one match each.
-- Matches can arrive in any order; they are sorted by time, so recomputing everything gives the same answer
-  as adding one match at the end. Courts with an unknown player are skipped and reported, never guessed.
-- Parameters are versioned (`PPRC_PARAMS.version`); change them and recompute history.
+## The rating algorithm (`functions/lib/pprc.js`, version 2: UTR-style)
+One function, `computePprc({ players, matches })`, rates every court from every club together. It works the way UTR does:
+- **A court's performance** is the opponents' level plus a margin from the share of games won: an even share is the same
+  level, winning 92% of the games is 2.0 above (the share is limited to 8%..92%, so one 8-0 cannot say more than that).
+  A win is never rated below the opponents' level. Tiebreak points are not games; a match tiebreak counts as one.
+- **Doubles** performances are worked out from the pair's level and split between the partners, so a strong partner does
+  not inflate your rating. Singles and doubles are rated **separately**; `overall` blends them by the evidence behind each.
+- **The rating is a weighted average of performances.** Recent courts count more (half as much every 150 days), courts with
+  more games count more (up to 16), and courts against opponents whose own rating is still uncertain count less.
+- **The seed (UTR) is the starting point** and counts like 24 games of evidence, so a new player stays near it and moves
+  away as evidence builds. That share is the rating's **reliability** (0 to 1). A rating is *verified* in Triace once the
+  player has more than 5 rated courts.
+- **Ratings depend on each other** (you are measured against your opponents), so they are solved together over every match
+  from every club until they settle. The result does not depend on the order matches were entered; a new match refines it.
+  Ratings are worked out as of the latest match, so with no new matches they do not change.
+- Courts with an unknown player are skipped and reported, never guessed. Ratings stay between 1.0 and 16.5.
+- Parameters are versioned (`PPRC_PARAMS.version`); change them and recompute history, then re-import with
+  `node scripts/import-pprc.mjs .local-migration/multiclub.json --database-url <url> --only pprcMaster --replace --write`
+  (it saves a backup of the old `pprcMaster` first and never touches `pprcClubs` or `clubs`).
 
-Triace's own ratings (`league.js` → `playerRatings`) call this same function.
+Triace's own ratings (`league.js` > `playerRatings`) call this same function. Players show **UTR singles / doubles** and
+**PPRC singles / doubles** on the tier list, team page and player page; PPRC shows as NR until verified.
 
 ## History on a profile
 `splitHistory(entries, 10)` returns the latest 10 matches, then everything older grouped by year.

@@ -60,6 +60,10 @@ export function UtrMeter({ tiers, value = 0 }) {
   );
 }
 
+// "6.00 / 6.20": singles then doubles, with a dash for a missing one (older registrations have no doubles UTR).
+export const utrPair = u => (u ? `${u.singles != null ? formatUtr(u.singles) : '—'} / ${u.doubles != null ? formatUtr(u.doubles) : '—'}` : '—');
+export const pprcPair = info => (info?.verified && info.singles != null ? `${info.singles.toFixed(2)} / ${info.doubles.toFixed(2)}` : 'NR');
+
 // The verified seal (a scalloped badge with a tick), as on social profiles.
 function VerifiedSeal() {
   return (
@@ -71,7 +75,7 @@ function VerifiedSeal() {
 // PPRC next to a UTR: the rating with the verified seal once the player has more than 5 rated matches, otherwise NR (not rated).
 export function PprcBadge({ info }) {
   const badge = info?.verified
-    ? <span className="pprc-badge ok" title="PPRC verified: more than 5 rated matches" aria-label={`PPRC ${info.rating.toFixed(2)}, verified`}>PPRC {info.rating.toFixed(2)} <VerifiedSeal /></span>
+    ? <span className="pprc-badge ok" title={`PPRC verified (more than 5 rated matches). Singles ${info.singles?.toFixed(2) ?? '—'}, doubles ${info.doubles?.toFixed(2) ?? '—'}`} aria-label={`PPRC ${info.rating.toFixed(2)}, verified`}>PPRC {info.rating.toFixed(2)} <VerifiedSeal /></span>
     : <span className="pprc-badge nr" title="Not rated: fewer than 6 PPRC matches" aria-label="PPRC not rated">PPRC NR</span>;
   return info?.id ? <Link className="pprc-link" to={`/pprc/${info.id}`} title="Open this player’s PPRC profile and match history">{badge}</Link> : badge;
 }
@@ -82,8 +86,8 @@ export function TeamCard({ team, tierName, tierId, rank, privateView = false, ma
   const ace2 = privateView ? (masked ? 'Ace 2' : team.ace2.fullName) : team.ace2Name || 'Ace 2 (masked)';
   const pprc = (privateView ? publicPprc(team) : team.pprc) || {};
   const rows = [
-    [`Captain · ${captain}`, privateView ? team.captain.utr : team.captainUtr, pprc.captain],
-    ...(captainOnly ? [] : [[ace1, privateView ? team.ace1.utr : team.ace1Utr, pprc.ace1], [ace2, privateView ? team.ace2.utr : team.ace2Utr, pprc.ace2]])
+    [`Captain · ${captain}`, privateView ? team.captain.utr : team.captainUtr, pprc.captain, privateView ? { singles: team.captain.singlesUtr, doubles: team.captain.doublesUtr } : team.utrs?.captain],
+    ...(captainOnly ? [] : [[ace1, privateView ? team.ace1.utr : team.ace1Utr, pprc.ace1, privateView ? { singles: team.ace1.singlesUtr, doubles: team.ace1.doublesUtr } : team.utrs?.ace1], [ace2, privateView ? team.ace2.utr : team.ace2Utr, pprc.ace2, privateView ? { singles: team.ace2.singlesUtr, doubles: team.ace2.doublesUtr } : team.utrs?.ace2]])
   ];
   const detail = (label, player) => `${label}: ${player.firstName || player.fullName}${player.lastName ? ` ${player.lastName}` : ''} · singles ${formatUtr(player.singlesUtr)}${player.doublesUtr ? ` · doubles ${formatUtr(player.doublesUtr)}` : ''}`;
   return (
@@ -97,7 +101,7 @@ export function TeamCard({ team, tierName, tierId, rank, privateView = false, ma
         <span>{captain}</span>{!captainOnly && <><span>{ace1}</span><span>{ace2}</span></>}
       </div>
       <dl>
-        {rows.map(([label, utr, info]) => <div key={label}><dt>{label}</dt><dd>{formatUtr(utr)} <PprcBadge info={info} /></dd></div>)}
+        {rows.map(([label, utr, info, pair]) => <div key={label}><dt>{label}</dt><dd>{formatUtr(utr)} <PprcBadge info={info} /><small className="utr-detail">UTR S/D {utrPair(pair)} · PPRC S/D {pprcPair(info)}</small></dd></div>)}
         <div className="combined"><dt>Combined UTR</dt><dd>{formatUtr(team.combinedUtr)}</dd></div>
       </dl>
       {privateView && (

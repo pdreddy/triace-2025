@@ -1,6 +1,6 @@
 import { Link, useParams } from 'react-router-dom';
 import { useTournament } from '../hooks/useTournament';
-import { EmptyState, PprcBadge, Stat } from '../components/UI';
+import { EmptyState, PprcBadge, Stat, pprcPair, utrPair } from '../components/UI';
 import { playerName, teamName } from '../components/League';
 import { ROLE_LABELS, playerId } from '../../functions/lib/league.js';
 import { splitHistory } from '../../functions/lib/pprc.js';
@@ -63,6 +63,8 @@ export default function Player() {
         <Stat value={`${player.singles.wins}–${player.singles.losses}`} label="Singles" />
         <Stat value={`${player.doubles.wins}–${player.doubles.losses}`} label="Doubles" />
         <Stat value={player.start.toFixed(2)} label="Start (counted UTR)" />
+        <Stat value={utrPair(team.utrs?.[role])} label="UTR singles / doubles" />
+        <Stat value={pprcPair(team.pprc?.[role])} label="PPRC singles / doubles" />
       </div>
 
       <section className="card">

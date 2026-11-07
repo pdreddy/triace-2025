@@ -82,7 +82,7 @@ export default function AdminPprc({ teams, busy, onLink, publicByDefault = false
                 <td>
                   {r.link ? (
                     <>
-                      <b>{byId.get(r.link.id)?.name || r.link.id}</b> · {r.link.overall.toFixed(2)} · {r.link.matches} {r.link.matches === 1 ? 'match' : 'matches'}{' '}
+                      <b>{byId.get(r.link.id)?.name || r.link.id}</b> · S {r.link.singles.toFixed(2)} / D {r.link.doubles.toFixed(2)} · {r.link.matches} {r.link.matches === 1 ? 'match' : 'matches'}{' '}
                       <PprcBadge info={publicPprc({ pprcLinks: { [r.role]: r.link } })[r.role]} />{' '}
                       <label className="small"><input type="checkbox" checked={r.link.public === true} disabled={busy || !!working} onChange={e => setPublic(r, e.target.checked)} aria-label={`Show ${r.name} PPRC profile publicly`} /> Public profile</label>{' '}
                       <button type="button" className="text-link" disabled={busy || !!working} onClick={() => unlink(r)}>Unlink</button>

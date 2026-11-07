@@ -393,13 +393,13 @@ test('the admin links registered players to PPRC; verified after more than 5 mat
   assert.deepEqual([record.pprcLinks.captain.verified, record.pprcLinks.ace1.verified, record.pprcLinks.ace2.verified], [true, false, true], 'more than 5 matches is verified; exactly 5 is not');
   assert.equal(record.pprcLinks.captain.overall, 6.12); assert.equal(record.pprcLinks.captain.linkedAt, 77);
   const pub = Object.values(linked.state.tiers).flatMap(t => Object.values(t.teams)).find(t => t.teamId === teamId);
-  assert.deepEqual(pub.pprc, { captain: { verified: true, rating: 6.12 }, ace1: { verified: false }, ace2: { verified: true, rating: 5.25 } }, 'a rating shows only when verified');
+  assert.deepEqual(pub.pprc, { captain: { verified: true, rating: 6.12, singles: 6.12, doubles: 6.02 }, ace1: { verified: false }, ace2: { verified: true, rating: 5.25, singles: 5.25, doubles: 5.15 } }, 'ratings (overall, singles, doubles) show only when verified');
   const text = JSON.stringify(publicState(linked.state));
   assert.ok(!text.includes('p_cap') && !text.includes('p_ace') && !text.includes('"matches":5'), 'ids and provisional figures stay private');
   const again = applyLinkPprc(linked.state, { links: [{ teamId, role: 'ace1', player: player('p_ace_one', 5.9, 6) }, { teamId, role: 'captain', player: null }] }, true).state;
   assert.equal(again.registrations[teamId].pprcLinks.captain, undefined, 'a link can be removed');
   const pub2 = Object.values(again.tiers).flatMap(t => Object.values(t.teams)).find(t => t.teamId === teamId);
-  assert.deepEqual(pub2.pprc, { ace1: { verified: true, rating: 5.9 }, ace2: { verified: true, rating: 5.25 } });
+  assert.deepEqual(pub2.pprc, { ace1: { verified: true, rating: 5.9, singles: 5.9, doubles: 5.8 }, ace2: { verified: true, rating: 5.25, singles: 5.25, doubles: 5.15 } });
   const none = applyLinkPprc(again, { links: ['captain', 'ace1', 'ace2'].map(role => ({ teamId, role, player: null })) }, true).state;
   assert.equal(none.registrations[teamId].pprcLinks, undefined); assert.equal(Object.values(none.tiers).flatMap(t => Object.values(t.teams))[0].pprc, undefined);
 });
@@ -451,12 +451,20 @@ test('a PPRC link shows its profile id publicly only when the admin made it publ
   const player = (id, matches = 9) => ({ id, overall: 6, singles: 6, doubles: 6, matches });
   const pubOf = s => Object.values(s.tiers).flatMap(t => Object.values(t.teams)).find(t => t.teamId === teamId).pprc;
   const first = applyLinkPprc(state, { links: [{ teamId, role: 'ace1', player: player('p_ace_one') }, { teamId, role: 'ace2', player: player('p_ace_two', 2), public: true }] }, true).state;
-  assert.deepEqual(pubOf(first), { ace1: { verified: true, rating: 6 }, ace2: { verified: false, id: 'p_ace_two' } }, 'only the public link carries an id, verified or not');
+  assert.deepEqual(pubOf(first), { ace1: { verified: true, rating: 6, singles: 6, doubles: 6 }, ace2: { verified: false, id: 'p_ace_two' } }, 'only the public link carries an id, verified or not');
   assert.equal(first.registrations[teamId].pprcLinks.ace1.public, false);
   const refreshed = applyLinkPprc(first, { links: [{ teamId, role: 'ace2', player: player('p_ace_two', 12) }] }, true).state;
-  assert.deepEqual(pubOf(refreshed).ace2, { verified: true, rating: 6, id: 'p_ace_two' }, 'a refresh without the flag keeps it public');
+  assert.deepEqual(pubOf(refreshed).ace2, { verified: true, rating: 6, singles: 6, doubles: 6, id: 'p_ace_two' }, 'a refresh without the flag keeps it public');
   const hidden = applyLinkPprc(refreshed, { links: [{ teamId, role: 'ace2', player: player('p_ace_two', 12), public: false }] }, true).state;
   assert.equal(pubOf(hidden).ace2.id, undefined, 'the admin can hide it again');
   assert.throws(() => applyLinkPprc(state, { links: [{ teamId, role: 'ace1', player: player('p_x'), public: 'yes' }] }, true), /public flag/);
   assert.ok(!JSON.stringify(publicState(first)).includes('p_ace_one'), 'a link that is not public never leaks its id');
+});
+
+test('the public team record shows singles and doubles UTR for every player', () => {
+  const state = league(2), pub = Object.values(state.tiers).flatMap(t => Object.values(t.teams))[0];
+  assert.deepEqual(Object.keys(pub.utrs).sort(), ['ace1', 'ace2', 'captain']);
+  for (const role of ['captain', 'ace1', 'ace2']) assert.deepEqual(Object.keys(pub.utrs[role]).sort(), ['doubles', 'singles']);
+  assert.equal(pub.utrs.captain.singles, 600, 'in hundredths, like the counted UTR');
+  assert.equal(pub.utrs.captain.doubles, null, 'a missing doubles UTR is null, not hidden');
 });

@@ -2,17 +2,29 @@
 // Pure functions only (no I/O), so the same code runs in the browser, Cloud Functions, the
 // migration script and the tests. Version the parameters: changing them means recomputing history.
 
+// The PPRC rating is built the way UTR and similar systems are: every court a player has played says how well they
+// played at that level, and the rating is the weighted average of those performances.
+//  - A court's performance is the opponents' level plus a margin from the share of games won (an even share is the
+//    same level; winning 92% of the games is `span` above). In doubles each player's performance is worked out from
+//    the pair's, so a strong partner does not inflate it.
+//  - Recent courts count more (halving every `halfLifeDays`), courts with more games count more (up to `gamesCap`), and courts against
+//    opponents whose own rating is still uncertain count less.
+//  - The seed (the player's UTR) is the starting point and counts like `seedWeight` games, so a new player stays near
+//    it and moves away as evidence builds; that share is the rating's reliability.
+//  - Singles and doubles are rated separately. Because ratings depend on each other (you are measured against your
+//    opponents), they are solved together over every match from every club until they settle, so the result does not
+//    depend on the order matches were entered and a new match simply refines it.
 export const PPRC_PARAMS = Object.freeze({
-  version: 1,
+  version: 2,
   min: 1, max: 16.5, defaultSeed: 3.5,
-  spread: 0.75,                          // rating gap that moves the expected game share (logistic)
-  k: { singles: 0.30, doubles: 0.24 },   // base step per court
-  provisional: { boost: 1.5, halfLifeMatches: 6 }, // newer players move faster until they have played ~a dozen courts
-  resultWeight: 0.2                      // actual = (1 - w) * game share + w * (won ? 1 : 0)
+  span: 2.0,           // rating points between an even share of games and a clean sweep
+  shareLimit: 0.92,    // a share of games is limited to 8%..92%, so one 8-0 never says more than that
+  halfLifeDays: 150,   // an older court counts half as much every 150 days
+  seedWeight: 24,      // the seed counts like this many games of evidence (about two courts)
+  gamesCap: 16,        // a court counts for at most this many games
+  iterations: 60, damping: 0.5, tolerance: 0.0005
 });
 
-// Seeds count as one match each, so a player's overall figure moves smoothly as they play.
-const overallOf = p => (p.singles * (p.played.singles + 1) + p.doubles * (p.played.doubles + 1)) / (p.played.singles + p.played.doubles + 2);
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const round = (v, n = 2) => Number(v.toFixed(n));
 
@@ -64,67 +76,130 @@ export function resolveName(registry, raw, { roster, preferred } = {}) {
 }
 
 // ---------- Rating ----------
-const expectedShare = (mine, theirs, spread) => 1 / (1 + Math.exp(-(mine - theirs) / spread));
+const DAY = 86400000;
 export const gamesLabel = (mine, theirs) => `${mine}-${theirs}`;
 
-// players: { [id]: { singles?: number, doubles?: number } } seed ratings (UTR). A missing seed falls back
-// to the other discipline, then to the default.
+// players: { [id]: { singles?: number, doubles?: number } } seed ratings (UTR). A missing seed falls back to the other
+// discipline, then to the default.
 // matches: [{ id, club, season, stage, ts, courts: [{ label, type: 'singles'|'doubles', home: [id], away: [id],
-//   homeGames, awayGames, winner: 'home'|'away', score? }] }]. Order does not matter: they are sorted by time.
+//   homeGames, awayGames, winner: 'home'|'away', score? }] }]. Order does not matter.
 // A court is skipped (and reported) if a side has no player or someone is not in `players`.
-export function computePprc({ players, matches, params = PPRC_PARAMS }) {
-  const state = new Map(), history = {}, skipped = [];
+// `asOf` (default: the latest match) is the moment ratings are worked out for; older courts count less.
+export function computePprc({ players, matches, params = PPRC_PARAMS, asOf }) {
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const seedOf = (p, type) => clamp(Number(p?.[type]) || Number(p?.[type === 'singles' ? 'doubles' : 'singles']) || params.defaultSeed, params.min, params.max);
-  for (const [id, p] of Object.entries(players || {})) {
-    const s = seedOf(p, 'singles'), d = seedOf(p, 'doubles');
-    state.set(id, { id, seed: { singles: s, doubles: d }, singles: s, doubles: d, played: { singles: 0, doubles: 0 }, wins: 0, losses: 0, record: { singles: { wins: 0, losses: 0 }, doubles: { wins: 0, losses: 0 } }, last: null });
-    history[id] = [];
+  const ids = Object.keys(players || {}), TYPES = ['singles', 'doubles'];
+  const seed = {}, rating = {}, evidence = {}, played = {}, record = {}, history = {};
+  for (const id of ids) {
+    seed[id] = { singles: seedOf(players[id], 'singles'), doubles: seedOf(players[id], 'doubles') };
+    rating[id] = { ...seed[id] }; evidence[id] = { singles: 0, doubles: 0 }; history[id] = [];
+    played[id] = { singles: 0, doubles: 0 }; record[id] = { singles: { wins: 0, losses: 0 }, doubles: { wins: 0, losses: 0 } };
   }
+
+  // Every court that can be rated, in time order.
+  const skipped = [], courts = [];
   const ordered = [...(matches || [])].sort((a, b) => (a.ts - b.ts) || String(a.id).localeCompare(String(b.id)));
   for (const match of ordered) {
     (match.courts || []).forEach((court, index) => {
       const sides = { home: court.home || [], away: court.away || [] };
-      const bad = !['singles', 'doubles'].includes(court.type) ? 'type' : !sides.home.length || !sides.away.length ? 'players' : [...sides.home, ...sides.away].some(id => !state.has(id)) ? 'unknown player' : (court.winner !== 'home' && court.winner !== 'away') ? 'winner' : null;
+      const bad = !TYPES.includes(court.type) ? 'type' : !sides.home.length || !sides.away.length ? 'players' : [...sides.home, ...sides.away].some(id => !seed[id]) ? 'unknown player' : (court.winner !== 'home' && court.winner !== 'away') ? 'winner' : null;
       if (bad) { skipped.push({ matchId: match.id, court: court.label || index + 1, reason: bad }); return; }
-      const type = court.type, avg = ids => ids.reduce((sum, id) => sum + state.get(id)[type], 0) / ids.length;
-      const rating = { home: avg(sides.home), away: avg(sides.away) };
       const games = { home: Number(court.homeGames) || 0, away: Number(court.awayGames) || 0 }, total = games.home + games.away;
-      const deltas = {};
-      for (const side of ['home', 'away']) {
-        const other = side === 'home' ? 'away' : 'home', won = court.winner === side;
-        const share = total ? games[side] / total : (won ? 1 : 0);
-        const actual = (1 - params.resultWeight) * share + params.resultWeight * (won ? 1 : 0);
-        const lowest = Math.min(...sides[side].map(id => state.get(id).played[type]));
-        const boost = 1 + params.provisional.boost * Math.exp(-lowest / params.provisional.halfLifeMatches);
-        const raw = params.k[type] * boost * (actual - expectedShare(rating[side], rating[other], params.spread));
-        deltas[side] = won ? Math.max(0, raw) : Math.min(0, raw); // a win never costs rating and a loss never earns it
-      }
-      for (const side of ['home', 'away']) {
-        const other = side === 'home' ? 'away' : 'home', won = court.winner === side;
-        for (const id of sides[side]) {
-          const p = state.get(id);
-          p[type] = clamp(p[type] + deltas[side], params.min, params.max);
-          p.played[type]++; won ? p.wins++ : p.losses++; p.record[type][won ? 'wins' : 'losses']++;
-          p.last = match.ts;
-          history[id].push({
-            matchId: match.id, club: match.club, season: match.season, stage: match.stage || null, ts: match.ts, court: court.label || null, type, won,
-            partner: sides[side].find(x => x !== id) || null, opponents: sides[other], games: gamesLabel(games[side], games[other]), score: court.score || null,
-            change: round(deltas[side], 3), after: round(p[type], 3), overall: round(overallOf(p))
-          });
-        }
-      }
+      const shareOf = side => {
+        const raw = total ? games[side] / total : (court.winner === side ? params.shareLimit : 1 - params.shareLimit);
+        const limited = clamp(raw, 1 - params.shareLimit, params.shareLimit);
+        return court.winner === side ? Math.max(limited, 0.5) : Math.min(limited, 0.5); // winning never rates below the opponents' level
+      };
+      courts.push({ match, ts: match.ts, court, sides, games, total, share: { home: shareOf('home'), away: shareOf('away') }, seq: courts.length });
     });
   }
-  const ratings = {};
-  for (const p of state.values()) {
-    ratings[p.id] = {
-      singles: round(p.singles), doubles: round(p.doubles),
-      overall: round(overallOf(p)),
-      seed: { singles: round(p.seed.singles), doubles: round(p.seed.doubles) },
-      played: p.played, wins: p.wins, losses: p.losses, record: p.record, lastPlayed: p.last, version: params.version
+  if (courts.length) solve();
+  return { ratings: buildRatings(), history, skipped };
+
+  function solve() {
+    const DAY = 86400000, end = Number.isFinite(asOf) ? asOf : Math.max(...courts.map(c => c.ts));
+    const decay = (from, to) => Math.pow(0.5, Math.max(0, to - from) / (params.halfLifeDays * DAY));
+    const gamesWeight = c => Math.min(c.total || params.gamesCap / 2, params.gamesCap); // evidence in games, the same unit as the seed's weight
+    const reliability = Object.fromEntries(ids.map(id => [id, { singles: 0, doubles: 0 }]));
+
+    // One performance per player per court, from the current ratings of everyone else on court.
+    const performances = () => {
+      const out = [];
+      for (const c of courts) {
+        const type = c.court.type;
+        for (const side of ['home', 'away']) {
+          const mine = c.sides[side], theirs = c.sides[side === 'home' ? 'away' : 'home'];
+          const level = theirs.reduce((sum, id) => sum + rating[id][type], 0) / theirs.length;
+          const team = level + params.span * (2 * c.share[side] - 1);
+          const oppReliability = theirs.reduce((sum, id) => sum + reliability[id][type], 0) / theirs.length;
+          for (const id of mine) {
+            const partner = mine.find(x => x !== id);
+            const raw = type === 'doubles' && partner ? 2 * team - rating[partner][type] : team; // the pair's level, split between the two
+            out.push({ id, type, seq: c.seq, ts: c.ts, side, perf: clamp(raw, team - 2 * params.span, team + 2 * params.span), base: gamesWeight(c) * (0.5 + 0.5 * oppReliability) });
+          }
+        }
+      }
+      return out;
     };
+
+    // Solve for ratings that agree with each other.
+    for (let step = 0; step < params.iterations; step++) {
+      const sums = {};
+      for (const e of performances()) { const k = `${e.id}|${e.type}`, w = e.base * decay(e.ts, end), x = sums[k] ||= { w: 0, m: 0 }; x.w += w; x.m += w * e.perf; }
+      let moved = 0;
+      for (const id of ids) for (const type of TYPES) {
+        const x = sums[`${id}|${type}`] || { w: 0, m: 0 };
+        const target = clamp((seed[id][type] * params.seedWeight + x.m) / (params.seedWeight + x.w), params.min, params.max);
+        const next = clamp(rating[id][type] + params.damping * (target - rating[id][type]), params.min, params.max);
+        moved = Math.max(moved, Math.abs(next - rating[id][type]));
+        rating[id][type] = next; evidence[id][type] = x.w; reliability[id][type] = x.w / (x.w + params.seedWeight);
+      }
+      if (moved < params.tolerance) break;
+    }
+
+    // History: the rating after each court, from that player's own courts up to then, against the settled ratings of
+    // the others. `change` is the move since their previous court in that discipline.
+    const events = performances(), byPlayer = {};
+    for (const e of events) (byPlayer[e.id] ||= []).push(e);
+    const ratingAt = (id, list, type, upTo, t) => {
+      let w = 0, m = 0;
+      for (const e of list) if (e.type === type && e.seq <= upTo) { const x = e.base * decay(e.ts, t); w += x; m += x * e.perf; }
+      return { rating: clamp((seed[id][type] * params.seedWeight + m) / (params.seedWeight + w), params.min, params.max), weight: w };
+    };
+    const byCourt = new Map(courts.map(c => [c.seq, c]));
+    for (const id of ids) {
+      const list = (byPlayer[id] || []).sort((a, b) => a.seq - b.seq), last = { ...seed[id] };
+      for (const e of list) {
+        const c = byCourt.get(e.seq), other = e.side === 'home' ? 'away' : 'home', won = c.court.winner === e.side;
+        const now = ratingAt(id, list, e.type, e.seq, e.ts);
+        const sg = e.type === 'singles' ? now : ratingAt(id, list, 'singles', e.seq, e.ts), db = e.type === 'doubles' ? now : ratingAt(id, list, 'doubles', e.seq, e.ts);
+        played[id][e.type]++; record[id][e.type][won ? 'wins' : 'losses']++;
+        history[id].push({
+          matchId: c.match.id, club: c.match.club, season: c.match.season, stage: c.match.stage || null, ts: c.ts, court: c.court.label || null, type: e.type, won,
+          partner: c.sides[e.side].find(x => x !== id) || null, opponents: c.sides[other], games: gamesLabel(c.games[e.side], c.games[other]), score: c.court.score || null,
+          change: round(now.rating - last[e.type], 3), after: round(now.rating, 3),
+          overall: round((sg.rating * (sg.weight + params.seedWeight) + db.rating * (db.weight + params.seedWeight)) / (sg.weight + db.weight + 2 * params.seedWeight))
+        });
+        last[e.type] = now.rating;
+      }
+    }
   }
-  return { ratings, history, skipped };
+
+  function buildRatings() {
+    const out = {};
+    for (const id of ids) {
+      const ws = evidence[id].singles, wd = evidence[id].doubles, k = params.seedWeight;
+      out[id] = {
+        singles: round(rating[id].singles), doubles: round(rating[id].doubles),
+        overall: round((rating[id].singles * (ws + k) + rating[id].doubles * (wd + k)) / (ws + wd + 2 * k)), // each discipline counts by the evidence behind it
+        seed: { singles: round(seed[id].singles), doubles: round(seed[id].doubles) },
+        reliability: { singles: round(ws / (ws + k)), doubles: round(wd / (wd + k)) },
+        played: played[id], wins: record[id].singles.wins + record[id].doubles.wins, losses: record[id].singles.losses + record[id].doubles.losses,
+        record: record[id], lastPlayed: history[id].length ? Math.max(...history[id].map(h => h.ts)) : null, version: params.version
+      };
+    }
+    return out;
+  }
 }
 
 // ---------- History views ----------

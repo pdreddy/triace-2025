@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useTournament, useMyTeams } from '../hooks/useTournament';
-import { EmptyState, Message, PprcBadge, Stat, tierTone } from '../components/UI';
+import { EmptyState, Message, PprcBadge, Stat, pprcPair, tierTone, utrPair } from '../components/UI';
 import { CaptainSignIn, TeamEditForm } from '../components/TeamTools';
 import { FixtureCard, teamIndex, teamName, playerName } from '../components/League';
 import { Icon } from '../components/Icons';
@@ -69,7 +69,7 @@ export default function Team() {
         <h2>Players</h2>
         <ul>{players.map(([role, label, name, utr]) => {
           const r = ratingOf(role);
-          return <li key={role}><span>{label}</span><Link to={`/player/${teamId}/${role}`}><b>{name}</b></Link><small>UTR {formatUtr(utr)} <PprcBadge info={team.pprc?.[role]} /></small><em>{r ? r.rating.toFixed(2) : formatUtr(utr)}</em></li>;
+          return <li key={role}><span>{label}</span><Link to={`/player/${teamId}/${role}`}><b>{name}</b></Link><small>UTR {formatUtr(utr)} <PprcBadge info={team.pprc?.[role]} /><br />UTR S/D {utrPair(team.utrs?.[role])} · PPRC S/D {pprcPair(team.pprc?.[role])}</small><em>{r ? r.rating.toFixed(2) : formatUtr(utr)}</em></li>;
         })}</ul>
         <p className="small">Right: live Triace rating. Starting point is the counted UTR: the higher of singles and doubles, or their average when they are more than {formatUtr(data.leagueRules?.utrGapLimit ?? 175)} apart.</p>
       </section>
