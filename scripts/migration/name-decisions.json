@@ -18,7 +18,6 @@
  "Team A6::Mohan": "Mohan Koripuri",
  "Team A5::Ram": "Janaki Ram Kantheti",
  "Team A9::Vijay": "Vijay V",
- "Team A8::Uday": "Uday K",
  "Team B7::Sreedhar": "Sridhar Kuppusamy",
  "Team A3::Vivek": "Vivekvardhan Reddy Mereddy",
  "Team B3::Dinesh": "Dinesh Reddy Timmareddy",
@@ -31,5 +30,19 @@
  "Sashi": "Sashi",
  "Shashi": "Sashi",
  "Sashi R": "Sashi",
- "Team B3::Kailash": "Kailas Magi"
+ "Team B3::Kailash": "Kailas Magi",
+ "Team A9::Kartha V": "Krishna Vennapusa",
+ "Team A9::Kartha": "Krishna Vennapusa",
+ "Team A9::Vijay V": "Vijay V",
+ "Team B7::Srikanth": "Srikant Tenni",
+ "Team A7::Uday P": "Uday P",
+ "Team A1::Uday": "Uday P",
+ "Team A2::Uday": "Uday P",
+ "Team A3::Uday": "Uday P",
+ "Team A4::Uday": "Uday P",
+ "Team A5::Uday": "Uday P",
+ "Team A6::Uday": "Uday P",
+ "Team A7::Uday": "Uday P",
+ "Team A8::Uday": "Uday P",
+ "Team A9::Uday": "Uday P"
 }
