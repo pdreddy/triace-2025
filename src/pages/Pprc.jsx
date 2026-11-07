@@ -120,18 +120,14 @@ export function PprcPlayer() {
   );
 }
 
-export default function Pprc() {
+// Every player in the shared PPRC list (KOC and Triace), with search and a club filter.
+export function PprcDirectory() {
   const [state, setState] = useState({ loading: true, list: [], error: '' }), [query, setQuery] = useState(''), [club, setClub] = useState('all');
   useEffect(() => { fetchPlayerList().then(list => setState({ loading: false, list, error: '' })).catch(e => setState({ loading: false, list: [], error: e.message })); }, []);
   const q = query.trim().toLowerCase();
   const rows = useMemo(() => state.list.filter(p => (club === 'all' || (p.clubs || []).includes(club)) && (!q || p.name.toLowerCase().includes(q))).sort((a, b) => b.overall - a.overall), [state.list, q, club]);
   return (
-    <section className="page players-screen">
-      <header className="page-head">
-        <p className="eyebrow">PPRC · one rating across every club</p>
-        <h1>PPRC <em>players.</em></h1>
-        <p>One list of players for KOC, Triace and every PPRC tournament. Open a player to see every match they have played.</p>
-      </header>
+    <>
       {state.error && <EmptyState icon="user" title="Could not load the players.">{state.error}</EmptyState>}
       {state.loading && <div className="page-loading" aria-busy="true"><span className="spinner" /> Loading players…</div>}
       {!state.loading && !state.error && (
@@ -140,6 +136,7 @@ export default function Pprc() {
             <input type="search" aria-label="Search players" placeholder="Search players" value={query} onChange={e => setQuery(e.target.value)} />
             <select aria-label="Club" value={club} onChange={e => setClub(e.target.value)}><option value="all">All clubs</option><option value="koc">KOC</option><option value="triace">Triace</option></select>
           </div>
+          <p className="small">{rows.length} of {state.list.length} PPRC players. Right: PPRC singles / doubles, then UTR singles / doubles.</p>
           <ul className="history" data-testid="pprc-list">
             {rows.map((p, i) => (
               <li key={p.id}>
@@ -152,6 +149,19 @@ export default function Pprc() {
           {!rows.length && <EmptyState icon="user" title="No players match." />}
         </>
       )}
+    </>
+  );
+}
+
+export default function Pprc() {
+  return (
+    <section className="page players-screen">
+      <header className="page-head">
+        <p className="eyebrow">PPRC · one rating across every club</p>
+        <h1>PPRC <em>players.</em></h1>
+        <p>One list of players for KOC, Triace and every PPRC tournament. Open a player to see every match they have played.</p>
+      </header>
+      <PprcDirectory />
     </section>
   );
 }
