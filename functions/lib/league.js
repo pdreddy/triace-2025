@@ -383,8 +383,8 @@ export function playerRatings(teams, fixturesByTier) {
     .sort((a, b) => a.result.approvedAt - b.result.approvedAt || (a.round || 99) - (b.round || 99));
   for (const f of finals) {
     const sides = { home: matchPlayers(f, 'home'), away: matchPlayers(f, 'away') };
-    formatOf(f).forEach((format, i) => {
-      const m = f.result.matches[i];
+    formatOf(f).forEach(format => {
+      const m = f.result.matches.find(x => x.key === format.key); // by key: results saved before the court order changed list courts differently
       if (!m?.winner) return;
       const ids = side => (sides[side][format.key] || []).map(role => playerId(f[side], role)).filter(id => players.has(id));
       const winners = ids(m.winner), losers = ids(m.winner === 'home' ? 'away' : 'home');

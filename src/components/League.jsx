@@ -181,7 +181,7 @@ export function FixtureCard({ fixture, teams, mine = false, admin = false, onSub
   const players = { home: matchPlayers(fixture, 'home'), away: matchPlayers(fixture, 'away') };
   const canEnter = fixture.home && fixture.away && (admin || (mine && fixture.status !== 'final'));
   const sideName = side => teamName(teams.get(fixture[side]));
-  const who = (side, key) => (players[side] ? players[side][key].map(r => playerName(teams.get(fixture[side]), r)).join(' + ') : sideName(side));
+  const who = (side, key) => (players[side]?.[key] ? players[side][key].map(r => playerName(teams.get(fixture[side]), r)).join(' + ') : sideName(side));
   return (
     <article className={`fixture-card ${fixture.status}${mine ? ' mine' : ''}${fixture.stage === 'final' ? ' grand' : ''}${overdue ? ' overdue' : ''}`}>
       <div className="fixture-top">
@@ -196,12 +196,12 @@ export function FixtureCard({ fixture, teams, mine = false, admin = false, onSub
       </div>
       {shown && (
         <ul className="fixture-matches">
-          {shown.matches.map((m, i) => m.winner && (
+          {shown.matches.map(m => m.winner && (
             <li key={m.key}>
-              <span>{format[i].label}</span>
+              <span>{format.find(c => c.key === m.key)?.label || 'Super tiebreak'}</span>
               <b>{who(m.winner, m.key)}</b>
               <em>{m.score}</em>
-              {players.home && <small>def. {who(m.winner === 'home' ? 'away' : 'home', m.key)}</small>}
+              {players.home && players.home[m.key] && <small>def. {who(m.winner === 'home' ? 'away' : 'home', m.key)}</small>}
             </li>
           ))}
         </ul>

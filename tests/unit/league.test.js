@@ -319,3 +319,16 @@ test('a captain code lets a new device claim the team; the admin can issue a new
   assert.throws(() => applyClaimTeam(reset, { teamId: 'team_claim00000000000000', codeHash: 'a'.repeat(64) }, 'phone-3'), /doesn’t match/);
   assert.ok(applyClaimTeam(reset, { teamId: 'team_claim00000000000000', codeHash: 'c'.repeat(64) }, 'phone-3'));
 });
+
+test('results saved before the court change (old match order, no totals) still rate and rank correctly', () => {
+  let state = league(2);
+  const f = Object.values(state.fixtures.goat)[0];
+  state = applySubmitResult(state, { tierId: 'goat', fixtureId: f.id, courts: result('home', 'home', 'away'), lineups }, 'admin', true).state;
+  const fx = state.fixtures.goat[f.id], byKey = Object.fromEntries(fx.result.matches.map(m => [m.key, m]));
+  const modern = playerRatings(Object.values(state.tiers.goat.teams), state.fixtures);
+  fx.result = { matches: ['d1', 'd2', 's'].map(k => byKey[k]), winner: fx.result.winner, lineups: fx.result.lineups, approvedAt: fx.result.approvedAt };
+  const legacy = playerRatings(Object.values(state.tiers.goat.teams), state.fixtures);
+  for (const [id, p] of modern) assert.equal(legacy.get(id).rating, p.rating, `${id} rating is the same from an old-order result`);
+  const row = standings(Object.values(state.tiers.goat.teams), state.fixtures.goat).find(r => r.team.teamId === f.home);
+  assert.deepEqual([row.won, row.matchesWon, row.matchesLost, row.gamesWon], [1, 2, 1, 0]);
+});
