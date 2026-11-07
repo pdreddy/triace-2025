@@ -49,7 +49,11 @@ NODE_MAJOR=$(node -p "process.versions.node.split('.')[0]")
 
 say "Fetching $REPO ($BRANCH) into $DIR"
 if [ -d "$DIR/.git" ]; then
-  if [ -n "$(git -C "$DIR" status --porcelain)" ]; then echo "$DIR has uncommitted changes. Commit or stash them, or use another DIR."; exit 1; fi
+  # Only edits to files the repo tracks matter; leftovers such as test-results/ or the demo data are fine.
+  if [ -n "$(git -C "$DIR" status --porcelain --untracked-files=no)" ]; then
+    echo "$DIR has changes to tracked files:"; git -C "$DIR" status --short --untracked-files=no | sed 's/^/  /'
+    echo "Commit or stash them (git stash), or run this from another folder."; exit 1
+  fi
   git -C "$DIR" fetch origin "$BRANCH" && git -C "$DIR" checkout "$BRANCH" && git -C "$DIR" merge --ff-only "origin/$BRANCH" || { echo "Could not update $DIR."; exit 1; }
 else
   git clone --branch "$BRANCH" "$REPO" "$DIR" || { echo "Could not clone $REPO. If the repository is private, sign in to GitHub first (gh auth login)."; exit 1; }
