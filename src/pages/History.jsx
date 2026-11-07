@@ -3,7 +3,7 @@ import { useTournament } from '../hooks/useTournament';
 import { EmptyState, Stat, tierTone } from '../components/UI';
 import { Icon } from '../components/Icons';
 import { Bracket, StandingsTable, teamName } from '../components/League';
-import { WinnerCard } from '../components/Winners';
+import { WinnerCard, PlayerName } from '../components/Winners';
 import { seasonList, seasonsOf, seasonTeams, seasonTable, seasonTiers, championTiers, tierResult } from '../data/seasons.js';
 
 const date = ms => (ms ? new Date(ms).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—');
@@ -20,9 +20,10 @@ export function PageTabs({ active }) {
 
 const Form = ({ results }) => <span className="form">{results.map((r, i) => <i key={i} className={r === 'W' ? 'win' : 'loss'}>{r}</i>)}</span>;
 const signed = n => (n > 0 ? `+${n}` : String(n));
+const Names = ({ text, teamId }) => String(text).split('/').map(n => n.trim()).filter(Boolean).map((n, i) => <span key={n}>{i > 0 && ' · '}<PlayerName name={n} teamId={teamId} /></span>);
 export const Members = ({ team, superSix = false }) => {
   const names = (superSix && team?.superSixMembers) || team?.members;
-  return names ? <small className="members">{names.split('/').map(n => n.trim()).join(' · ')}</small> : null;
+  return names ? <small className="members"><Names text={names} teamId={team.teamId} /></small> : null;
 };
 
 // Season 1's Super Six: the top six teams of each tier play a three-week round robin.
@@ -34,7 +35,7 @@ function SuperSix({ season, teams }) {
       <div className="podiums">
         {tierIds.map(id => (
           <WinnerCard key={id} tier={{ id, name: tiers[id].name }} result={tierResult(season, id)} teams={teams} members={team => (team?.superSixMembers || team?.members || '').split('/').map(n => n.trim()).join(' · ')} empty="To be announced.">
-            <ul className="six-teams">{tiers[id].teams.map(t => <li key={t}><b>{teamName(teams.get(t))}</b> <small>{squad(t)}</small></li>)}</ul>
+            <ul className="six-teams">{tiers[id].teams.map(t => <li key={t}><b>{teamName(teams.get(t))}</b> <small><Names text={squad(t)} teamId={t} /></small></li>)}</ul>
           </WinnerCard>
         ))}
       </div>
@@ -57,7 +58,7 @@ function SuperSix({ season, teams }) {
                 <ul>
                   {week.matches[id].map(m => (
                     <li key={m.home + m.away}>
-                      <span>{squad(m.home)}</span><i>vs</i><span>{squad(m.away)}</span>
+                      <span><Names text={squad(m.home)} teamId={m.home} /></span><i>vs</i><span><Names text={squad(m.away)} teamId={m.away} /></span>
                     </li>
                   ))}
                 </ul>

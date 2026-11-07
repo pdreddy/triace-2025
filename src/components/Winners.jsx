@@ -1,4 +1,6 @@
 import { useId } from 'react';
+import { Link } from 'react-router-dom';
+import { useNameResolver } from '../services/names';
 import { teamName } from './League';
 import { tierTone } from './UI';
 
@@ -37,10 +39,16 @@ export function Medal({ size = 34 }) {
   );
 }
 
+// One player's name, spelled as in the shared PPRC list and linked to the public profile when there is one.
+export function PlayerName({ name, teamId }) {
+  const resolve = useNameResolver(), who = resolve(name, teamId);
+  return who.id ? <Link className="player-name" to={`/pprc/${who.id}`}>{who.name}</Link> : <>{who.name}</>;
+}
+
 // A squad written as "A · B · C" (or "A / B / C"), one name per line so full names stay readable.
-export function Squad({ names, big = false }) {
+export function Squad({ names, big = false, teamId }) {
   const list = String(names || '').split(/\s*[·/]\s*/).filter(Boolean);
-  return list.length ? <ul className={`squad${big ? ' big' : ''}`}>{list.map(n => <li key={n}>{n}</li>)}</ul> : null;
+  return list.length ? <ul className={`squad${big ? ' big' : ''}`}>{list.map(n => <li key={n}><PlayerName name={n} teamId={teamId} /></li>)}</ul> : null;
 }
 
 // Winner and runner-up of one tier. `members(team)` returns the squad line to show.
@@ -55,11 +63,11 @@ export function WinnerCard({ tier, result, teams, members, large = false, empty 
             <Trophy />
             <p className="winner-label">Champions</p>
             <h3>{name(result.winner)}</h3>
-            <Squad names={members(teams.get(result.winner))} big={large} />
+            <Squad names={members(teams.get(result.winner))} big={large} teamId={result.winner} />
           </div>
           <div className="runner-up">
             <Medal />
-            <div><span>Runner-up</span><b>{name(result.runnerUp)}</b><Squad names={members(teams.get(result.runnerUp))} /></div>
+            <div><span>Runner-up</span><b>{name(result.runnerUp)}</b><Squad names={members(teams.get(result.runnerUp))} teamId={result.runnerUp} /></div>
           </div>
         </>
       ) : <p className="muted winner-empty">{empty}</p>}
