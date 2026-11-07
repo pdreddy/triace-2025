@@ -32,14 +32,15 @@ test('values Firebase cannot store are removed before sending', () => {
   assert.deepEqual(clean({ a: undefined, b: NaN, c: [1, undefined], d: { e: undefined, f: 2 } }), { b: null, c: [1, null], d: { f: 2 } });
 });
 
-test('the multi-club rules allow public reads of the player data and no writes from clients', () => {
-  const rules = JSON.parse(fs.readFileSync(new URL('../../database.multiclub.rules.json', import.meta.url), 'utf8')).rules;
+test('the project rules keep Triace as it was and add public reads of the shared player data, with no writes from clients', () => {
+  const rules = JSON.parse(fs.readFileSync(new URL('../../database.rules.json', import.meta.url), 'utf8')).rules;
   assert.equal(rules['.write'], false); assert.equal(rules['.read'], false);
+  assert.ok(rules.traice2_0 && rules.traice2_0.registrations && rules.traice2_0.tiers, 'the Triace rules are still there');
   assert.equal(rules.pprcMaster['.read'], true); assert.equal(rules.clubs['.read'], true);
-  const writes = JSON.stringify(rules).match(/"\.write":\s*[^,}]+/g);
-  assert.ok(writes.every(w => /false/.test(w)), 'no path lets a client write');
+  for (const section of [rules.pprcMaster, rules.clubs]) assert.ok(!JSON.stringify(section).includes('.write'), 'no path in the shared data lets a client write');
   assert.equal(rules.importLog, undefined, 'the import log is not readable');
 });
+
 
 import { planTriacePlayers } from '../../functions/lib/pprcImport.js';
 

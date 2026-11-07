@@ -62,6 +62,12 @@
           ".read": "auth != null && auth.uid === $uid"
         }
       }
+    },
+    "pprcMaster": {
+      ".read": true
+    },
+    "clubs": {
+      ".read": true
     }
   }
 }

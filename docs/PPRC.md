@@ -82,10 +82,20 @@ GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json \
 ```
 Plan only is the default and sends nothing. `--write` refuses to touch a section that already has data unless `--replace`
 is added, and `--replace` first saves the existing data to `.local-migration/`. It writes in batches of 200 paths and
-leaves a record under `importLog/`. Deploy `database.multiclub.rules.json` first (paste it into the Realtime Database
-rules of the `multiclub-890ea` project): player data is publicly readable, nothing can be written from a browser, and the
-import runs with a service account, which is not bound by the rules. The app reads it from `/pprc` and `/pprc/<playerId>`
-(set `VITE_MULTICLUB_DATABASE_URL` to use another database).
+leaves a record under `importLog/`.
+
+**Rules first, and add them, never replace.** The Triace app lives in the same Firebase project (`multiclub-890ea`) and
+has its own rules, so pasting a different rules file into the console would break the live site. In Firebase console >
+Realtime Database > Rules, add these two blocks next to the existing ones (inside `"rules": { ... }`) and publish:
+```json
+"pprcMaster": { ".read": true },
+"clubs": { ".read": true }
+```
+The repo's `database.rules.template.json` / `database.rules.json` already contain them (so `./deploy.sh --rules` would also
+add them, but it replaces the whole project's rules, so compare with the console first if anything else uses this database).
+Player data is then publicly readable, nothing can be written from a browser, and the import runs with a service account,
+which is not bound by the rules. The app reads it from `/pprc` and `/pprc/<playerId>` (set `VITE_MULTICLUB_DATABASE_URL`
+to use another database).
 
 ## Triace registrations and the PPRC tick
 Admin → **PPRC players** lists every registered player. Link each one to their PPRC profile (the player's own choice from

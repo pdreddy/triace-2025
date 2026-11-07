@@ -2,6 +2,12 @@
   "rules": {
     ".read": false,
     ".write": false,
+    "pprcMaster": {
+      ".read": true
+    },
+    "clubs": {
+      ".read": true
+    },
     "traice2_0": {
       ".read": "auth != null && auth.token.admin === true",
       "settings": {
