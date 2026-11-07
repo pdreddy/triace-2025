@@ -13,11 +13,12 @@ pprcMaster/
   ratings/<playerId>          singles, doubles, overall, seed, played, wins, losses, record, lastPlayed, version
   ratingHistory/<playerId>/<year>/<matchId>_<n>   one entry per court played (opponents, partner, games, change, after)
   recent/<playerId>           the latest 10 entries, newest first (what a profile loads first)
-clubs/<club>/
+pprcClubs/<club>/
   meta/
   seasons/<season>/
     meta/  teams/  matches/<matchId>      matches reference players by id; the typed names are kept for traceability
 ```
+The club history is stored under `pprcClubs`, never under `clubs`: the project's own `clubs` node holds the live KOC season data and admin settings (including a password), so the import never reads, writes or exposes it, and it must not be made publicly readable.
 Clubs and seasons in the first migration: `koc` s2 and s3 (there is no KOC season 1 data); `triace` s1 (round robin plus the playoffs, including Super 6).
 
 ## The rating algorithm (`functions/lib/pprc.js`)
@@ -89,7 +90,7 @@ has its own rules, so pasting a different rules file into the console would brea
 Realtime Database > Rules, add these two blocks next to the existing ones (inside `"rules": { ... }`) and publish:
 ```json
 "pprcMaster": { ".read": true },
-"clubs": { ".read": true }
+"pprcClubs": { ".read": true }
 ```
 The repo's `database.rules.template.json` / `database.rules.json` already contain them (so `./deploy.sh --rules` would also
 add them, but it replaces the whole project's rules, so compare with the console first if anything else uses this database).

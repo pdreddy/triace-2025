@@ -23,17 +23,22 @@ export function batches(paths, size = 200) {
 const bytes = value => Buffer.byteLength(JSON.stringify(value ?? null));
 
 // What an import would do: which sections, how many paths and bytes, and any key Firebase would reject.
-// Depth per section: how many levels down one write stays whole (clubs go down to the individual match).
+// The migration tree's "clubs" section is written under its own name, never under the project's existing `clubs` node
+// (the KOC app keeps its live season data and admin settings there).
+export const TARGET = { clubs: 'pprcClubs' };
+const target = section => TARGET[section] || section;
+// Depth per section: how many levels down one write stays whole (the club history goes down to the individual match).
 const DEPTH = { clubs: 6, pprcMaster: 3 };
 export function planImport(tree, { only } = {}) {
-  const sections = Object.keys(tree).filter(k => !only || only.includes(k));
+  const names = Object.keys(tree).filter(k => !only || only.includes(k) || only.includes(target(k)));
+  const sections = names.map(target);
   const paths = {}, problems = [];
-  for (const section of sections) Object.assign(paths, flatten({ [section]: tree[section] }, DEPTH[section] ?? 3));
+  for (const name of names) Object.assign(paths, flatten({ [target(name)]: tree[name] }, DEPTH[name] ?? 3));
   for (const path of Object.keys(paths)) {
     if (/[.$#[\]]/.test(path.replace(/\/$/, ''))) problems.push(`path contains a character Firebase does not allow: ${path}`);
     if (path.length > 700) problems.push(`path is too long: ${path.slice(0, 80)}…`);
   }
-  const stats = Object.fromEntries(sections.map(section => [section, { paths: Object.keys(paths).filter(p => p.startsWith(`${section}/`)).length, bytes: bytes(tree[section]) }]));
+  const stats = Object.fromEntries(names.map(name => [target(name), { paths: Object.keys(paths).filter(p => p.startsWith(`${target(name)}/`)).length, bytes: bytes(tree[name]) }]));
   return { sections, paths, stats, problems };
 }
 

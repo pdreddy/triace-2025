@@ -21,10 +21,11 @@ test('writes are split into batches without losing a path', () => {
 
 test('the plan lists sections, sizes and problems, and can be limited to some sections', () => {
   const plan = planImport(tree);
-  assert.deepEqual(plan.sections, ['pprcMaster', 'clubs']);
-  assert.ok(plan.paths['clubs/koc/seasons/s3/matches/m1'], 'clubs go down to the individual match');
+  assert.deepEqual(plan.sections, ['pprcMaster', 'pprcClubs']);
+  assert.ok(plan.paths['pprcClubs/koc/seasons/s3/matches/m1'], 'the club history goes down to the individual match');
+  assert.ok(!Object.keys(plan.paths).some(p => p.startsWith('clubs/')), 'the project\'s own clubs node is never written');
   assert.equal(plan.stats.pprcMaster.paths, 3); assert.deepEqual(plan.problems, []);
-  assert.deepEqual(planImport(tree, { only: ['clubs'] }).sections, ['clubs']);
+  assert.deepEqual(planImport(tree, { only: ['clubs'] }).sections, ['pprcClubs']);
   assert.equal(planImport({ pprcMaster: { players: { 'bad.key': 1 } } }).problems.length, 1);
 });
 
@@ -36,8 +37,9 @@ test('the project rules keep Triace as it was and add public reads of the shared
   const rules = JSON.parse(fs.readFileSync(new URL('../../database.rules.json', import.meta.url), 'utf8')).rules;
   assert.equal(rules['.write'], false); assert.equal(rules['.read'], false);
   assert.ok(rules.traice2_0 && rules.traice2_0.registrations && rules.traice2_0.tiers, 'the Triace rules are still there');
-  assert.equal(rules.pprcMaster['.read'], true); assert.equal(rules.clubs['.read'], true);
-  for (const section of [rules.pprcMaster, rules.clubs]) assert.ok(!JSON.stringify(section).includes('.write'), 'no path in the shared data lets a client write');
+  assert.equal(rules.pprcMaster['.read'], true); assert.equal(rules.pprcClubs['.read'], true);
+  assert.equal(rules.clubs, undefined, 'the project\'s clubs node (KOC admin settings) is not made public');
+  for (const section of [rules.pprcMaster, rules.pprcClubs]) assert.ok(!JSON.stringify(section).includes('.write'), 'no path in the shared data lets a client write');
   assert.equal(rules.importLog, undefined, 'the import log is not readable');
 });
 
@@ -93,10 +95,10 @@ test('import: writes the tree, leaves everything else alone, and logs what it di
   const db = fakeDb({ traice2_0: { tiers: { goat: { teams: { t1: { captainFirstName: 'John' } } } } } });
   const result = await runImport(db, tree, { now: 777, source: 'multiclub.json' });
   assert.deepEqual(db.root.pprcMaster, tree.pprcMaster);
-  assert.deepEqual(db.root.clubs, tree.clubs);
+  assert.deepEqual(db.root.pprcClubs, tree.clubs);
   assert.equal(db.root.traice2_0.tiers.goat.teams.t1.captainFirstName, 'John', 'Triace data is untouched');
-  assert.deepEqual(Object.keys(db.root).sort(), ['clubs', 'importLog', 'pprcMaster', 'traice2_0']);
-  assert.deepEqual(db.root.importLog[777].sections, ['pprcMaster', 'clubs']);
+  assert.deepEqual(Object.keys(db.root).sort(), ['importLog', 'pprcClubs', 'pprcMaster', 'traice2_0']);
+  assert.deepEqual(db.root.importLog[777].sections, ['pprcMaster', 'pprcClubs']);
   assert.equal(result.written, Object.keys(planImport(tree).paths).length);
 });
 
@@ -155,4 +157,16 @@ test('a database that never answers fails with a clear message instead of hangin
   await assert.rejects(() => withTimeout(new Promise(() => {}), 20, 'Could not reach the database.'), /Could not reach/);
   assert.equal(await withTimeout(Promise.resolve(5), 1000, 'x'), 5);
   await assert.rejects(() => withTimeout(Promise.reject(new Error('permission denied')), 1000, 'x'), /permission denied/);
+});
+
+test('import: an existing clubs node (live KOC data) is never read, changed or removed, even with replace', async () => {
+  const live = { koc: { admin: { password: 'secret' }, seasons: { koc_s3: { teams: { team1: { name: 'Rudra' } } } } } };
+  const db = fakeDb({ clubs: live });
+  await runImport(db, tree);
+  assert.deepEqual(db.root.clubs, live, 'KOC data is exactly as it was');
+  assert.deepEqual(db.root.pprcClubs, tree.clubs);
+  await assert.rejects(() => runImport(db, tree), err => err instanceof ImportRefused && /pprcClubs/.test(err.message) && !/Already has data: .*\bclubs\b[^C]/.test(err.message.replace('pprcClubs', '')));
+  await runImport(db, tree, { replace: true });
+  assert.deepEqual(db.root.clubs, live, 'replace only ever replaces our own sections');
+  assert.ok(!db.calls.removes.includes('clubs'));
 });
