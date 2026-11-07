@@ -370,3 +370,24 @@ test('PPRC links are checked: known team and role, a valid player, no duplicate 
   assert.throws(() => applyLinkPprc(state, { links: [] }, true), /at least one/);
   assert.throws(() => applyLinkPprc(state, { links: [{ teamId, role: 'ace1', player: ok }, { teamId, role: 'ace2', player: ok }] }, true), /twice/);
 });
+
+import { buildDemoState } from '../../functions/lib/demoSeed.js';
+test('the demo seed registers sample teams from PPRC players, links most of them, and leaves some as NR', () => {
+  const names = Array.from({ length: 24 }, (_, i) => `Person${String.fromCharCode(97 + i)} Surname${i}`);
+  const tree = { pprcMaster: { playerList: {}, players: {}, ratings: {} } };
+  names.forEach((name, i) => {
+    const id = `p_${name.toLowerCase().replace(/ /g, '_')}`, s = 4 + i * 0.12;
+    tree.pprcMaster.playerList[id] = { name, overall: s, played: 3, clubs: ['koc'] }; tree.pprcMaster.players[id] = { name };
+    tree.pprcMaster.ratings[id] = { overall: s, singles: s, doubles: s, seed: { singles: s, doubles: s }, played: { singles: i % 2 ? 9 : 2, doubles: 1 } };
+  });
+  const { state, summary } = buildDemoState(tree, { teams: 6, now: 1000 });
+  assert.ok(summary.teams >= 3 && summary.linked >= 6);
+  const pub = Object.values(state.tiers).flatMap(t => Object.values(t.teams));
+  assert.equal(pub.length, summary.teams, 'every created team is listed in a tier');
+  const badges = pub.flatMap(t => Object.values(t.pprc || {}));
+  assert.ok(badges.some(b => b.verified) && badges.some(b => !b.verified), 'both a verified rating and NR appear');
+  assert.ok(pub.some(t => !t.pprc?.captain || !t.pprc?.ace1 || !t.pprc?.ace2), 'some players are left unlinked');
+  assert.ok(Object.values(state.registrations).every(r => /^\+1555/.test(r.whatsappPhone) && r.ownerUid.startsWith('demo_owner_')));
+  assert.deepEqual(buildDemoState(null, { teams: 4 }).summary.linked, 0, 'without PPRC data the teams are made up and nothing is linked');
+  assert.ok(buildDemoState(null, { teams: 4 }).summary.teams >= 2);
+});

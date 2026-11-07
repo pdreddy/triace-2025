@@ -1,9 +1,11 @@
 // Reads the shared PPRC player data from the multi-club Realtime Database over its REST interface (public
 // read, no sign-in). Nothing is written from the browser.
-const BASE = (import.meta.env.VITE_MULTICLUB_DATABASE_URL || 'https://multiclub-890ea-default-rtdb.firebaseio.com').replace(/\/$/, '');
+// The local demo serves its own copy of the data at /pprc-db (see scripts/demo-plugin.mjs); everything else reads the shared database.
+const BASE = (import.meta.env.VITE_MULTICLUB_DATABASE_URL || (import.meta.env.MODE === 'demo' ? '/pprc-db' : 'https://multiclub-890ea-default-rtdb.firebaseio.com')).replace(/\/$/, '');
 
 async function read(path) {
   const response = await fetch(`${BASE}/${path}.json`);
+  if (response.status === 404 && BASE === '/pprc-db') throw new Error((await response.json().catch(() => ({}))).error || 'No local PPRC data.');
   if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? 'The player data is not readable yet.' : `Could not load player data (${response.status}).`);
   return response.json();
 }

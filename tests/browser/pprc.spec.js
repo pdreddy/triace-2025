@@ -22,8 +22,8 @@ function fixture({ newbie = false } = {}) {
 
 test('PPRC profile: latest ten with the game type, older matches by year, a year opens on click', async ({ page }) => {
   const tree = fixture(), requested = [];
-  await page.route('**/multiclub-890ea-default-rtdb.firebaseio.com/**', route => {
-    const path = new URL(route.request().url()).pathname.replace(/^\/|\.json$/g, '');
+  await page.route('**/pprc-db/**', route => {
+    const path = new URL(route.request().url()).pathname.replace(/^\/pprc-db\/|\.json$/g, '');
     requested.push(path);
     const value = path.split('/').reduce((node, key) => (node == null ? node : node[key]), tree);
     route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(value ?? null) });
@@ -55,7 +55,7 @@ test('PPRC profile: latest ten with the game type, older matches by year, a year
 });
 
 test('PPRC pages explain when the data cannot be read', async ({ page }) => {
-  await page.route('**/multiclub-890ea-default-rtdb.firebaseio.com/**', route => route.fulfill({ status: 401, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"error":"Permission denied"}' }));
+  await page.route('**/pprc-db/**', route => route.fulfill({ status: 401, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"error":"Permission denied"}' }));
   await page.goto('/pprc');
   await expect(page.getByText('The player data is not readable yet.')).toBeVisible();
 });
@@ -69,8 +69,8 @@ async function acceptRules(page) {
 
 test('registration finds players already in PPRC, links them, and carries their ratings', async ({ page }) => {
   const tree = fixture();
-  await page.route('**/multiclub-890ea-default-rtdb.firebaseio.com/**', route => {
-    const path = new URL(route.request().url()).pathname.replace(/^\/|\.json$/g, '');
+  await page.route('**/pprc-db/**', route => {
+    const path = new URL(route.request().url()).pathname.replace(/^\/pprc-db\/|\.json$/g, '');
     const value = path.split('/').reduce((node, key) => (node == null ? node : node[key]), tree);
     route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(value ?? null) });
   });
@@ -106,7 +106,7 @@ test('registration finds players already in PPRC, links them, and carries their 
 });
 
 test('registration still works when the shared player list cannot be read', async ({ page }) => {
-  await page.route('**/multiclub-890ea-default-rtdb.firebaseio.com/**', route => route.fulfill({ status: 401, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"error":"Permission denied"}' }));
+  await page.route('**/pprc-db/**', route => route.fulfill({ status: 401, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"error":"Permission denied"}' }));
   await acceptRules(page);
   await page.goto('/register');
   await page.getByLabel('Ace 1 full name').fill('Someone Else');
@@ -122,8 +122,8 @@ async function login(page) {
   await expect(page).toHaveURL(/\/admin$/);
   await expect(page.getByRole('button', { name: 'Save configuration ↗' })).toBeEnabled();
 }
-const serveMaster = (page, tree) => page.route('**/multiclub-890ea-default-rtdb.firebaseio.com/**', route => {
-  const path = new URL(route.request().url()).pathname.replace(/^\/|\.json$/g, '');
+const serveMaster = (page, tree) => page.route('**/pprc-db/**', route => {
+  const path = new URL(route.request().url()).pathname.replace(/^\/pprc-db\/|\.json$/g, '');
   const value = path.split('/').reduce((node, key) => (node == null ? node : node[key]), tree);
   route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(value ?? null) });
 });

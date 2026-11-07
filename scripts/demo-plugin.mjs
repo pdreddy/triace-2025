@@ -23,7 +23,20 @@ export function demoPlugin(env) {
       await writeFile(temporary, JSON.stringify(next), { mode: 0o600 }); await rename(temporary, file); state = next; return result;
     }); queue = job.catch(() => {}); return job;
   }
+  // The shared PPRC database, served from a local file so the demo works offline: GET /pprc-db/<path>.json
+  // (the same shape as the Realtime Database REST interface). The file is the multiclub.json the migration writes.
+  const treeFile = path.resolve(env.PPRC_TREE || '.local-migration/multiclub.json');
   return { name: 'traice-local-demo', configureServer(server) {
+    server.middlewares.use('/pprc-db', async (req, res) => {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8'); res.setHeader('Cache-Control', 'no-store');
+      const host = (req.headers.host || '').split(':')[0];
+      if (!['localhost', '127.0.0.1'].includes(host)) { res.statusCode = 403; return res.end('{"error":"Local demo only accepts loopback hosts."}'); }
+      let tree;
+      try { tree = JSON.parse(await readFile(treeFile, 'utf8')); } catch { res.statusCode = 404; return res.end(JSON.stringify({ error: 'No local PPRC data. Run: bash run-local.sh --export <your-export.json> --demo' })); }
+      const segments = decodeURIComponent(new URL(req.url, 'http://x').pathname).replace(/^\/|\.json$/g, '').split('/').filter(Boolean);
+      const value = segments.reduce((node, key) => (node && typeof node === 'object' && Object.hasOwn(node, key) ? node[key] : null), tree);
+      res.end(JSON.stringify(value ?? null));
+    });
     server.middlewares.use('/api', async (req, res) => {
       res.setHeader('Content-Type', 'application/json; charset=utf-8'); res.setHeader('Cache-Control', 'no-store'); res.setHeader('X-Content-Type-Options', 'nosniff');
       const send = (code, body) => { res.statusCode = code; res.end(JSON.stringify(body)); };

@@ -5,6 +5,8 @@
 #   bash run-local.sh --browser            ...and the browser tests (downloads Chromium the first time)
 #   bash run-local.sh --demo               ...and start the app at http://127.0.0.1:3000 (Ctrl+C to stop)
 #   bash run-local.sh --export export.json ...and a PPRC migration dry run on your database export (sends nothing)
+#   With --demo the app starts with sample registered teams and, if you gave --export, your real PPRC players and
+#   match history (served locally, nothing is read from or written to Firebase). --reset-demo starts the sample data again.
 # Options combine, e.g. bash run-local.sh --browser --demo
 # Settings (environment): BRANCH (default codex/tier-card-improvements), DIR (default ./triace-2025),
 #   REPO (default the GitHub repo), TRAICE_ADMIN_PASSWORD (demo admin password, default local-demo-password).
@@ -14,11 +16,12 @@ set -uo pipefail
 REPO="${REPO:-https://github.com/pdreddy/triace-2025.git}"
 BRANCH="${BRANCH:-codex/tier-card-improvements}"
 DIR="${DIR:-triace-2025}"
-BROWSER=0; DEMO=0; EXPORT=""
+BROWSER=0; DEMO=0; EXPORT=""; RESET=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --browser) BROWSER=1 ;;
     --demo) DEMO=1 ;;
+    --reset-demo) RESET=1 ;;
     --export) shift; EXPORT="${1:-}" ;;
     -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
     *) echo "Unknown option: $1 (try --help)"; exit 1 ;;
@@ -74,6 +77,8 @@ if [ -n "$EXPORT" ]; then
 fi
 
 if [ "$DEMO" = 1 ]; then
+  if [ ! -f .local-migration/multiclub.json ]; then echo "Note: no PPRC data yet, so /pprc and the PPRC panel stay empty. Add --export <your-export.json> to load it."; fi
+  if [ "$RESET" = 1 ]; then node scripts/seed-demo.mjs --reset; else node scripts/seed-demo.mjs; fi
   summary_text() { printf '%s\n' "${RESULTS[@]}"; }
   say "Results so far"; summary_text
   say "Starting the app: http://127.0.0.1:3000  (admin: /admin/login, user reddi2026, password ${TRAICE_ADMIN_PASSWORD:-local-demo-password})"
