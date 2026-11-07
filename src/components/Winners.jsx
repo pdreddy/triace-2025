@@ -1,6 +1,7 @@
 import { useId } from 'react';
 import { Link } from 'react-router-dom';
 import { useNameResolver } from '../services/names';
+import { VerifiedSeal } from './UI';
 import { teamName } from './League';
 import { tierTone } from './UI';
 
@@ -42,7 +43,8 @@ export function Medal({ size = 34 }) {
 // One player's name, spelled as in the shared PPRC list and linked to the public profile when there is one.
 export function PlayerName({ name, teamId }) {
   const resolve = useNameResolver(), who = resolve(name, teamId);
-  return who.id ? <Link className="player-name" to={`/pprc/${who.id}`}>{who.name}</Link> : <>{who.name}</>;
+  const link = who.id ? <Link className="player-name" to={`/pprc/${who.id}`}>{who.name}</Link> : <>{who.name}</>;
+  return who.verified ? <>{link} <span className="pprc-badge ok" title={`PPRC verified rating ${who.rating.toFixed(2)}`} aria-label={`PPRC ${who.rating.toFixed(2)}, verified`}>{who.rating.toFixed(2)} <VerifiedSeal /></span></> : link;
 }
 
 // A squad written as "A · B · C" (or "A / B / C"), one name per line so full names stay readable.

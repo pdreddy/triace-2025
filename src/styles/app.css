@@ -1562,3 +1562,5 @@ td > a, .fixture-team, .team-card h3 a { display: inline-flex; align-items: cent
 .badge.season.club-triace { color: #ffb56b; border-color: rgba(255, 181, 107, .45); background: rgba(255, 181, 107, .1); }
 .badge.star { color: #1b2634; border-color: #f6c93b; background: linear-gradient(135deg, #fff3a8, #f6c93b); }
 .badge.earned { color: var(--text, #e6edf3); }
+.verified-rating { font-size: .6em; font-weight: 800; margin-left: 4px; color: #22b8cf; }
+.squad .pprc-badge, .members .pprc-badge { margin-left: 4px; }

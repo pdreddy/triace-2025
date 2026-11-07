@@ -99,7 +99,7 @@ export function PprcPlayer() {
       <header className="team-hero">
         <div>
           <p className="eyebrow">PPRC player · {Object.keys(info.clubs || {}).map(clubName).join(' · ') || 'No club'}</p>
-          <h1>{info.name}{verified && <span className="verified-name" title={`PPRC verified: ${courtsPlayed(rating)} rated courts (more than 5)`}><VerifiedSeal /> <span className="sr-only">PPRC verified</span></span>}</h1>
+          <h1>{info.name}{verified && <span className="verified-name" title={`PPRC verified: ${courtsPlayed(rating)} rated courts (more than 5)`}><VerifiedSeal /> <b className="verified-rating">{rating.overall.toFixed(2)}</b> <span className="sr-only">PPRC verified</span></span>}</h1>
           <ul className="badge-row" aria-label="Badges" data-testid="pprc-badges">
             <li className={`badge ${verified ? 'verified' : 'nr'}`} title={verified ? 'More than 5 rated courts' : 'Not rated yet: 5 or fewer rated courts'}>{verified ? <><VerifiedSeal /> Verified</> : 'NR · not rated yet'}</li>
             {badges.map(b => <li key={b.key} className={`badge ${b.kind}${b.club ? ` club-${b.club}` : ''}`} title={b.title}>{b.label}</li>)}
@@ -148,7 +148,7 @@ export function PprcDirectory() {
             {rows.map((p, i) => (
               <li key={p.id}>
                 <span className="history-result">{i + 1}</span>
-                <div><Link to={`/pprc/${p.id}`}><b>{p.name}</b></Link>{p.played > 5 && <span className="verified-name" title="PPRC verified"><VerifiedSeal /></span>} <span className="muted">· {(p.clubs || []).map(clubName).join(' · ')} · {p.played} {p.played === 1 ? 'match' : 'matches'}</span></div>
+                <div><Link to={`/pprc/${p.id}`}><b>{p.name}</b></Link>{p.played > 5 && <span className="verified-name" title="PPRC verified"><VerifiedSeal /> <b className="verified-rating">{Number.isFinite(p.overall) ? p.overall.toFixed(2) : ''}</b></span>} <span className="muted">· {(p.clubs || []).map(clubName).join(' · ')} · {p.played} {p.played === 1 ? 'match' : 'matches'}</span></div>
                 <em title="PPRC singles / doubles">{pair(p.singles, p.doubles)}</em><small className="muted" title="UTR singles / doubles">UTR {pair(p.utr?.singles, p.utr?.doubles)}</small>
               </li>
             ))}

@@ -7,11 +7,16 @@ const IGNORE = '__ignore__';
 
 export function makeResolver(list = []) {
   const registry = createRegistry(list.map(p => ({ id: p.id, name: p.name })));
+  const byId = new Map(list.map(p => [p.id, p]));
   const decided = (raw, teamId) => {
     const hit = (teamId && decidedBy.get(nameKey(`Team ${teamId}::${raw}`))) ?? decidedBy.get(nameKey(raw));
     return hit && hit !== IGNORE ? hit : null;
   };
-  const named = (name, id) => (registry.byId.has(id) ? { name: registry.byId.get(id).name, id } : { name, id: null });
+  const named = (name, id) => {
+    if (!registry.byId.has(id)) return { name, id: null };
+    const p = byId.get(id);
+    return { name: p.name, id, ...(Number.isFinite(p.overall) && p.played > 5 ? { rating: p.overall, verified: true } : {}) }; // verified: more than 5 rated courts
+  };
   return function resolve(rawName, teamId) {
     const raw = String(rawName || '').trim();
     if (!raw) return { name: '', id: null };

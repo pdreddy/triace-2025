@@ -34,3 +34,9 @@ test('spelling variants of one person resolve to one player', () => {
   for (const raw of ['Sridhar', 'Sridhar.', 'SRIDHAR']) assert.equal(resolve(raw, 'b7').id, 'p_sridhar_kuppuswamy', raw);
   for (const raw of ['RajC', 'Raj C', 'raj chinta']) assert.equal(resolve(raw, 'a4').id, 'p_rajasekhar_chintha', raw);
 });
+
+test('a verified player (more than 5 rated courts) carries the PPRC rating, others do not', () => {
+  const resolve = makeResolver([{ id: 'p_hari_mothukuri', name: 'Hari Mothukuri', overall: 6.11, played: 29 }, { id: 'p_prashanth_gourineni', name: 'Prashanth Gourineni', overall: 5.5, played: 4 }]);
+  assert.deepEqual(resolve('Hari', 'a5'), { name: 'Hari Mothukuri', id: 'p_hari_mothukuri', rating: 6.11, verified: true });
+  assert.deepEqual(resolve('Prashanth', 'zz'), { name: 'Prashanth Gourineni', id: 'p_prashanth_gourineni' });
+});
