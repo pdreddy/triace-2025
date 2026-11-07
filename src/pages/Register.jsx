@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useTournament } from '../hooks/useTournament';
 import { useRulesAccess } from '../hooks/useRulesAccess';
 import { Field, Message, UtrMeter, tierTone } from '../components/UI';
+import PprcLookup from '../components/PprcLookup';
 import { Icon } from '../components/Icons';
 import { assignSelectedTier, assignTier, orderedTiers, parseUtr, formatUtr, validateRegistration, playerUtr, UTR_GAP_LIMIT, DEFAULT_TIERS } from '../../functions/lib/tournament.js';
 
@@ -12,7 +13,7 @@ const PLAYERS = [
   { key: 'ace2', title: 'Ace 2', note: 'Full name private', label: 'Ace 2 full name', placeholder: 'Full name', max: 80, autoComplete: 'off' }
 ];
 const STEPS = ['Tier', 'Captain', 'Ace 1', 'Ace 2', 'Confirm'];
-const emptyPlayers = () => Object.fromEntries(PLAYERS.map(p => [p.key, { name: '', phone: '', singles: '', doubles: '' }]));
+const emptyPlayers = () => Object.fromEntries(PLAYERS.map(p => [p.key, { name: '', phone: '', singles: '', doubles: '', pprc: null }]));
 // Counted rating for the live preview, using the same gap rule as the server (playerUtr).
 function rating(player, gap = UTR_GAP_LIMIT) {
   try {
@@ -113,6 +114,8 @@ export default function Register() {
     setError(''); setSuccess(null);
     try {
       const payload = { teamId: id.current, whatsappPhone, ace1Phone: players.ace1.phone, ace2Phone: players.ace2.phone, selectedTier, consent, rulesAccepted: accepted };
+      const links = Object.fromEntries(Object.entries(players).filter(([, value]) => value.pprc).map(([key, value]) => [key, value.pprc.id]));
+      if (Object.keys(links).length) payload.pprcIds = links;
       for (const [key, value] of Object.entries(players)) payload[key] = { [key === 'captain' ? 'firstName' : 'fullName']: value.name.trim(), singlesUtr: parseUtr(value.singles), doublesUtr: value.doubles.trim() ? parseUtr(value.doubles) : null };
       validateRegistration(payload, settings, config, gap);
       setBusy(true);
@@ -165,7 +168,8 @@ export default function Register() {
             {PLAYERS.map((p, i) => (
               <section key={p.key} className={`step-panel card${step === i + 1 ? ' on' : ''}`}>
                 <div className="card-head"><h2><span className="player-num">0{i + 1}</span>{p.title}</h2><span className="pill">{p.note}</span></div>
-                <Field id={`${p.key}-name`} label={p.label} value={players[p.key].name} onChange={e => change(p.key, 'name', e.target.value)} required maxLength={p.max} autoComplete={p.autoComplete} placeholder={p.placeholder} />
+                <Field id={`${p.key}-name`} label={p.label} value={players[p.key].name} onChange={e => { change(p.key, 'name', e.target.value); if (players[p.key].pprc) change(p.key, 'pprc', null); }} required maxLength={p.max} autoComplete={p.autoComplete} placeholder={p.placeholder} />
+                <PprcLookup query={players[p.key].name} linked={players[p.key].pprc} onUnlink={() => change(p.key, 'pprc', null)} onPick={found => setPlayers(old => ({ ...old, [p.key]: { ...old[p.key], pprc: found, name: p.key === 'captain' ? found.name.split(' ')[0] : found.name, ...(found.singles ? { singles: found.singles.toFixed(2), doubles: found.doubles ? found.doubles.toFixed(2) : '' } : {}) } }))} />
                 {p.key === 'captain' && <Field id="captain-whatsapp" label="Captain WhatsApp number (private)" type="tel" inputMode="tel" autoComplete="tel" placeholder="+15551234567" hint="Include country code. This is visible to the team owner and admin, never on public pages." value={whatsappPhone} onChange={e => setWhatsappPhone(e.target.value)} required maxLength={25} />}
                 {p.key !== 'captain' && <Field id={`${p.key}-whatsapp`} label={`${p.title} WhatsApp number (private)`} type="tel" inputMode="tel" autoComplete="off" placeholder="+15551234567" hint="Include country code. This is visible to the team owner and admin, never on public pages." value={players[p.key].phone} onChange={e => change(p.key, 'phone', e.target.value)} required maxLength={25} />}
                 <div className="ratings">

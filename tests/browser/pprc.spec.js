@@ -56,3 +56,57 @@ test('PPRC pages explain when the data cannot be read', async ({ page }) => {
   await page.goto('/pprc');
   await expect(page.getByText('The player data is not readable yet.')).toBeVisible();
 });
+
+async function acceptRules(page) {
+  await page.goto('/');
+  for (let i = 0; i < 9; i++) await page.getByRole('button', { name: 'Next rule card' }).click();
+  await page.getByRole('checkbox', { name: /read all sections/ }).check();
+  await page.getByRole('button', { name: 'Agree to rules' }).click();
+}
+
+test('registration finds players already in PPRC, links them, and carries their ratings', async ({ page }) => {
+  const tree = fixture();
+  await page.route('**/multiclub-890ea-default-rtdb.firebaseio.com/**', route => {
+    const path = new URL(route.request().url()).pathname.replace(/^\/|\.json$/g, '');
+    const value = path.split('/').reduce((node, key) => (node == null ? node : node[key]), tree);
+    route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(value ?? null) });
+  });
+  await acceptRules(page);
+  await page.goto('/register');
+  await expect(page.getByRole('button', { name: 'Register team ↗' })).toBeEnabled();
+  await page.getByLabel('Captain first name', { exact: true }).fill('John');
+  await page.getByLabel('Captain WhatsApp number (private)').fill('+15551234567');
+  await page.getByLabel('Ace 1 WhatsApp number (private)').fill('+15551234568');
+  await page.getByLabel('Ace 2 WhatsApp number (private)').fill('+15551234569');
+  await page.getByLabel('Ace 2 full name').fill('Secret Beta');
+  await page.locator('#captain-utr').fill('6'); await page.locator('#ace2-utr').fill('6');
+
+  await page.getByLabel('Ace 1 full name').fill('krishna ven');
+  const suggest = page.getByTestId('pprc-suggest');
+  await expect(suggest).toContainText('Krishna Vennapusa');
+  await expect(suggest).toContainText('KOC');
+  await suggest.getByRole('button', { name: /Krishna Vennapusa/ }).click();
+  await expect(page.getByTestId('pprc-linked')).toContainText('Krishna Vennapusa');
+  await expect(page.getByLabel('Ace 1 full name')).toHaveValue('Krishna Vennapusa');
+  await expect(page.locator('#ace1-utr')).not.toHaveValue('');
+  expect(Number(await page.locator('#ace1-utr').inputValue())).toBeGreaterThan(1);
+
+  await page.getByLabel('Ace 1 full name').fill('Krishna Vennapusa x');
+  await expect(page.getByTestId('pprc-linked')).toHaveCount(0); // editing the name unlinks it
+  await page.getByLabel('Ace 1 full name').fill('krishna ven');
+  await page.getByTestId('pprc-suggest').getByRole('button', { name: /Krishna Vennapusa/ }).click();
+  await page.getByRole('checkbox', { name: /permission to register/ }).check();
+  const sent = page.waitForRequest(r => r.url().includes('register') && r.method() === 'POST');
+  await page.getByRole('button', { name: 'Register team ↗' }).click();
+  expect(JSON.parse((await sent).postData()).pprcIds).toEqual({ ace1: 'p_krishna_vennapusa' });
+  await expect(page.getByRole('status').filter({ hasText: 'Team registered successfully' })).toBeVisible();
+});
+
+test('registration still works when the shared player list cannot be read', async ({ page }) => {
+  await page.route('**/multiclub-890ea-default-rtdb.firebaseio.com/**', route => route.fulfill({ status: 401, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"error":"Permission denied"}' }));
+  await acceptRules(page);
+  await page.goto('/register');
+  await page.getByLabel('Ace 1 full name').fill('Someone Else');
+  await expect(page.getByTestId('pprc-suggest')).toHaveCount(0);
+  await expect(page.getByLabel('Ace 1 full name')).toHaveValue('Someone Else');
+});

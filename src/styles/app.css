@@ -1080,3 +1080,9 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
 .game-triace { background: #e8eefc; color: #2446a6; }
 .toolbar { display: flex; gap: 10px; flex-wrap: wrap; margin: 0 0 12px; }
 .toolbar input[type=search] { flex: 1 1 220px; }
+
+.pprc-suggest { margin: -4px 0 12px; display: grid; gap: 6px; }
+.pprc-suggest ul { display: grid; gap: 6px; }
+.pprc-suggest button { width: 100%; text-align: left; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.pprc-suggest button span { color: var(--muted); font-size: 13px; }
+.pprc-linked { margin: -4px 0 12px; padding: 8px 12px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--line); font-size: 14px; }

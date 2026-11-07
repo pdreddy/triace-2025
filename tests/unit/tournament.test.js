@@ -26,3 +26,18 @@ test('GOAT preference with Rising fallback enters exactly one eligible tier',()=
 
 test('saving public masking immediately adds or removes both Ace names',()=>{let {state}=applyRegistration(initialState(),payload(),'user');const id=payload().teamId;assert.equal(state.tiers.goat.teams[id].ace1Name,undefined);let request={settings:{...state.settings,aceNameMaskingEnabled:false},tierConfig:state.tierConfig,expectedRevision:state.configRevision};state=applyConfiguration(state,request).state;assert.equal(state.tiers.goat.teams[id].ace1Name,'Private Ace One');assert.equal(state.tiers.goat.teams[id].ace2Name,'Private Ace Two');request={settings:{...state.settings,aceNameMaskingEnabled:true},tierConfig:state.tierConfig,expectedRevision:state.configRevision};state=applyConfiguration(state,request).state;assert.equal(state.tiers.goat.teams[id].ace1Name,undefined);assert.equal(state.tiers.goat.teams[id].ace2Name,undefined);});
 test('legacy registrations without Ace-name publication consent stay masked',()=>{const state=initialState(),team={...validateRegistration(payload(),state.settings,state.tierConfig),ownerUid:'user',registeredAt:1};delete team.rulesAccepted;state.registrations[team.teamId]=team;const request={settings:{...state.settings,aceNameMaskingEnabled:false},tierConfig:state.tierConfig,expectedRevision:state.configRevision};const saved=applyConfiguration(state,request).state;assert.equal(saved.tiers.goat,undefined);assert.equal(publicRecord(team,saved.settings).ace1Name,undefined);});
+
+test('a registration can link its players to the shared PPRC list; the links stay private', () => {
+  const state = initialState(), links = { captain: 'p_john_smith', ace1: 'p_vivekvardhan_reddy_mereddy', ace2: '' };
+  const team = validateRegistration({ ...payload(), pprcIds: links }, state.settings, state.tierConfig);
+  assert.deepEqual(team.pprcIds, { captain: 'p_john_smith', ace1: 'p_vivekvardhan_reddy_mereddy' }, 'empty links are dropped');
+  assert.equal(validateRegistration(payload(), state.settings, state.tierConfig).pprcIds, undefined, 'links are optional');
+  assert.equal(validateRegistration({ ...payload(), pprcIds: {} }, state.settings, state.tierConfig).pprcIds, undefined);
+  for (const bad of [{ captain: 'John Smith' }, { captain: 'p_' }, { ace3: 'p_someone' }, { captain: 'p_same', ace1: 'p_same' }, { captain: 5 }, 'p_x', ['p_x']])
+    assert.throws(() => validateRegistration({ ...payload(), pprcIds: bad }, state.settings, state.tierConfig), /PPRC/, JSON.stringify(bad));
+  const saved = applyRegistration(state, { ...payload(), pprcIds: links }, 'user', 5).state;
+  assert.deepEqual(saved.registrations.team_1234567890123456.pprcIds, team.pprcIds, 'kept on the private registration');
+  const text = JSON.stringify(publicState(saved));
+  assert.ok(!text.includes('p_vivekvardhan') && !text.includes('pprcIds'), 'never part of the public data');
+  assert.equal(publicRecord(saved.registrations.team_1234567890123456, saved.settings).pprcIds, undefined);
+});

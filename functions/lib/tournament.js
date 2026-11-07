@@ -92,18 +92,30 @@ function player(value, captain, settings, gapLimit) {
   assert(value.doublesUtr === null || integer(value.doublesUtr, settings.minPlayerUtr, settings.maxPlayerUtr), `${label}: optional doubles UTR must be within the individual limits.`);
   return { [key]: clean, singlesUtr: value.singlesUtr, doublesUtr: value.doublesUtr, utr: playerUtr(value.singlesUtr, value.doublesUtr, gapLimit) };
 }
+// Links to the shared PPRC player list: { captain?, ace1?, ace2? } -> player id. Private to the team (an id is made from the
+// full name), so it is never part of the public record.
+const PPRC_ID = /^p_[a-z0-9_]{2,100}$/;
+function validPprcIds(value) {
+  if (value === undefined || value === null) return null;
+  assert(value && typeof value === 'object' && !Array.isArray(value), 'Invalid PPRC player links.');
+  const entries = Object.entries(value).filter(([, id]) => id !== '' && id != null);
+  for (const [key, id] of entries) assert(['captain', 'ace1', 'ace2'].includes(key) && typeof id === 'string' && PPRC_ID.test(id), 'Invalid PPRC player link.');
+  assert(new Set(entries.map(([, id]) => id)).size === entries.length, 'The same PPRC player cannot be linked twice.');
+  return entries.length ? Object.fromEntries(entries) : null;
+}
 export function validateRegistration(payload, settings, tiers, gapLimit = UTR_GAP_LIMIT) {
   validateSettings(settings); validateTierConfig(tiers);
   assert(settings.registrationEnabled, 'Registration is currently closed.');
-  exact(payload, ['teamId', 'captain', 'ace1', 'ace2', 'selectedTier', 'consent', 'rulesAccepted', ...['whatsappPhone', 'ace1Phone', 'ace2Phone'].filter(key => Object.hasOwn(payload || {}, key))], 'Invalid registration fields.');
+  exact(payload, ['teamId', 'captain', 'ace1', 'ace2', 'selectedTier', 'consent', 'rulesAccepted', ...['whatsappPhone', 'ace1Phone', 'ace2Phone', 'pprcIds'].filter(key => Object.hasOwn(payload || {}, key))], 'Invalid registration fields.');
   assert(typeof payload.teamId === 'string' && /^[a-zA-Z0-9_-]{16,80}$/.test(payload.teamId), 'Invalid registration identifier.');
   assert(payload.consent === true, 'Player consent is required.');
   assert(payload.rulesAccepted === true, 'Read and accept the tournament rules before registering.');
   assert(['higher', 'both', 'goat_fallback_rising'].includes(payload.selectedTier) || (typeof payload.selectedTier === 'string' && Object.hasOwn(tiers, payload.selectedTier) && tiers[payload.selectedTier].active), 'Select an active tier or a valid tier preference.');
+  const pprcIds = validPprcIds(payload.pprcIds);
   const captain = player(payload.captain, true, settings, gapLimit), ace1 = player(payload.ace1, false, settings, gapLimit), ace2 = player(payload.ace2, false, settings, gapLimit);
   const combinedUtr = captain.utr + ace1.utr + ace2.utr, assignedTier = assignSelectedTier(combinedUtr, tiers, payload.selectedTier);
   assert(assignedTier, 'Your team does not qualify for the selected tier. Choose an eligible tier or contact the tournament admin.');
-  return { teamId: payload.teamId, captain, ace1, ace2, ...Object.fromEntries(['whatsappPhone', 'ace1Phone', 'ace2Phone'].filter(key => Object.hasOwn(payload, key)).map(key => [key, normalizeWhatsAppPhone(payload[key])])), combinedUtr, selectedTier: payload.selectedTier, assignedTier, listedTiers: listedTiers(combinedUtr, tiers, payload.selectedTier), rulesAccepted: true };
+  return { teamId: payload.teamId, captain, ace1, ace2, ...(pprcIds ? { pprcIds } : {}), ...Object.fromEntries(['whatsappPhone', 'ace1Phone', 'ace2Phone'].filter(key => Object.hasOwn(payload, key)).map(key => [key, normalizeWhatsAppPhone(payload[key])])), combinedUtr, selectedTier: payload.selectedTier, assignedTier, listedTiers: listedTiers(combinedUtr, tiers, payload.selectedTier), rulesAccepted: true };
 }
 export function publicRecord(team, settings = DEFAULT_SETTINGS) {
   return { teamId: team.teamId, captainFirstName: team.captain.firstName, captainUtr: team.captain.utr, ace1Utr: team.ace1.utr, ace2Utr: team.ace2.utr, ...(!settings.aceNameMaskingEnabled && team.rulesAccepted === true ? { ace1Name: team.ace1.fullName, ace2Name: team.ace2.fullName } : {}), combinedUtr: team.combinedUtr, assignedTier: team.assignedTier, registeredAt: team.registeredAt };

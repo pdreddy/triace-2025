@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PPRC_PARAMS, displayName, nameKey, playerIdFor, createRegistry, resolveName, computePprc, splitHistory } from '../../functions/lib/pprc.js';
+import { PPRC_PARAMS, matchPlayers, displayName, nameKey, playerIdFor, createRegistry, resolveName, computePprc, splitHistory } from '../../functions/lib/pprc.js';
 
 test('name keys ignore case, accents, punctuation and spacing', () => {
   assert.equal(nameKey('  José  O’Neil-Smith '), 'jose o neil smith');
@@ -139,4 +139,16 @@ test('every name is written like "Vivekvardhan Reddy Mereddy"', () => {
   assert.equal(displayName("mary-anne o'neil"), "Mary-Anne O'Neil");
   assert.equal(displayName(null), '');
   assert.equal(nameKey(displayName('DINKAR  bhardwaj')), nameKey('Dinkar Bhardwaj'), 'the same person either way');
+});
+
+test('typing part of a name finds players, most experienced first', () => {
+  const list = [{ id: 'a', name: 'Vivekvardhan Reddy Mereddy', played: 20 }, { id: 'b', name: 'Vivek Tiku', played: 35 }, { id: 'c', name: 'Dinkar Bhardwaj', played: 5 }, { id: 'd', name: 'Reddy Vivek', played: 1 }];
+  assert.deepEqual(matchPlayers(list, 'viv').map(p => p.id), ['b', 'a', 'd']);
+  assert.deepEqual(matchPlayers(list, 'viv red').map(p => p.id), ['a', 'd']);
+  assert.deepEqual(matchPlayers(list, 'VIVEKVARDHAN').map(p => p.id), ['a']);
+  assert.deepEqual(matchPlayers(list, 'v'), [], 'one letter is too little to search');
+  assert.deepEqual(matchPlayers(list, ''), []);
+  assert.deepEqual(matchPlayers(list, 'zzz'), []);
+  assert.equal(matchPlayers(list, 'vi', 2).length, 2);
+  assert.deepEqual(matchPlayers(undefined, 'viv'), []);
 });

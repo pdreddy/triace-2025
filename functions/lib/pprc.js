@@ -140,3 +140,14 @@ export function splitHistory(entries, count = 10) {
   }
   return { recent: newest.slice(0, count), years: [...years].map(([year, items]) => ({ year, count: items.length, items })) };
 }
+
+// Players whose name starts with what was typed, each typed word matching the start of a different part of the name
+// ("viv red" finds "Vivekvardhan Reddy Mereddy"). Most experienced first; at most `limit`.
+export function matchPlayers(list, query, limit = 5) {
+  const words = nameKey(query).split(' ').filter(Boolean);
+  if (!words.length || words.join('').length < 2) return [];
+  return (list || [])
+    .filter(p => { const parts = nameKey(p.name).split(' '); return words.every(w => parts.some(part => part.startsWith(w))); })
+    .sort((a, b) => (b.played || 0) - (a.played || 0) || String(a.name).localeCompare(b.name))
+    .slice(0, limit);
+}
