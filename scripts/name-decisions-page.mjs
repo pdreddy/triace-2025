@@ -36,7 +36,7 @@ const state = id => (saved[id] ||= { decision: '', every: false });
 const fmt = ts => ts ? new Date(ts).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '';
 function render() {
   const q = $('q').value.toLowerCase(), only = $('undecided').checked, teams = new Map();
-  ROWS.forEach((r, i) => { const s = state(i); if (only && s.decision) return; if (q && !(r.raw + ' ' + r.team).toLowerCase().includes(q)) return; (teams.get(r.team) || teams.set(r.team, []).get(r.team)).push(i); });
+  ROWS.forEach((r, i) => { const s = state(i); if (only && s.decision) return; if (q && !((r.label || r.raw) + ' ' + r.team).toLowerCase().includes(q)) return; (teams.get(r.team) || teams.set(r.team, []).get(r.team)).push(i); });
   $('list').innerHTML = '';
   for (const [team, ids] of teams) {
     const d = document.createElement('details'); d.className = 'team'; d.open = true;
@@ -54,7 +54,7 @@ function card(i) {
   const ex = (r.examples || []).map(e => '<div class="ex">' + [fmt(e.ts), e.season, e.court, e.with.length ? 'with ' + e.with.join(' + ') : '', e.against.length ? 'against ' + e.against.join(' + ') : '', e.vs ? '(' + e.vs + ')' : ''].filter(Boolean).join(' · ') + '</div>').join('');
   el.innerHTML = '<div class="top"><span class="name"></span><span class="tag">' + r.count + (r.count === 1 ? ' match' : ' matches') + '</span><span class="tag">' + r.kind + '</span>' + (isNew ? '<span class="tag new">new person</span>' : '') + '</div>' + ex +
     (r.kind === 'unknown' && r.candidates.length ? '<div class="ex">Closest KOC season 3 names:</div>' : '') + '<div class="cands"></div><div class="entry"><input type="text" list="people" placeholder="Full name" value=""><label class="every"><input type="checkbox"> every team</label><button class="clear">Clear</button></div>';
-  el.querySelector('.name').textContent = r.raw;
+  el.querySelector('.name').textContent = r.label || r.raw;
   const cands = el.querySelector('.cands');
   r.candidates.forEach(c => { const b = document.createElement('button'); b.textContent = c; if (c === s.decision) b.className = 'on'; b.onclick = () => { s.decision = c; render(); }; cands.appendChild(b); });
   const input = el.querySelector('input[type=text]'); input.value = s.decision;

@@ -43,7 +43,7 @@ The Triace player page shows the ten and opens a year only when it is clicked.
 
 ## Migrating the old databases (dry run)
 ```bash
-node scripts/migrate-pprc.mjs <export.json> <out-dir> [decisions.csv | overrides.json]
+node scripts/migrate-pprc.mjs <export.json> <out-dir> scripts/migration/name-decisions.json
 ```
 Writes `multiclub.json` (the tree above), `report.md`, `report.json` and `name-decisions.csv`. It never contacts Firebase.
 
@@ -58,3 +58,6 @@ for a name that always means one person). A full name that is not in the master 
 Sources: KOC2DB (preferred, full names), KOC2DBPONEW, KOC2DBPO → KOC s1; KOC season 2 teams from `koc_s2`;
 `koc_s3/matches` (approved only) → KOC s3; TriAceDBNEW, TriAceDB, TriAceDB2 → Triace s1; TriAceDBNEW_Play and
 TriAceDBSUPER6 → Triace s1 playoffs. Duplicates (the same match under two paths) are dropped, keeping the first source.
+
+Confirmed decisions live in `scripts/migration/name-decisions.json` (keys are `Team::Name`, or a bare name for "always this person").
+Names are compared ignoring capitalisation, so "Durga" and "DURGA" are one name and one row in the fixer page.
