@@ -41,11 +41,11 @@ export function createFirebaseService() {
     mode: env.VITE_USE_EMULATORS === 'true' ? 'Firebase Emulators' : 'Firebase',
     info: { projectId: config.projectId, authDomain: config.authDomain, databaseURL: config.databaseURL, root: paths.root, season1Path: paths.season1, emulators: env.VITE_USE_EMULATORS === 'true' },
     subscribePublic(callback, onError) {
-      const state = {}, ready = new Set(), keys = ['settings', 'tierConfig', 'configRevision', 'tiers'];
+      const state = {}, ready = new Set(), unavailable = new Set(), keys = ['settings', 'tierConfig', 'configRevision', 'tiers'];
       let bootstrapAttempted = false;
       const emit = () => {
         if (ready.size !== keys.length) return;
-        callback({ ...state, legacySeasons: state.legacySeasons, fixtures: state.fixtures || {}, leagueRules: rulesOf(state), season: state.season || { name: DEFAULT_SEASON_NAME }, seasons: state.seasons || {}, schedules: state.schedules || {} });
+        callback({ ...state, legacySeasons: state.legacySeasons, fixtures: state.fixtures || {}, leagueRules: rulesOf(state), season: state.season || { name: DEFAULT_SEASON_NAME }, seasons: state.seasons || {}, schedules: state.schedules || {}, unavailable: [...unavailable] });
         if (!state.settings && !bootstrapAttempted) {
           bootstrapAttempted = true;
           httpsCallable(functions, 'bootstrapTournament')({}).catch(error => {
@@ -59,7 +59,7 @@ export function createFirebaseService() {
       };
       const off = keys.map(key => onValue(ref(database, `${ROOT}/${key}`), snapshot => { state[key] = snapshot.val() ?? (key === 'configRevision' ? 0 : key === 'settings' ? null : {}); ready.add(key); emit(); }, error => onError(new Error(rulesHint(error, ROOT)))));
       // League data loads on its own so a missing database rule for it never blocks the core tournament data.
-      for (const key of ['fixtures', 'leagueRules', 'season', 'seasons', 'schedules', 'earlyBird', 'calendar', 'partnerPosts']) off.push(onValue(ref(database, `${ROOT}/${key}`), snapshot => { state[key] = snapshot.val() || undefined; emit(); }, () => { state[key] = undefined; emit(); }));
+      for (const key of ['fixtures', 'leagueRules', 'season', 'seasons', 'schedules', 'earlyBird', 'calendar', 'partnerPosts']) off.push(onValue(ref(database, `${ROOT}/${key}`), snapshot => { unavailable.delete(key); state[key] = snapshot.val() || undefined; emit(); }, () => { unavailable.add(key); state[key] = undefined; emit(); }));  // unreadable is not the same as empty: the admin forms refuse to save defaults over it
       // Season 1 (legacy) lives in the same database at its own configurable path.
       off.push(onValue(ref(database, paths.season1), snapshot => { state.legacySeasons = snapshot.exists() ? { s1: snapshot.val() } : undefined; emit(); }, () => { state.legacySeasons = undefined; emit(); }));
       return () => off.forEach(unsubscribe => unsubscribe());

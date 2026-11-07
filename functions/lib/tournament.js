@@ -154,11 +154,26 @@ export function bootstrapState(current) {
 }
 // The shared libraries report problems as plain errors named ValidationError; the server only shows a clear message for the real class.
 export function guard(fn) { try { return fn(); } catch (error) { if (error?.name === 'ValidationError' && !(error instanceof ValidationError)) throw new ValidationError(error.message); throw error; } }
+// Optimistic concurrency for the small admin records (calendar, early bird, league rules). The record carries a `revision`; a save
+// names the revision it was based on and is refused if someone saved in between. A request without one is still accepted so an
+// older page keeps working during a rollout.
+export function splitRevision(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return { fields: payload, expected: undefined };
+  const { expectedRevision, ...fields } = payload;
+  return { fields, expected: expectedRevision };
+}
+export function checkRevision(record, expected, label) {
+  if (expected === undefined) return (record?.revision || 0) + 1;
+  assert(Number.isInteger(expected) && expected >= 0, 'Invalid revision.');
+  assert(expected === (record?.revision || 0), `${label} was changed in another session. Reload it before saving.`);
+  return expected + 1;
+}
 export function applyCalendar(current, payload) {
   assert(current?.settings, 'Save the initial tournament configuration first.');
-  const calendar = guard(() => validateCalendar(payload)), state = structuredClone(current);
-  state.calendar = calendar;
-  return { state, result: { calendar } };
+  const { fields, expected } = splitRevision(payload), revision = checkRevision(current.calendar, expected, 'The calendar');
+  const calendar = guard(() => validateCalendar(fields)), state = structuredClone(current);
+  state.calendar = { ...calendar, revision };
+  return { state, result: { calendar, revision } };
 }
 export function publicState(state) { return { calendar: calendarOf(state), partnerPosts: state.partnerPosts || {}, earlyBird: state.earlyBird, settings: state.settings, tierConfig: state.tierConfig || {}, configRevision: state.configRevision || 0, tiers: state.tiers || {}, fixtures: state.fixtures || {}, leagueRules: rulesOf(state), season: state.season || { name: DEFAULT_SEASON_NAME }, seasons: state.seasons || {}, schedules: state.schedules || {} }; }
 function canonical(value) { return JSON.stringify(value, (_, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).filter(key => item[key] !== null && item[key] !== undefined).sort().map(key => [key, item[key]])) : item); }
@@ -229,10 +244,11 @@ export function applyRegistration(current, payload, uid, now = Date.now(), login
 }
 // Admin: the early-bird dates and late surcharge (shown on the rules, the registration page and a site-wide bar).
 export function applyEarlyBird(current, payload) {
+  const { fields, expected } = splitRevision(payload), revision = checkRevision(current?.earlyBird, expected, 'The early-bird settings');
   let plan;
-  try { plan = validateEarlyBird(payload); }
+  try { plan = validateEarlyBird(fields); }
   catch (error) { throw new ValidationError(error.message); }   // so the server answers with the clear message, not "internal"
-  return { state: { ...structuredClone(current || initialState()), earlyBird: plan }, result: { earlyBird: plan } };
+  return { state: { ...structuredClone(current || initialState()), earlyBird: { ...plan, revision } }, result: { earlyBird: plan, revision } };
 }
 export function applyConfiguration(current, payload) {
   exact(payload, ['settings', 'tierConfig', 'expectedRevision'], 'Invalid configuration request.');
@@ -288,8 +304,9 @@ export function validateLeagueRules(value) {
 }
 export function applyLeagueRules(current, payload) {
   assert(current?.settings, 'Save the initial tournament configuration first.');
+  const { fields, expected } = splitRevision(payload), revision = checkRevision(current.leagueRules, expected, 'The league rules');
   const state = structuredClone(current);
-  state.leagueRules = validateLeagueRules(payload);
+  state.leagueRules = { ...validateLeagueRules(fields), revision };
   const promoted = promoteWaitlist(state);   // a higher limit seats waiting teams straight away
-  return { state, result: { leagueRules: state.leagueRules, promoted } };
+  return { state, result: { leagueRules: state.leagueRules, promoted, revision } };
 }

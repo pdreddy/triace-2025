@@ -1,21 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useRevisionedDraft } from '../hooks/useRevisionedDraft';
 import { Field, Message } from './UI';
 import { DEFAULT_EARLY_BIRD, earlyBirdStatus, validateEarlyBird } from '../config/earlyBird.js';
 
 // Admin → Early-bird registration: turn it on or off, set the dates and the late surcharge. Saved to the database, so no rebuild is needed.
-export default function EarlyBirdAdmin({ service, saved, disabled }) {
-  const plan = { ...DEFAULT_EARLY_BIRD, ...(saved || {}) };
-  const [draft, setDraft] = useState({ ...plan, surchargeUsd: String(plan.surchargeUsd) }), [dirty, setDirty] = useState(false);
+const toDraft = saved => { const { revision, ...plan } = { ...DEFAULT_EARLY_BIRD, ...(saved || {}) }; return { ...plan, surchargeUsd: String(plan.surchargeUsd) }; };
+
+export default function EarlyBirdAdmin({ service, saved, disabled: off, unavailable = false }) {
+  const disabled = off || unavailable;
+  const { draft, dirty, conflict, expectedRevision, edit: change, markSaved, reload } = useRevisionedDraft(saved, toDraft);
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [message, setMessage] = useState('');
-  useEffect(() => { if (!dirty) setDraft({ ...plan, surchargeUsd: String(plan.surchargeUsd) }); }, [saved, dirty]);   // eslint-disable-line react-hooks/exhaustive-deps
-  const edit = (key, value) => { setDraft(old => ({ ...old, [key]: value })); setDirty(true); setMessage(''); setError(''); };
+  const edit = (key, value) => { change(key, value); setMessage(''); setError(''); };
   const candidate = { enabled: draft.enabled, opens: draft.opens, ends: draft.ends, surchargeUsd: draft.surchargeUsd.trim() === '' ? NaN : Number(draft.surchargeUsd) };
   let problem = '', preview = null;
   try { preview = earlyBirdStatus(validateEarlyBird(candidate)); } catch (e) { problem = e.message; }
 
   async function save() {
     setBusy(true); setError(''); setMessage('');
-    try { await service.saveEarlyBird(validateEarlyBird(candidate)); setDirty(false); setMessage('Early-bird settings saved. Every page updates right away.'); }
+    try { const result = await service.saveEarlyBird({ ...validateEarlyBird(candidate), expectedRevision }); markSaved(result?.revision); setMessage('Early-bird settings saved. Every page updates right away.'); }
     catch (e) { setError(e.message); } finally { setBusy(false); }
   }
   return (
@@ -30,10 +32,12 @@ export default function EarlyBirdAdmin({ service, saved, disabled }) {
       </div>
       {preview && preview.phase !== 'off' && <p className="early-preview"><b>Visitors will see:</b> {preview.headline}. {preview.detail}</p>}
       {preview && preview.phase === 'off' && <p className="early-preview">Early bird is off: nothing is shown to visitors.</p>}
+      {unavailable && <Message error>The saved early-bird settings could not be read, so saving is turned off. Check the connection and reload.</Message>}
+      {conflict && <Message error>Another admin saved these settings while you were editing. <button type="button" className="text-link" onClick={reload}>Discard my changes and reload</button></Message>}
       <Message error>{problem && dirty ? problem : error}</Message>
       <Message>{message}</Message>
       <div className="card-actions">
-        <button type="button" className="button" disabled={disabled || busy || !dirty || !!problem} onClick={save}>{busy ? 'Saving…' : 'Save early-bird settings'}</button>
+        <button type="button" className="button" disabled={disabled || busy || !dirty || !!problem || conflict} onClick={save}>{busy ? 'Saving…' : 'Save early-bird settings'}</button>
       </div>
     </section>
   );

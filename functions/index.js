@@ -10,6 +10,7 @@ import { applyRegistration, applyEarlyBird, applyConfiguration, applyRecalculati
 import { applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult, applyManageSeason, applySetSchedule, applyMoveFixture, applyIssueChallenge, applyUpdateTeam, applyLinkPprc, applyWithdrawTeam, applySetCaptainLogin, applyAutoSchedule, applyAddBuffer } from './lib/league.js';
 import { applyUtrUpdates, validateUtrUpdates } from './lib/pprcSync.js';
 import { clean } from './lib/pprcImport.js';
+import { adminStatus } from './lib/adminAccess.js';
 import { adminEmail, adminUsername, validateAdminUsername, newAdminPassword, checkRemoval } from './lib/admins.js';
 import { getAuth } from 'firebase-admin/auth';
 import { usernameAttempt, newPassword, loginNames, captainUid, loginEmail } from './lib/captainLogin.js';
@@ -20,12 +21,23 @@ initializeApp();
 // TRAICE_DB_ROOT / TRAICE_DB_SEASON1_PATH come from functions/.env (see functions/.env.example).
 const paths = resolveDbPaths({ root: process.env.TRAICE_DB_ROOT, season1: process.env.TRAICE_DB_SEASON1_PATH });
 const options = { region: 'us-central1', maxInstances: 10, timeoutSeconds: 60 };
-function requireAuth(request, admin = false) {
+function requireAuth(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in to continue.');
-  if (admin && request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access is required.');
 }
+// The token's admin claim is only a hint (it can be an hour old); the account record decides, so removing an admin takes effect at once.
+async function currentAdmin(request) {
+  if (request.auth?.token?.admin !== true) return false;
+  return adminStatus(await getAuth().getUser(request.auth.uid).catch(() => null), request.auth.token).admin;
+}
+async function requireAdmin(request) {
+  requireAuth(request);
+  if (!(await currentAdmin(request))) throw new HttpsError('permission-denied', 'Administrator access is required.');
+}
+// `operation(state, { now })`: the time (and any random id the caller made beforehand) is fixed once per request, so every
+// retry of the transaction computes exactly the same result from the same inputs.
 async function mutate(operation) {
-  let outcome, updateError;
+  let outcome, updateError, attempts = 0, rootBytes = 0;
+  const startedAt = Date.now(), ctx = { now: startedAt };
   const root = getDatabase().ref(paths.root);
   let listener;
   try {
@@ -33,11 +45,15 @@ async function mutate(operation) {
     // state rather than an empty local cache. Root reads use the Admin SDK only.
     await new Promise((resolve, reject) => { listener = () => resolve(); root.on('value', listener, reject); });
     const transaction = await root.transaction(current => {
-      try { const result = operation(current); updateError = null; outcome = result.result; return result.state; }
+      attempts++;
+      try { if (attempts > 1) rootBytes = JSON.stringify(current ?? null).length; const result = operation(current, ctx); updateError = null; outcome = result.result; return result.state; }
       catch (error) { updateError = error; return undefined; }
     }, undefined, false);
     if (!transaction.committed && updateError) throw updateError;
     if (!transaction.committed) throw new HttpsError('aborted', 'The update could not complete. Please retry.');
+    // Contention is measured, not guessed: retries mean unrelated writes collided on the tournament root.
+    const elapsed = Date.now() - startedAt;
+    if (attempts > 1 || elapsed > 3000) console.info('Tournament transaction', { attempts, elapsedMs: elapsed, rootBytes: rootBytes || undefined });
     return outcome;
   } catch (error) {
     if (error instanceof HttpsError) throw error;
@@ -55,7 +71,7 @@ export const bootstrapTournament = onCall(options, async () => {
   return mutate(bootstrapState);
 });
 export const importSeason1 = onCall(options, async request => {
-  requireAuth(request, true);
+  await requireAdmin(request);
   try { validateLegacySeason(request.data?.season); } catch (error) { throw new HttpsError('failed-precondition', error.message); }
   const target = getDatabase().ref(paths.season1), existing = (await target.get()).val();
   // Defence in depth: only ever replace a previous Season 1 import, never other data that happens to sit at the path.
@@ -83,38 +99,37 @@ export const registerTeam = onCall(options, async request => {
     teamId, names: loginNames(request.data),
     createAccount: createCaptainAccount,
     deleteAccount: uid => getAuth().deleteUser(uid),
-    register: login => mutate(state => applyRegistration(state, request.data, request.auth.uid, Date.now(), login)),
+    register: login => mutate((state, { now }) => applyRegistration(state, request.data, request.auth.uid, now, login)),
     log: error => console.error('Captain login provisioning needs reconciliation', { code: error?.code })
   });
 });
-export const saveConfiguration = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyConfiguration(state, request.data)); });
-export const recalculateTiers = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyRecalculation(state)); });
-export const generateFixtures = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyGenerateFixtures(state, request.data)); });
+export const saveConfiguration = onCall(options, async request => { await requireAdmin(request); return mutate(state => applyConfiguration(state, request.data)); });
+export const recalculateTiers = onCall(options, async request => { await requireAdmin(request); return mutate(state => applyRecalculation(state)); });
+export const generateFixtures = onCall(options, async request => { await requireAdmin(request); return mutate(state => applyGenerateFixtures(state, request.data)); });
 export const submitResult = onCall(options, async request => { requireAuth(request); return mutate(state => applySubmitResult(state, request.data, request.auth.uid, request.auth.token.admin === true)); });
-export const reviewResult = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyReviewResult(state, request.data)); });
-export const generatePlayoffs = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyGeneratePlayoffs(state, request.data)); });
+export const reviewResult = onCall(options, async request => { await requireAdmin(request); return mutate(state => applyReviewResult(state, request.data)); });
+export const generatePlayoffs = onCall(options, async request => { await requireAdmin(request); return mutate(state => applyGeneratePlayoffs(state, request.data)); });
 // Find a partner: public posts, private contact details, and a swap of WhatsApp numbers when someone replies.
 const newId = () => randomUUID().replaceAll('-', '').slice(0, 20);
-export const createPartnerPost = onCall(options, async request => { requireAuth(request); return mutate(state => applyCreatePost(state, request.data, request.auth.uid, Date.now(), newId())); });
-export const expressInterest = onCall(options, async request => { requireAuth(request); return mutate(state => applyExpressInterest(state, request.data, request.auth.uid, Date.now(), newId())); });
+export const createPartnerPost = onCall(options, async request => { requireAuth(request); const id = newId(); return mutate((state, { now }) => applyCreatePost(state, request.data, request.auth.uid, now, id)); });
+export const expressInterest = onCall(options, async request => { requireAuth(request); const id = newId(); return mutate((state, { now }) => applyExpressInterest(state, request.data, request.auth.uid, now, id)); });
 export const closePartnerPost = onCall(options, async request => { requireAuth(request); return mutate(state => applyClosePost(state, request.data, request.auth.uid, request.auth?.token?.admin === true)); });
 export const markPartnerPicked = onCall(options, async request => { requireAuth(request); return mutate(state => applyMarkPicked(state, request.data, request.auth.uid, request.auth?.token?.admin === true)); });
 export const reopenPartnerPost = onCall(options, async request => { requireAuth(request); return mutate(state => applyReopenPost(state, request.data, request.auth.uid, request.auth?.token?.admin === true)); });
-export const saveEarlyBird = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyEarlyBird(state, request.data)); });
-export const saveCalendar = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyCalendar(state, request.data)); });
-export const autoSchedule = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyAutoSchedule(state, request.data)); });
-export const addBufferWeeks = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyAddBuffer(state, request.data)); });
-export const saveLeagueRules = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyLeagueRules(state, request.data)); });
-export const manageSeason = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyManageSeason(state, request.data)); });
-const isAdmin = request => request.auth?.token?.admin === true;
-export const setSchedule = onCall(options, async request => { requireAuth(request, true); return mutate(state => applySetSchedule(state, request.data)); });
-export const moveFixture = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyMoveFixture(state, request.data)); });
-export const issueChallenge = onCall(options, async request => { requireAuth(request); return mutate(state => applyIssueChallenge(state, request.data, request.auth.uid, isAdmin(request))); });
-export const updateTeam = onCall(options, async request => { requireAuth(request); return mutate(state => applyUpdateTeam(state, request.data, request.auth.uid, isAdmin(request))); });
+export const saveEarlyBird = onCall(options, async request => { await requireAdmin(request); return mutate(state => applyEarlyBird(state, request.data)); });
+export const saveCalendar = onCall(options, async request => { await requireAdmin(request); return mutate(state => applyCalendar(state, request.data)); });
+export const autoSchedule = onCall(options, async request => { await requireAdmin(request); return mutate(state => applyAutoSchedule(state, request.data)); });
+export const addBufferWeeks = onCall(options, async request => { await requireAdmin(request); return mutate(state => applyAddBuffer(state, request.data)); });
+export const saveLeagueRules = onCall(options, async request => { await requireAdmin(request); return mutate(state => applyLeagueRules(state, request.data)); });
+export const manageSeason = onCall(options, async request => { await requireAdmin(request); return mutate(state => applyManageSeason(state, request.data)); });
+export const setSchedule = onCall(options, async request => { await requireAdmin(request); return mutate(state => applySetSchedule(state, request.data)); });
+export const moveFixture = onCall(options, async request => { await requireAdmin(request); return mutate(state => applyMoveFixture(state, request.data)); });
+export const issueChallenge = onCall(options, async request => { requireAuth(request); const admin = await currentAdmin(request); return mutate(state => applyIssueChallenge(state, request.data, request.auth.uid, admin)); });
+export const updateTeam = onCall(options, async request => { requireAuth(request); const admin = await currentAdmin(request); return mutate(state => applyUpdateTeam(state, request.data, request.auth.uid, admin)); });
 // Admin: update PPRC players' UTRs from a file (the browser has already matched the names), then re-rate everyone from the
 // stored matches. Writes only under pprcMaster (and an import log); never touches clubs or traice2_0.
 export const syncPprcUtr = onCall({ ...options, timeoutSeconds: 120, memory: '512MiB' }, async request => {
-  requireAuth(request, true);
+  await requireAdmin(request);
   let updates;
   try { updates = validateUtrUpdates(request.data?.updates); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
   const db = getDatabase(), read = async path => (await db.ref(path).get()).val() || {};
@@ -131,16 +146,17 @@ export const syncPprcUtr = onCall({ ...options, timeoutSeconds: 120, memory: '51
   await db.ref(`importLog/${Date.now()}`).set({ at: Date.now(), source: 'utr upload', by: request.auth.uid, ...result.summary });
   return result.summary;
 });
-export const linkPprc = onCall(options, async request => { requireAuth(request); return mutate(state => applyLinkPprc(state, request.data, isAdmin(request))); });
+export const linkPprc = onCall(options, async request => { requireAuth(request); const admin = await currentAdmin(request); return mutate(state => applyLinkPprc(state, request.data, admin)); });
 export const withdrawTeam = onCall(options, async request => {
   requireAuth(request);
-  const result = await mutate(state => applyWithdrawTeam(state, request.data, request.auth.uid, isAdmin(request)));
+  const admin = await currentAdmin(request);
+  const result = await mutate(state => applyWithdrawTeam(state, request.data, request.auth.uid, admin));
   await getAuth().deleteUser(captainUid(result.teamId)).catch(() => {});   // the team is gone, so is its login
   return result;
 });
 // Admin: give a team's captain a new password (and sign out their old sessions). The password is returned once and never stored.
 export const resetCaptainLogin = onCall(options, async request => {
-  requireAuth(request, true);
+  await requireAdmin(request);
   const teamId = request.data?.teamId;
   if (typeof teamId !== 'string' || !TEAM_ID.test(teamId)) throw new HttpsError('invalid-argument', 'Choose a team.');
   const record = (await getDatabase().ref(`${paths.root}/registrations/${teamId}`).get()).val();
@@ -172,11 +188,11 @@ async function listAdminUsers() {
 }
 const asRefusal = fn => { try { return fn(); } catch (error) { throw new HttpsError('failed-precondition', error.message); } };
 export const listAdmins = onCall(options, async request => {
-  requireAuth(request, true);
+  await requireAdmin(request);
   return { admins: (await listAdminUsers()).map(a => ({ ...a, you: a.uid === request.auth.uid })) };
 });
 export const createAdmin = onCall(options, async request => {
-  requireAuth(request, true);
+  await requireAdmin(request);
   const username = asRefusal(() => validateAdminUsername(request.data?.username)), password = newAdminPassword(max => randomInt(max));
   try {
     const user = await getAuth().createUser({ email: adminEmail(username), password, displayName: `${username} (admin)` });
@@ -189,7 +205,7 @@ export const createAdmin = onCall(options, async request => {
   }
 });
 export const resetAdminPassword = onCall(options, async request => {
-  requireAuth(request, true);
+  await requireAdmin(request);
   const uid = request.data?.uid;
   if (typeof uid !== 'string' || !uid || uid.length > 128) throw new HttpsError('invalid-argument', 'Choose an admin.');
   const admins = await listAdminUsers(), admin = admins.find(a => a.uid === uid);
@@ -199,7 +215,7 @@ export const resetAdminPassword = onCall(options, async request => {
   return { uid, username: admin.username, password };
 });
 export const removeAdmin = onCall(options, async request => {
-  requireAuth(request, true);
+  await requireAdmin(request);
   const uid = request.data?.uid;
   if (typeof uid !== 'string' || !uid || uid.length > 128) throw new HttpsError('invalid-argument', 'Choose an admin.');
   const admins = await listAdminUsers();
@@ -233,7 +249,7 @@ export const scheduledBackup = onSchedule({ schedule: 'every 6 hours', region: '
   catch (error) { console.error('Scheduled backup failed', { name: error.name, code: error.code, message: error.message }); throw error; }
 });
 export const backupNow = onCall(options, async request => {
-  requireAuth(request, true);
+  await requireAdmin(request);
   try { return await runBackup(); }
   catch (error) {
     if (error instanceof HttpsError) throw error;

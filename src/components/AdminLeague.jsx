@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useRevisionedDraft } from '../hooks/useRevisionedDraft';
 import { Link } from 'react-router-dom';
 import { Field } from './UI';
 import { teamName, playerName } from './League';
@@ -6,23 +7,24 @@ import { formatUtr, parseUtr, DEFAULT_LEAGUE_RULES } from '../../functions/lib/t
 import { ROLES, playoffSpots, singlesEligibility, standings } from '../../functions/lib/league.js';
 
 // Every league rule the admin controls. The rules cards, registration, standings and playoffs read these.
-export function LeagueRulesCard({ rules = DEFAULT_LEAGUE_RULES, busy, onSave }) {
-  const toDraft = r => ({ ...r, utrGapLimit: formatUtr(r.utrGapLimit) });
-  const [draft, setDraft] = useState(() => toDraft(rules)), [dirty, setDirty] = useState(false);
-  useEffect(() => { if (!dirty) setDraft(toDraft(rules)); }, [rules, dirty]);
-  const set = (key, value) => { setDraft(old => ({ ...old, [key]: value })); setDirty(true); };
+const rulesDraft = r => { const { revision, ...rest } = r || DEFAULT_LEAGUE_RULES; return { ...rest, utrGapLimit: formatUtr(rest.utrGapLimit) }; };
+export function LeagueRulesCard({ rules = DEFAULT_LEAGUE_RULES, busy: working, onSave, unavailable = false }) {
+  const busy = working || unavailable;
+  const { draft, dirty, conflict, expectedRevision, edit: set, markSaved, reload } = useRevisionedDraft(rules, rulesDraft);
   const number = key => ({ value: draft[key], onChange: e => set(key, e.target.value) });
   async function save(event) {
     event.preventDefault();
     let gap; try { gap = parseUtr(draft.utrGapLimit); } catch { gap = -1; }
     const numbers = ['pointsPerWin', 'playoffThreshold', 'playoffSpotsLarge', 'playoffSpotsSmall', 'singlesMinPercent', 'tierCapacity', 'challengerFrom', 'challengerTo', 'targetFrom', 'targetTo', 'challengeCutoffRounds'];
-    const ok = await onSave({ utrGapLimit: gap, challengeEnabled: !!draft.challengeEnabled, ...Object.fromEntries(numbers.map(k => [k, Number(draft[k])])) });
-    if (ok) setDirty(false);
+    const ok = await onSave({ expectedRevision, utrGapLimit: gap, challengeEnabled: !!draft.challengeEnabled, ...Object.fromEntries(numbers.map(k => [k, Number(draft[k])])) });
+    if (ok) markSaved(ok.revision);
   }
   const spots = key => <select id={key} value={draft[key]} onChange={e => set(key, e.target.value)}>{[2, 3, 4].map(n => <option key={n} value={n}>Top {n}</option>)}</select>;
   return (
     <form className="card" onSubmit={save} aria-label="League rules">
       <div className="card-head"><h3>League rules</h3><span className="pill">{dirty ? 'Unsaved' : 'Saved'}</span></div>
+      {unavailable && <p className="message error">The saved league rules could not be read, so saving is turned off. Check the connection and reload.</p>}
+      {conflict && <p className="message error">Another admin saved the league rules while you were editing. <button type="button" className="text-link" onClick={reload}>Discard my changes and reload</button></p>}
       <p className="small note">These values drive the rules cards, registration ratings, standings, playoff spots and the singles check. Saved changes show everywhere immediately; run Recalculate Tiers after changing the gap so existing teams are re-rated.</p>
       <fieldset disabled={busy} className="rules-grid">
         <Field id="rule-gap" label="Singles/doubles gap before averaging (UTR)" type="number" min="0" max="16.5" step="0.01" required {...number('utrGapLimit')} />
@@ -44,7 +46,7 @@ export function LeagueRulesCard({ rules = DEFAULT_LEAGUE_RULES, busy, onSave }) 
         <Field id="rule-cutoff" label="Closed for the last N rounds" type="number" min="0" max="52" required {...number('challengeCutoffRounds')} />
         </div>
       </fieldset>
-      <button className="button small" disabled={busy || !dirty}>Save league rules</button>
+      <button className="button small" disabled={busy || !dirty || conflict}>Save league rules</button>
     </form>
   );
 }

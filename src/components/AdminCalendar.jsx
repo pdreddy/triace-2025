@@ -1,17 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useRevisionedDraft } from '../hooks/useRevisionedDraft';
 import { Field, Message } from './UI';
 import { DEFAULT_CALENDAR, validateCalendar, bufferText, roundStart, addDays } from '../config/calendar.js';
 
-const form = calendar => ({ ...calendar, buffers: bufferText(calendar.buffers), roundDays: String(calendar.roundDays), playoffGapWeeks: String(calendar.playoffGapWeeks) });
+const form = saved => { const { revision, ...calendar } = { ...DEFAULT_CALENDAR, ...(saved || {}) }; return { ...calendar, buffers: bufferText(calendar.buffers), roundDays: String(calendar.roundDays), playoffGapWeeks: String(calendar.playoffGapWeeks) }; };
 const longDay = day => day ? new Date(`${day}T12:00:00Z`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }) : '—';
 
 // Admin → Dates: every date in one place. The season calendar drives "Auto-schedule" (fixtures + dated rounds for every tier, buffer weeks included).
-export default function AdminCalendar({ service, saved, tiers, disabled }) {
-  const calendar = { ...DEFAULT_CALENDAR, ...(saved || {}) };
-  const [draft, setDraft] = useState(form(calendar)), [dirty, setDirty] = useState(false), [busy, setBusy] = useState(false);
+export default function AdminCalendar({ service, saved, tiers, disabled: off, unavailable = false }) {
+  const disabled = off || unavailable, calendar = { ...DEFAULT_CALENDAR, ...(saved || {}) };
+  const { draft, dirty, conflict, expectedRevision, edit: change, markSaved, reload } = useRevisionedDraft(saved, form), [busy, setBusy] = useState(false);
   const [error, setError] = useState(''), [message, setMessage] = useState(''), [outcome, setOutcome] = useState(null), [extra, setExtra] = useState({ afterRound: '', weeks: '1' });
-  useEffect(() => { if (!dirty) setDraft(form(calendar)); }, [saved, dirty]);   // eslint-disable-line react-hooks/exhaustive-deps
-  const edit = (key, value) => { setDraft(old => ({ ...old, [key]: value })); setDirty(true); setMessage(''); setError(''); };
+  const edit = (key, value) => { change(key, value); setMessage(''); setError(''); };
   let valid = null, problem = '';
   try { valid = validateCalendar({ ...draft, roundDays: Number(draft.roundDays), playoffGapWeeks: Number(draft.playoffGapWeeks) }); } catch (e) { problem = e.message; }
   const maxTeams = Math.max(0, ...tiers.map(t => t.teams));
@@ -23,7 +23,7 @@ export default function AdminCalendar({ service, saved, tiers, disabled }) {
     setBusy(true); setError(''); setMessage('');
     try { const result = await work(); setMessage(done(result)); return result; } catch (e) { setError(e.message); } finally { setBusy(false); }
   }
-  const save = () => run(async () => { await service.saveCalendar(valid); setDirty(false); }, () => 'Calendar saved. Registration follows these dates from now on.');
+  const save = () => run(async () => { const result = await service.saveCalendar({ ...valid, expectedRevision }); markSaved(result?.revision); }, () => 'Calendar saved. Registration follows these dates from now on.');
   const auto = async () => {
     if (!window.confirm('Create fixtures for every tier that has none and date every round from this calendar? Results that are already in are never deleted.')) return;
     const result = await run(() => service.autoSchedule({}), r => `Scheduled ${r.tiers.filter(t => !t.skipped).length} tier(s).`);
@@ -44,10 +44,12 @@ export default function AdminCalendar({ service, saved, tiers, disabled }) {
         <Field id="cal-buffers" label="Buffer weeks" value={draft.buffers} disabled={disabled} onChange={e => edit('buffers', e.target.value)} hint="round:weeks, e.g. 3:1, 6:2 = one free week after round 3, two after round 6." />
       </div>
       {preview.length > 0 && <p className="early-preview"><b>Round dates:</b> {preview.map((d, i) => `R${i + 1} ${longDay(d).replace(/, \d{4}$/, '')}`).join(' · ')} · <b>Playoffs from</b> {longDay(playoffs)}</p>}
+      {unavailable && <Message error>The saved calendar could not be read, so saving is turned off. Check the connection and reload.</Message>}
+      {conflict && <Message error>Another admin saved the calendar while you were editing. <button type="button" className="text-link" onClick={reload}>Discard my changes and reload</button></Message>}
       <Message error>{problem && dirty ? problem : error}</Message>
       <Message>{message}</Message>
       <div className="card-actions">
-        <button type="button" className="button" disabled={disabled || busy || !dirty || !!problem} onClick={save}>{busy ? 'Working…' : 'Save calendar'}</button>
+        <button type="button" className="button" disabled={disabled || busy || !dirty || !!problem || conflict} onClick={save}>{busy ? 'Working…' : 'Save calendar'}</button>
         <button type="button" className="secondary" disabled={disabled || busy || dirty || !calendar.seasonStart} onClick={auto} title={dirty ? 'Save the calendar first' : ''}>Auto-schedule all tiers</button>
       </div>
       {dirty && <p className="small note">Save the calendar before auto-scheduling.</p>}

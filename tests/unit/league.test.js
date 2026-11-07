@@ -178,7 +178,7 @@ test('league rules are validated, saved and change ratings, points and playoff s
     assert.throws(() => applyLeagueRules(base, bad));
   const rules = { ...DEFAULT_LEAGUE_RULES, utrGapLimit: 250, pointsPerWin: 3, playoffThreshold: 3, playoffSpotsLarge: 2 };
   const state = applyLeagueRules(base, rules).state;
-  assert.deepEqual(publicState(state).leagueRules, rules);
+  assert.deepEqual(publicState(state).leagueRules, { ...rules, revision: 1 });
   assert.deepEqual(publicState(initialState()).leagueRules, DEFAULT_LEAGUE_RULES, 'older data falls back to defaults');
   const p = team('Gap', 'team_gap0000000000000000', [500, 600, 600]); p.captain.doublesUtr = 700;
   assert.equal(applyRegistration(state, p, 'u').state.registrations.team_gap0000000000000000.captain.utr, 700, 'a 2.00 gap no longer averages when the limit is 2.50');

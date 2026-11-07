@@ -118,7 +118,7 @@ export default function Admin() {
     if (hasResults && !window.confirm(`Replace the ${tier.name} playoffs? Their results will be deleted.`)) return;
     return attempt(async () => { await service.generatePlayoffs({ tierId: tier.id, seeds }); setMessage(`${tier.name} playoffs created.`); });
   }
-  const saveRules = rules => attempt(async () => { const r = await service.saveLeagueRules(rules); setMessage(`League rules saved. Rules cards, standings and playoffs now use them.${r?.promoted?.length ? ` Moved up from the waitlist: ${r.promoted.map(p => `${p.captainFirstName}’s team`).join(', ')}. Message them on WhatsApp.` : ''}`); });
+  const saveRules = async rules => { let saved = null; await attempt(async () => { const r = await service.saveLeagueRules(rules); saved = r || {}; setMessage(`League rules saved. Rules cards, standings and playoffs now use them.${r?.promoted?.length ? ` Moved up from the waitlist: ${r.promoted.map(p => `${p.captainFirstName}’s team`).join(', ')}. Message them on WhatsApp.` : ''}`); }); return saved; };
   const renameSeason = name => attempt(async () => { await service.manageSeason({ action: 'rename', name }); setMessage('Season renamed.'); });
   const archiveSeason = (name, confirm) => attempt(async () => { await service.manageSeason({ action: 'archive', name, confirm }); setMessage(`Season saved to the history. ${name} has started; registration is open to new teams.`); });
   function review(tierId, fixtureId, approve) {
@@ -231,7 +231,7 @@ export default function Admin() {
             </fieldset>
           </form>
 
-          <EarlyBirdAdmin service={service} saved={data?.earlyBird} disabled={busy || !connected || !data} />
+          <EarlyBirdAdmin service={service} saved={data?.earlyBird} unavailable={!!data?.unavailable?.includes('earlyBird')} disabled={busy || !connected || !data} />
 
           <section className="recalculate pane pane-tiers">
             <div>
@@ -292,12 +292,12 @@ export default function Admin() {
           })}
 
           <SectionTitle id="calendar" num="04">Dates &amp; schedule</SectionTitle>
-          <AdminCalendar service={service} saved={data?.calendar} tiers={liveTiers.map(t => ({ id: t.id, name: t.name, teams: Object.keys(data?.tiers?.[t.id]?.teams || {}).length }))} disabled={busy || !connected || !data?.settings} />
+          <AdminCalendar service={service} saved={data?.calendar} unavailable={!!data?.unavailable?.includes('calendar')} tiers={liveTiers.map(t => ({ id: t.id, name: t.name, teams: Object.keys(data?.tiers?.[t.id]?.teams || {}).length }))} disabled={busy || !connected || !data?.settings} />
 
           <SectionTitle id="league" num="05">League &amp; results</SectionTitle>
           <p className="small note pane pane-league">Every league rule is set here. Create each tier’s round-robin schedule once its teams are final, then map the playoffs. Captains submit scores from the League page; they count once you approve them. You can also enter or correct any result there.</p>
           <div className="league-admin pane pane-league">
-            <LeagueRulesCard rules={data?.leagueRules} busy={busy || !connected || !data?.settings} onSave={saveRules} />
+            <LeagueRulesCard rules={data?.leagueRules} busy={busy || !connected || !data?.settings} unavailable={!!data?.unavailable?.includes('leagueRules')} onSave={saveRules} />
             {data?.season && <SeasonCard season={data.season} seasons={data.seasons} busy={busy || !connected || !data?.settings} onRename={renameSeason} onArchive={archiveSeason} />}
             {liveTiers.map(tier => {
               const fixtures = Object.values(data?.fixtures?.[tier.id] || {}), teamCount = Object.keys(data?.tiers?.[tier.id]?.teams || {}).length;
