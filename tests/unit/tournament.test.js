@@ -42,3 +42,25 @@ test('a registration can link its players to the shared PPRC list; the links sta
   assert.equal(publicRecord(saved.registrations.team_1234567890123456, saved.settings).pprcIds, undefined);
 });
 test('captain-only CSV leaves out both Aces',()=>{const {state}=applyRegistration(initialState(),payload(),'u',1000);const full=registrationsCsv(state.registrations,state.tierConfig),captain=registrationsCsv(state.registrations,state.tierConfig,{captainOnly:true});assert.match(full,/Ace 1 full name/);assert.doesNotMatch(captain,/Ace|Secret|WhatsApp"?,"?Ace/);assert.match(captain.split('\r\n')[0],/Captain first name.*Captain UTR.*Combined UTR/);assert.equal(captain.split('\r\n')[0].split(',').length,full.split('\r\n')[0].split(',').length-6);});
+
+import { buildDemoStateFromCsv } from '../../functions/lib/demoSeed.js';
+test('the demo can be loaded with the real teams from the admin CSV export', () => {
+  const real = (name, values) => ({ ...payload(values, 'higher', `real_team_${name}_12345678`), captain: { firstName: name, singlesUtr: values[0], doublesUtr: null }, ace1: { fullName: `${name} Ace One`, singlesUtr: values[1], doublesUtr: null }, ace2: { fullName: `${name} Ace Two`, singlesUtr: values[2], doublesUtr: null } });
+  let state = initialState();
+  [real('Alpha', [600, 650, 700]), real('Bravo', [550, 600, 650]), real('Charlie', [500, 500, 500]), real('Delta', [1000, 1000, 1000])].forEach((p, i) => { try { state = applyRegistration(state, p, `u${i}`, 100 + i).state; } catch { /* a team that fits no tier is not registered */ } });
+  const csv = registrationsCsv(state.registrations, state.tierConfig);
+  const count = Object.keys(state.registrations).length;
+  assert.ok(count >= 3);
+  const { state: demo, summary } = buildDemoStateFromCsv(csv);
+  assert.equal(summary.teams, count, 'every exported team is in the demo');
+  assert.deepEqual(Object.keys(demo.registrations).sort(), Object.keys(state.registrations).sort());
+  const alpha = demo.registrations.real_team_Alpha_12345678;
+  assert.deepEqual([alpha.captain.firstName, alpha.ace1.fullName, alpha.ace2.fullName, alpha.combinedUtr], ['Alpha', 'Alpha Ace One', 'Alpha Ace Two', 1950], 'names and counted UTRs carry over');
+  assert.equal(Object.values(demo.tiers).flatMap(t => Object.keys(t.teams)).length >= count, true, 'the teams are listed in tiers');
+  const tampered = csv.replace('Alpha Ace One', "'=HYPERLINK(1)");
+  assert.equal(buildDemoStateFromCsv(tampered).state.registrations.real_team_Alpha_12345678.ace1.fullName, '=HYPERLINK(1)', 'the guard apostrophe the export adds is removed');
+  assert.deepEqual(buildDemoStateFromCsv(csv + '\r\n"short_id","X","","6.00","Y","","6.00","Z","","6.00","18.00","higher","GOAT","2026-01-01T00:00:00Z"').summary.skipped.map(s => s.teamId), ['short_id'], 'a bad row is reported, not fatal');
+  assert.throws(() => buildDemoStateFromCsv('a,b\n1,2'), /registrations export/);
+  const base = initialState(); base.settings = { ...base.settings, aceNameMaskingEnabled: false };
+  assert.equal(buildDemoStateFromCsv(csv, { base }).state.settings.aceNameMaskingEnabled, false, 'the demo keeps its own settings');
+});
