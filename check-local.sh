@@ -8,14 +8,15 @@
 #   With --demo the app starts with sample registered teams and, if you gave --export, your real PPRC players and
 #   match history (served locally, nothing is read from or written to Firebase). --reset-demo starts the sample data again.
 # Options combine, e.g. bash check-local.sh --browser --demo
-# Settings (environment): BRANCH (default codex/tier-card-improvements), DIR (default ./triace-2025),
+# Settings (environment): BRANCH (default codex/tier-card-improvements), DIR (default: this folder if it is a Triace checkout, otherwise ./triace-2025),
 #   REPO (default the GitHub repo), TRAICE_ADMIN_PASSWORD (demo admin password, default local-demo-password).
 # Needs: git and Node 22+ (https://nodejs.org). Works on macOS, Linux and Windows Git Bash/WSL.
 set -uo pipefail
 
 REPO="${REPO:-https://github.com/pdreddy/triace-2025.git}"
 BRANCH="${BRANCH:-codex/tier-card-improvements}"
-DIR="${DIR:-triace-2025}"
+# Run from inside a Triace checkout, it checks that checkout; otherwise it clones into ./triace-2025.
+if [ -z "${DIR:-}" ]; then if [ -d .git ] && grep -q '"name": "traice"' package.json 2>/dev/null; then DIR="."; else DIR="triace-2025"; fi; fi
 BROWSER=0; DEMO=0; EXPORT=""; RESET=0
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -66,7 +67,7 @@ if [ "$BROWSER" = 1 ]; then
 fi
 
 if [ -n "$EXPORT" ]; then
-  [ -f "$EXPORT" ] || EXPORT="../$EXPORT"
+  [ -f "$EXPORT" ] || EXPORT="../$EXPORT"   # a relative path is relative to where you started
   if [ -f "$EXPORT" ]; then
     step "PPRC migration dry run" node scripts/migrate-pprc.mjs "$EXPORT" .local-migration scripts/migration/name-decisions.json
     step "PPRC import plan (nothing is sent)" node scripts/import-pprc.mjs .local-migration/multiclub.json --database-url https://multiclub-890ea-default-rtdb.firebaseio.com
