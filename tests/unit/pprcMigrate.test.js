@@ -40,12 +40,12 @@ test('one master record per person, ids from the name, contact details never cop
 
 test('matches land in club and season, duplicates are dropped, only approved results count', () => {
   const { tree, report } = buildMultiClub(exportData());
-  const s1 = tree.clubs.koc.seasons.s1.matches, s3 = tree.clubs.koc.seasons.s3.matches;
-  assert.deepEqual(Object.keys(s1), ['koc-s1-a1']);
-  assert.equal(s1['koc-s1-a1'].courts[0].names.home[0], 'Dinkar Bhardwaj', 'the full-name copy wins over the abbreviated one');
+  const s1 = tree.clubs.koc.seasons.s2.matches, s3 = tree.clubs.koc.seasons.s3.matches;
+  assert.deepEqual(Object.keys(s1), ['koc-s2-a1']);
+  assert.equal(s1['koc-s2-a1'].courts[0].names.home[0], 'Dinkar Bhardwaj', 'the full-name copy wins over the abbreviated one');
   assert.deepEqual(Object.keys(s3), ['koc-s3-k1'], 'the pending result is not imported');
   assert.equal(Object.keys(tree.clubs.triace.seasons.s1.matches).length, 2);
-  assert.ok(tree.clubs.koc.seasons.s2.meta.note, 'season 2 exists even without data');
+  assert.deepEqual(Object.keys(tree.clubs.koc.seasons), ['s2', 's3'], 'KOC has seasons 2 and 3 only: there is no season 1 data');
   assert.deepEqual(report.sources.filter(s => s.path === 'KOC2DBPONEW').map(s => [s.imported, s.duplicate]), [[0, 1]]);
   assert.equal(report.sources.find(s => s.path === 'koc_s3/matches').notApproved, 1);
   assert.deepEqual(Object.keys(tree.clubs.koc.seasons.s3.teams.t1), ['id', 'name', 'abbreviation', 'group', 'captain', 'players']);
@@ -78,7 +78,7 @@ test('one rating run covers every club and season; history is stored by year wit
   const { tree } = buildMultiClub(exportData(), { overrides: { Vinod: 'p_vinod_aripaka', Krishna: 'p_krishna_vennapusa', 'Hari Mothkuri': 'p_hari_mothukuri', Kalam: { name: 'Abdul Kalam' } } });
   const m = tree.pprcMaster, id = 'p_dinkar_bhardwaj';
   const clubs = Object.values(m.ratingHistory[id]['2026']).map(e => `${e.club}/${e.season}`).sort();
-  assert.deepEqual(clubs, ['koc/s1', 'koc/s3', 'triace/s1', 'triace/s1']);
+  assert.deepEqual(clubs, ['koc/s2', 'koc/s3', 'triace/s1', 'triace/s1']);
   assert.equal(m.ratings[id].played.singles + m.ratings[id].played.doubles, 4);
   assert.deepEqual(m.recent[id].map(e => e.ts), [...m.recent[id].map(e => e.ts)].sort((a, b) => b - a), 'newest first');
   assert.ok(m.ratings[id].version >= 1 && m.meta.algorithm.version >= 1);
@@ -114,7 +114,7 @@ test('roster names become people, and shorter or reordered versions of known peo
   assert.ok(!Object.keys(m.players).some(id => id.includes('player_3') || id === 'p_yogesh'), 'placeholders and single names are skipped');
   const court = tree.clubs.triace.seasons.s1.matches['triace-s1-x2'].courts[0];
   assert.deepEqual(court.names.away, ['Kalam'], 'Kalam now resolves to Kalam Shaik');
-  assert.deepEqual(tree.clubs.koc.seasons.s2.teams.a.players.slice(0, 2), ['p_kalam_shaik', 'p_vinod_punati']);
+  assert.equal(tree.clubs.koc.seasons.s2.teams, undefined, 'the old roster list is a name source, not a season');
 });
 
 test('Super 6 is a Triace season 1 playoff, not a season of its own', () => {
@@ -154,10 +154,22 @@ test('names are stored in one pattern and every history entry says which game it
   assert.equal(m.players.p_kalam_shaik.name, 'Kalam Shaik');
   assert.ok(Object.values(m.players).every(p => p.name === displayName(p.name)), 'no name is off-pattern');
   const all = Object.values(m.recent).flat(), titles = new Set(all.map(e => e.title));
-  assert.deepEqual([...titles].sort(), ['KOC · Season 1 · League', 'KOC · Season 3 · League', 'Triace · Season 1 · League']);
+  assert.deepEqual([...titles].sort(), ['KOC · Season 2 · League', 'KOC · Season 3 · League', 'Triace · Season 1 · League']);
   const e = m.recent.p_dinkar_bhardwaj.find(x => x.club === 'triace' && x.court === 'D1');
   assert.deepEqual([e.competition, e.seasonLabel, e.stageLabel, e.date, e.team, e.opponentTeam], ['Triace', 'Season 1', 'League', '1970-01-01'.replace('1970-01-01', new Date(e.ts).toISOString().slice(0, 10)), 'Team A', 'Team B']);
   assert.deepEqual(e.partnerName, 'Krishna Vennapusa'); assert.deepEqual(e.opponentNames, ['Hari Mothukuri', 'Kalam Shaik']);
   assert.equal(m.playerList.p_dinkar_bhardwaj.name, 'Dinkar Bhardwaj');
   assert.ok(m.playerList.p_dinkar_bhardwaj.clubs.includes('koc') && m.playerList.p_dinkar_bhardwaj.clubs.includes('triace'));
+});
+
+test('a match that is also listed as a playoff keeps one copy and becomes a playoff', () => {
+  const data = exportData();
+  const final = { ts: day(30), t1: 'Team A', t2: 'Team B', g1: 8, g2: 1, s1: 1, s2: 0, lines: [line('S1', 'singles', ['Dinkar Bhardwaj'], ['Rajesh Mishra'], 8, 1, { winnerTeamNum: 1 })] };
+  data.TriAceDBNEW.f1 = { ...final };
+  data.TriAceDBSUPER6 = { s6: { ...final, ts: day(31) } };
+  const { tree, report } = buildMultiClub(data);
+  const matches = Object.values(tree.clubs.triace.seasons.s1.matches).filter(m => m.courts[0].label === 'S1' && m.home.name === 'Team A' && m.courts[0].homeGames === 8 && m.courts[0].awayGames === 1);
+  assert.equal(matches.length, 1, 'one copy');
+  assert.equal(matches[0].stage, 'po');
+  assert.equal(report.sources.find(s => s.path === 'TriAceDBSUPER6').duplicate, 1);
 });

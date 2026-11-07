@@ -18,7 +18,7 @@ clubs/<club>/
   seasons/<season>/
     meta/  teams/  matches/<matchId>      matches reference players by id; the typed names are kept for traceability
 ```
-Clubs and seasons in the first migration: `koc` s1, s2 (teams and schedule only, no results), s3; `triace` s1 (round robin plus the playoffs, including Super 6).
+Clubs and seasons in the first migration: `koc` s2 and s3 (there is no KOC season 1 data); `triace` s1 (round robin plus the playoffs, including Super 6).
 
 ## The rating algorithm (`functions/lib/pprc.js`)
 One function, `computePprc({ players, matches })`, rates every court from every club in time order.
@@ -55,8 +55,8 @@ it goes to `name-decisions.csv` (raw name, team, number of matches, candidates).
 `decision` column and run again with that file. A decision applies to that name for that team only (leave `team` empty
 for a name that always means one person). A full name that is not in the master creates a new person.
 
-Sources: KOC2DB (preferred, full names), KOC2DBPONEW, KOC2DBPO → KOC s1; KOC season 2 teams from `koc_s2`;
-`koc_s3/matches` (approved only) → KOC s3; TriAceDBNEW, TriAceDB, TriAceDB2 → Triace s1; TriAceDBNEW_Play and
+Sources: KOC2DB (preferred, full names), KOC2DBPONEW, KOC2DBPO → KOC season 2; the rosters in `koc_s2` are used only to learn full names;
+`koc_s3/matches` (approved only) → KOC season 3; TriAceDBNEW, TriAceDB, TriAceDB2 → Triace s1; TriAceDBNEW_Play and
 TriAceDBSUPER6 → Triace s1 playoffs. Duplicates (the same match under two paths) are dropped, keeping the first source.
 
 Confirmed decisions live in `scripts/migration/name-decisions.json` (keys are `Team::Name`, or a bare name for "always this person").

@@ -1,15 +1,15 @@
 // Turns the old per-club Realtime Database export into the multi-club layout:
 //   pprcMaster/  one record per person (unique name across every club), their PPRC rating and history
-//   clubs/<club>/seasons/<season>/  teams and matches, with players stored as ids
+//   clubs/<club>/seasons/<season>/  teams and matches (KOC has seasons 2 and 3, Triace season 1), with players stored as ids
 // Pure (no I/O): feed it the parsed export, get back the tree to write and a report to review.
 import { PPRC_PARAMS, displayName, nameKey, playerIdFor, createRegistry, resolveName, computePprc, splitHistory } from './pprc.js';
 
 // Where each club's matches live in the old database, and which season they belong to. Earlier
-// sources win when the same match appears twice (e.g. KOC2DB keeps full names, KOC2DBPONEW abbreviates them).
+// sources win when the same match appears twice (e.g. KOC2DB, KOC season 2, keeps full names; KOC2DBPONEW abbreviates them).
 export const SOURCES = [
-  { club: 'koc', season: 's1', path: 'KOC2DB' },
-  { club: 'koc', season: 's1', path: 'KOC2DBPONEW' },
-  { club: 'koc', season: 's1', path: 'KOC2DBPO' },
+  { club: 'koc', season: 's2', path: 'KOC2DB' },
+  { club: 'koc', season: 's2', path: 'KOC2DBPONEW' },
+  { club: 'koc', season: 's2', path: 'KOC2DBPO' },
   { club: 'koc', season: 's3', path: 'koc_s3/matches', approvedOnly: true },
   { club: 'triace', season: 's1', path: 'TriAceDBNEW' },
   { club: 'triace', season: 's1', path: 'TriAceDB' },
@@ -20,7 +20,7 @@ export const SOURCES = [
 // A decision of this value means "not a real player": that name is left unrated and never asked about again.
 export const IGNORE = '__ignore__';
 export const CLUBS = {
-  koc: { name: 'KOC', seasons: { s1: 'Season 1', s2: 'Season 2', s3: 'Season 3' } },
+  koc: { name: 'KOC', seasons: { s2: 'Season 2', s3: 'Season 3' } }, // there is no season 1 data
   triace: { name: 'Triace', seasons: { s1: 'Season 1' } }
 };
 
@@ -122,7 +122,7 @@ export function buildMultiClub(data, { overrides = {}, createMissing = true, sou
   // Names are resolved in passes: exact and unique-token matches first, which also tells us who plays for
   // each team; then ambiguous first names are settled from that team's own players; only then is anyone created.
   const slots = [], rosters = new Map();
-  const ratedMatches = [], seenIds = new Set(), seenKeys = new Set();
+  const ratedMatches = [], seenIds = new Set(), seenKeys = new Map();
   for (const src of sources) {
     const raw = at(data, src.path) || {}, stat = { path: src.path, club: src.club, season: src.season, read: 0, duplicate: 0, notApproved: 0, imported: 0 };
     report.sources.push(stat);
@@ -130,8 +130,12 @@ export function buildMultiClub(data, { overrides = {}, createMissing = true, sou
       stat.read++;
       if (src.approvedOnly && String(m.status || '').toUpperCase() !== 'APPROVED') { stat.notApproved++; continue; }
       const idKey = `${src.club}/${src.season}/${legacyId}`, key = `${src.club}/${src.season}/${dupKey(m)}`;
-      if (seenIds.has(idKey) || seenKeys.has(key)) { stat.duplicate++; continue; }
-      seenIds.add(idKey); seenKeys.add(key);
+      if (seenIds.has(idKey) || seenKeys.has(key)) {
+        stat.duplicate++;
+        if (src.stage === 'po' && seenKeys.get?.(key)) seenKeys.get(key).stage = 'po'; // the same match listed again as a playoff: it is a playoff
+        continue;
+      }
+      seenIds.add(idKey);
       const id = safeKey(`${src.club}-${src.season}-${legacyId}`), ts = num(m.ts) ?? num(m.createdAt) ?? 0;
       const team = side => `${src.club}/${src.season}/${nameKey(side === 'home' ? m.t1 : m.t2)}`;
       const courts = (m.lines || []).map((line, i) => {
@@ -150,7 +154,7 @@ export function buildMultiClub(data, { overrides = {}, createMissing = true, sou
         courts, source: { path: src.path, legacyId }
       };
       tree.clubs[src.club].seasons[src.season].matches[id] = canonical;
-      ratedMatches.push(canonical); stat.imported++;
+      seenKeys.set(key, canonical); ratedMatches.push(canonical); stat.imported++;
     }
   }
   // Known rosters by team name (KOC only): seasons 2 and 3 and every auction.
@@ -212,13 +216,6 @@ export function buildMultiClub(data, { overrides = {}, createMissing = true, sou
     for (const id of teams[t.id].players) if (master[id]) master[id].clubs.koc = true;
   }
   tree.clubs.koc.seasons.s3.teams = teams;
-  const teams2 = {};
-  for (const t of Object.values(data.koc_s2?.teams || {})) {
-    teams2[t.id] = { id: t.id, name: t.name, abbreviation: t.abbreviation, group: t.group, players: (t.players || []).map(p => resolveName(registry, p.name).id).filter(Boolean) };
-    for (const id of teams2[t.id].players) if (master[id]) master[id].clubs.koc = true;
-  }
-  tree.clubs.koc.seasons.s2.teams = teams2;
-  tree.clubs.koc.seasons.s2.meta.note = 'Teams and schedule only: the export has no season 2 match results.';
 
   // One rating run over every club and season, in time order.
   const seeds = Object.fromEntries(Object.values(master).map(p => [p.id, { singles: p.seed?.singles, doubles: p.seed?.doubles }]));
