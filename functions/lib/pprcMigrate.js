@@ -257,7 +257,7 @@ export function buildMultiClub(data, { overrides = {}, createMissing = true, sou
     // Matches per year for each player (all of them, the latest ten included), so a profile can list the years without loading them.
     historyYears: Object.fromEntries(Object.entries(ratingHistory).map(([pid, years]) => [pid, Object.fromEntries(Object.entries(years).map(([y, items]) => [y, Object.keys(items).length]))])),
     // A small list for search boxes, so a page does not have to download every profile.
-    playerList: Object.fromEntries(Object.values(master).map(p => [p.id, { name: p.name, overall: rated.ratings[p.id].overall, played: rated.ratings[p.id].played.singles + rated.ratings[p.id].played.doubles, clubs: Object.keys(p.clubs || {}).concat(rated.history[p.id].some(e => e.club === 'triace') ? ['triace'] : []).filter((c, i, a) => a.indexOf(c) === i) }]))
+    playerList: Object.fromEntries(Object.values(master).map(p => [p.id, { name: p.name, overall: rated.ratings[p.id].overall, singles: rated.ratings[p.id].singles, doubles: rated.ratings[p.id].doubles, utr: { singles: rated.ratings[p.id].seed.singles, doubles: rated.ratings[p.id].seed.doubles }, played: rated.ratings[p.id].played.singles + rated.ratings[p.id].played.doubles, clubs: Object.keys(p.clubs || {}).concat(rated.history[p.id].some(e => e.club === 'triace') ? ['triace'] : []).filter((c, i, a) => a.indexOf(c) === i) }]))
   };
   report.players = { total: Object.keys(master).length, provisional: report.names.provisional.length, rated: Object.values(rated.ratings).filter(r => r.played.singles + r.played.doubles > 0).length };
   report.names.similarRoster = notes.similarRoster || {};

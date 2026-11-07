@@ -4,6 +4,7 @@ import { EmptyState, Stat } from '../components/UI';
 import { fetchPlayer, fetchPlayerList, fetchYear } from '../services/pprc';
 
 const signed = v => (Math.abs(v) < 0.005 ? '0.00' : `${v > 0 ? '+' : '−'}${Math.abs(v).toFixed(2)}`);
+const pair = (a, b) => `${Number.isFinite(a) ? a.toFixed(2) : '—'} / ${Number.isFinite(b) ? b.toFixed(2) : '—'}`;
 const clubName = id => ({ koc: 'KOC', triace: 'Triace' }[id] || id);
 
 // One played court: which game it was (club, season, league or playoffs), the date, the result and the people.
@@ -97,6 +98,7 @@ export function PprcPlayer() {
           <p className="eyebrow">PPRC player · {Object.keys(info.clubs || {}).map(clubName).join(' · ') || 'No club'}</p>
           <h1>{info.name}</h1>
           <p className="team-hero-utr"><b>{rating.overall.toFixed(2)}</b> PPRC rating <span className="muted">· singles {rating.singles.toFixed(2)} · doubles {rating.doubles.toFixed(2)}</span></p>
+          <p className="small muted">UTR (starting point) singles {rating.seed.singles.toFixed(2)} · doubles {rating.seed.doubles.toFixed(2)}{rating.reliability ? ` · reliability singles ${Math.round(rating.reliability.singles * 100)}% · doubles ${Math.round(rating.reliability.doubles * 100)}%` : ''}</p>
           {info.needsFullName && <p className="small warn-text">Only a first name is known so far.</p>}
         </div>
       </header>
@@ -105,7 +107,8 @@ export function PprcPlayer() {
         <Stat value={total ? `${Math.round((rating.wins / total) * 100)}%` : '—'} label="Win rate" />
         <Stat value={`${rating.record.singles.wins}–${rating.record.singles.losses}`} label="Singles" />
         <Stat value={`${rating.record.doubles.wins}–${rating.record.doubles.losses}`} label="Doubles" />
-        <Stat value={rating.seed.singles.toFixed(2)} label="Starting singles" />
+        <Stat value={pair(rating.seed.singles, rating.seed.doubles)} label="UTR singles / doubles" />
+        <Stat value={pair(rating.singles, rating.doubles)} label="PPRC singles / doubles" />
       </div>
       <section className="tier-group">
         <div className="tier-head"><div><h2>All matches</h2><span>Latest 10 first{games.length ? ` (${games.join(', ')})` : ''}. Older matches are grouped by year; click a year to open it.</span></div></div>
@@ -142,7 +145,7 @@ export default function Pprc() {
               <li key={p.id}>
                 <span className="history-result">{i + 1}</span>
                 <div><Link to={`/pprc/${p.id}`}><b>{p.name}</b></Link> <span className="muted">· {(p.clubs || []).map(clubName).join(' · ')} · {p.played} {p.played === 1 ? 'match' : 'matches'}</span></div>
-                <em>{p.overall.toFixed(2)}</em><span />
+                <em title="PPRC singles / doubles">{pair(p.singles, p.doubles)}</em><small className="muted" title="UTR singles / doubles">UTR {pair(p.utr?.singles, p.utr?.doubles)}</small>
               </li>
             ))}
           </ul>

@@ -85,7 +85,7 @@ export function planTriacePlayers(entries, master = {}) {
     writes[`pprcMaster/players/${id}`] = { name: displayName(entry.name), nameKey: key, clubs: { triace: true }, seed: { singles, doubles }, seedSource: 'triace registration' };
     writes[`pprcMaster/nameIndex/${key}`] = id;
     writes[`pprcMaster/ratings/${id}`] = { singles, doubles, overall, seed: { singles, doubles }, played: { singles: 0, doubles: 0 }, wins: 0, losses: 0, record: { singles: { wins: 0, losses: 0 }, doubles: { wins: 0, losses: 0 } }, lastPlayed: null, version: PPRC_PARAMS.version };
-    writes[`pprcMaster/playerList/${id}`] = { name: displayName(entry.name), overall, played: 0, clubs: ['triace'] };
+    writes[`pprcMaster/playerList/${id}`] = { name: displayName(entry.name), overall, singles, doubles, utr: { singles, doubles }, played: 0, clubs: ['triace'] };
     summary.created.push({ id, name: displayName(entry.name), label });
   }
   return { writes, summary };

@@ -6,6 +6,7 @@ import { fetchPlayer, fetchPlayerList } from '../services/pprc';
 
 const ROLES = [['captain', 'Captain'], ['ace1', 'Ace 1'], ['ace2', 'Ace 2']];
 const utr = n => (n == null ? '' : (n / 100).toFixed(2));
+const two = (a, b) => `${Number.isFinite(a) ? a.toFixed(2) : '—'} / ${Number.isFinite(b) ? b.toFixed(2) : '—'}`;
 const matchesOf = rating => (rating?.played?.singles || 0) + (rating?.played?.doubles || 0);
 const figures = (id, rating) => ({ id, overall: rating.overall, singles: rating.singles, doubles: rating.doubles, matches: matchesOf(rating) });
 
@@ -14,6 +15,7 @@ const figures = (id, rating) => ({ id, overall: rating.overall, singles: rating.
 export default function AdminPprc({ teams, busy, onLink, publicByDefault = false }) {
   const [list, setList] = useState(null), [error, setError] = useState(''), [working, setWorking] = useState(''), [note, setNote] = useState('');
   const [search, setSearch] = useState({}), [fullNames, setFullNames] = useState({});
+  const [view, setView] = useState('registered'), [allQuery, setAllQuery] = useState(''), [allClub, setAllClub] = useState('all');
   useEffect(() => { fetchPlayerList().then(setList).catch(e => setError(e.message)); }, []);
   const byId = useMemo(() => new Map((list || []).map(p => [p.id, p])), [list]);
 
@@ -23,6 +25,8 @@ export default function AdminPprc({ teams, busy, onLink, publicByDefault = false
   })), [teams]);
   const linked = rows.filter(r => r.link), verified = linked.filter(r => r.link.matches > PPRC_VERIFIED_AFTER);
 
+  const linkedIds = useMemo(() => new Set(linked.map(r => r.link.id)), [linked]);
+  const everyone = useMemo(() => (list || []).filter(p => (allClub === 'all' || (p.clubs || []).includes(allClub)) && (!allQuery.trim() || nameKey(p.name).includes(nameKey(allQuery)))).sort((a, b) => (b.overall || 0) - (a.overall || 0)), [list, allClub, allQuery]);
   const suggestions = row => {
     if (!list || row.link) return [];
     const typed = search[row.key]?.trim(), pool = typed ? matchPlayers(list, typed, 5) : matchPlayers(list, row.name, 3);
@@ -70,7 +74,39 @@ export default function AdminPprc({ teams, busy, onLink, publicByDefault = false
       {error && <p className="small warn-text">{error}</p>}
       {note && <p className="small">{note}</p>}
       {!list && !error && <p className="small">Loading the PPRC list…</p>}
-      <div className="table-wrap">
+      <div className="view-switch" role="group" aria-label="Which players to show">
+        <button type="button" className={view === 'registered' ? 'on' : ''} aria-pressed={view === 'registered'} onClick={() => setView('registered')}>Registered in Triace ({rows.length})</button>
+        <button type="button" className={view === 'all' ? 'on' : ''} aria-pressed={view === 'all'} onClick={() => setView('all')}>All PPRC players{list ? ` (${list.length})` : ''}</button>
+      </div>
+      {view === 'all' && (
+        <div data-testid="pprc-all">
+          <div className="toolbar">
+            <input type="search" aria-label="Search all PPRC players" placeholder="Search players" value={allQuery} onChange={e => setAllQuery(e.target.value)} />
+            <select aria-label="Club" value={allClub} onChange={e => setAllClub(e.target.value)}><option value="all">All clubs</option><option value="koc">KOC</option><option value="triace">Triace</option></select>
+          </div>
+          <p className="small">{everyone.length} of {list?.length ?? 0} players. PPRC shows as a rating once a player has more than {PPRC_VERIFIED_AFTER} rated matches.</p>
+          <div className="table-wrap">
+            <table className="standings">
+              <thead><tr><th scope="col">#</th><th scope="col">Player</th><th scope="col">Clubs</th><th scope="col" className="num">Matches</th><th scope="col" className="num">UTR S / D</th><th scope="col" className="num">PPRC S / D</th><th scope="col">In Triace</th></tr></thead>
+              <tbody>
+                {everyone.map((p, i) => (
+                  <tr key={p.id}>
+                    <td className="rank-cell">{i + 1}</td>
+                    <td><a href={`/pprc/${p.id}`}><b>{p.name}</b></a></td>
+                    <td>{(p.clubs || []).map(c => ({ koc: 'KOC', triace: 'Triace' }[c] || c)).join(' · ')}</td>
+                    <td className="num">{p.played ?? 0}</td>
+                    <td className="num">{p.utr ? two(p.utr.singles, p.utr.doubles) : '—'}</td>
+                    <td className="num">{p.played > PPRC_VERIFIED_AFTER ? two(p.singles, p.doubles) : <PprcBadge info={null} />}</td>
+                    <td>{linkedIds.has(p.id) ? 'Linked' : (p.clubs || []).includes('triace') ? 'Played' : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {!everyone.length && <p className="small">No players match.</p>}
+        </div>
+      )}
+      <div className="table-wrap" hidden={view !== 'registered'}>
         <table className="standings">
           <thead><tr><th scope="col">Team</th><th scope="col">Player</th><th scope="col" className="num">UTR</th><th scope="col">PPRC</th></tr></thead>
           <tbody>
@@ -89,7 +125,7 @@ export default function AdminPprc({ teams, busy, onLink, publicByDefault = false
                     </>
                   ) : (
                     <div>
-                      {suggestions(r).map(p => <button key={p.id} type="button" className="secondary small" disabled={busy || !!working} onClick={() => link(r, p)}>Link {p.name}{r.chosen === p.id ? ' (their choice)' : ''} · {Number(p.overall).toFixed(2)} · {p.played}</button>)}
+                      {suggestions(r).map(p => <button key={p.id} type="button" className="secondary small" disabled={busy || !!working} onClick={() => link(r, p)}>Link {p.name}{r.chosen === p.id ? ' (their choice)' : ''} · PPRC S/D {Number.isFinite(p.singles) ? `${p.singles.toFixed(2)} / ${p.doubles.toFixed(2)}` : Number(p.overall).toFixed(2)} · UTR S/D {p.utr ? `${p.utr.singles.toFixed(2)} / ${p.utr.doubles.toFixed(2)}` : '—'} · {p.played} {p.played === 1 ? 'match' : 'matches'}</button>)}
                       <input type="search" aria-label={`Search PPRC for ${r.name} (${r.label})`} placeholder="Search PPRC" value={search[r.key] || ''} onChange={e => setSearch(old => ({ ...old, [r.key]: e.target.value }))} />
                       {list && !suggestions(r).length && <span className="small muted"> Not in PPRC yet. </span>}
                       {r.role === 'captain' && <input type="text" aria-label={`Full name of ${r.name} for PPRC`} placeholder="Full name (to create a profile)" value={fullNames[r.key] || ''} onChange={e => setFullNames(old => ({ ...old, [r.key]: e.target.value }))} />}
