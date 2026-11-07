@@ -27,3 +27,10 @@ test('a unique partial name matches the list; an ambiguous or unknown name stays
 test('before the PPRC list loads, decided names still read in the full spelling without a link', () => {
   assert.deepEqual(makeResolver()('Hari', 'a5'), { name: 'Hari Mothukuri', id: null });
 });
+
+test('spelling variants of one person resolve to one player', () => {
+  const resolve = makeResolver([{ id: 'p_damu_palavali', name: 'Damu Palavali' }, { id: 'p_sridhar_kuppuswamy', name: 'Sridhar Kuppuswamy' }, { id: 'p_rajasekhar_chintha', name: 'Rajasekhar Chintha' }]);
+  for (const raw of ['Damu', 'Palvali', 'Damdodhara Plavali', 'damu palavali']) assert.equal(resolve(raw, 'a4').id, 'p_damu_palavali', raw);
+  for (const raw of ['Sridhar', 'Sridhar.', 'SRIDHAR']) assert.equal(resolve(raw, 'b7').id, 'p_sridhar_kuppuswamy', raw);
+  for (const raw of ['RajC', 'Raj C', 'raj chinta']) assert.equal(resolve(raw, 'a4').id, 'p_rajasekhar_chintha', raw);
+});
