@@ -38,3 +38,13 @@ test('a refused registration leaves no orphan login',async()=>{
  const bad=team();bad.ace1.singlesUtr=0;const before=(await auth.listUsers()).users.length;
  assert.notEqual((await call('registerTeam',bad)).status,200);assert.equal((await auth.listUsers()).users.length,before);
 });
+
+test('health diagnostics require no login and leave tournament data and Auth users unchanged', async () => {
+ const before = (await database.ref('traice2_0').get()).val();
+ const users = (await auth.listUsers()).users.map(user => user.uid).sort();
+ const result = await call('healthCheck', {}, null);
+ assert.equal(result.status, 200);
+ assert.deepEqual(result.result, { ok: true, service: 'traice' });
+ assert.deepEqual((await database.ref('traice2_0').get()).val(), before);
+ assert.deepEqual((await auth.listUsers()).users.map(user => user.uid).sort(), users);
+});

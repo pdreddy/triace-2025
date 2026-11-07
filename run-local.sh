@@ -14,9 +14,8 @@ for arg in "$@"; do
   esac
 done
 
-if ! command -v node >/dev/null; then echo "Node.js 22.12+ is required. Install it from https://nodejs.org"; exit 1; fi
-NODE_MAJOR=$(node -p "process.versions.node.split('.')[0]")
-if [ "$NODE_MAJOR" -lt 22 ]; then echo "Node $(node -v) is too old; this app needs 22.12 or newer."; exit 1; fi
+if ! command -v node >/dev/null; then echo "Node.js 24.12+ (<25) is required. Install it from https://nodejs.org"; exit 1; fi
+node -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit(major === 24 && minor >= 12 ? 0 : 1)' || { echo "This app requires Node 24.12+ (below 25)."; exit 1; }
 
 if [ ! -d node_modules ]; then echo "Installing dependencies…"; npm ci --no-audit --no-fund; fi
 

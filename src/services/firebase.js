@@ -6,7 +6,7 @@ import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/
 import { rulesOf, DEFAULT_SEASON_NAME } from '../../functions/lib/tournament.js';
 import { dbPaths } from '../config/dbPaths.js';
 import { isCaptainEmail, loginEmail, normalizePassword } from '../../functions/lib/captainAccount.js';
-import { classifyCallable, classifyPasswordProbe, diagnose } from './diagnose.js';
+import { runSetupChecks } from './setupChecks.js';
 const env = import.meta.env;
 function rulesHint(error, root) {
   const message = errorMessage(error);
@@ -64,40 +64,14 @@ export function createFirebaseService() {
       off.push(onValue(ref(database, paths.season1), snapshot => { state.legacySeasons = snapshot.exists() ? { s1: snapshot.val() } : undefined; emit(); }, () => { state.legacySeasons = undefined; emit(); }));
       return () => off.forEach(unsubscribe => unsubscribe());
     },
-    // The live setup check (/status): each step reports { id, label, status: ok|warn|fail|running, detail, fix }.
-    // It only reads public data and calls functions with an empty request, which every function refuses without changing anything.
-    async runChecks(report) {
-      const step = async (id, label, fn) => {
-        report({ id, label, status: 'running' });
-        try { report({ id, label, ...(await fn()) }); }
-        catch (error) { report({ id, label, status: 'fail', detail: error?.message || String(error), fix: diagnose(`${error?.code || ''} ${error?.message || ''}`) }); }
-      };
-      await step('config', 'Firebase project', async () => ({ status: 'ok', detail: `${config.projectId} · ${new URL(config.databaseURL).host} · data under ${paths.root}` }));
-      await step('database', 'Database is readable', async () => {
-        const snapshot = await get(ref(database, `${ROOT}/settings`));
-        return snapshot.exists() ? { status: 'ok', detail: 'tournament settings found' } : { status: 'warn', detail: 'reachable, but there are no tournament settings yet', fix: 'With the functions deployed, opening the home page once creates them.' };
-      });
-      for (const [label, path] of [['Early-bird rules', `${ROOT}/earlyBird`], ['Partner board rules', `${ROOT}/partnerPosts`], ['Season 1 data rules', paths.season1]]) {
-        await step(`rules-${path}`, `${label} published`, async () => { await get(ref(database, path)); return { status: 'ok', detail: 'readable' }; });
-      }
-      await step('anonymous', 'Anonymous sign-in', async () => {
-        if (!auth.currentUser) await signInAnonymously(auth);
-        return { status: 'ok', detail: auth.currentUser?.isAnonymous ? 'works' : `signed in as ${auth.currentUser?.email}` };
-      });
-      await step('password', 'Email/Password sign-in', async () => {
-        try { await signInWithEmailAndPassword(auth, loginEmail('setup-check'), 'setup-check-not-a-real-password'); return { status: 'warn', detail: 'unexpectedly signed in' }; }
-        catch (error) { return classifyPasswordProbe(error?.code); }
-      });
-      for (const name of ['bootstrapTournament', 'registerTeam', 'createPartnerPost', 'expressInterest', 'markPartnerPicked', 'reopenPartnerPost', 'closePartnerPost', 'saveEarlyBird', 'saveCalendar', 'addBufferWeeks', 'listAdmins', 'createAdmin', 'resetAdminPassword', 'removeAdmin', 'resetCaptainLogin', 'importSeason1']) {
-        await step(`fn-${name}`, `Function ${name}`, async () => { try { await httpsCallable(functions, name)({}); return { status: 'ok', detail: 'answers' }; } catch (error) { return classifyCallable(error?.code, error?.message); } });
-      }
-      await step('account', 'This browser’s account', async () => {
-        const user = auth.currentUser;
-        if (!user || user.isAnonymous) return { status: 'ok', detail: 'not signed in as admin (sign in at /admin/login)' };
-        const token = await getIdTokenResult(user, true);
-        return token.claims.admin === true ? { status: 'ok', detail: `${user.email} is an administrator` } : { status: 'warn', detail: `${user.email} is signed in but has no admin role`, fix: 'Run GOOGLE_CLOUD_PROJECT=<project> node scripts/grant-admin.cjs <email>, then sign out and in again.' };
-      });
-    },
+    // No sign-in probes or write commands: diagnostics preserve the current account and tournament.
+    runChecks: report => runSetupChecks({
+      report, config, paths,
+      read: async path => (await get(ref(database, path))).val(),
+      currentUser: () => auth.currentUser,
+      claims: async user => (await getIdTokenResult(user)).claims,
+      health: async () => (await httpsCallable(functions, 'healthCheck')({})).data
+    }),
     subscribeConnection(callback) { return onValue(ref(database, '.info/connected'), snapshot => callback(snapshot.val() === true)); },
     subscribeAuth(callback, onError) {
       stopped = false;

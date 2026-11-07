@@ -4,7 +4,7 @@ export const DEFAULT_EARLY_BIRD = { enabled: true, opens: '2026-11-06', ends: '2
 
 const DAY = 86400000;
 const parse = day => Date.parse(`${day}T00:00:00Z`);
-const isDay = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && new Date(parse(value)).toISOString().slice(0, 10) === value;
+const isDay = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(parse(value)) && new Date(parse(value)).toISOString().slice(0, 10) === value;
 export const nextDay = day => new Date(parse(day) + DAY).toISOString().slice(0, 10);
 export const daysBetween = (from, to) => Math.round((parse(to) - parse(from)) / DAY);
 export const longDate = day => new Date(`${day}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });

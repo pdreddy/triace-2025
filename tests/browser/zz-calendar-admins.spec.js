@@ -1,5 +1,5 @@
-import { test, expect , showEverything } from './fixtures.js';
-// Named zz- so it runs last: it leaves teams, fixtures and dates behind in the shared demo state, which other specs do not expect.
+import { test, expect, showEverything } from './fixtures.js';
+// This spec has its own demo state; other spec files cannot leave registration closed.
 
 async function adminLogin(page, user = 'reddi2026', password = 'local-e2e-test-password') {
   await showEverything(page);await page.goto('/admin/login');
@@ -7,6 +7,10 @@ async function adminLogin(page, user = 'reddi2026', password = 'local-e2e-test-p
   await page.getByLabel(/password/i).fill(password);
   await page.getByRole('button', { name: /sign in|log in/i }).click();
   await expect(page.locator('#admin-firebase')).toBeVisible();
+  // The admin shell can render before its first public-data poll arrives.
+  const { calendar } = await (await page.request.get('/api/public')).json();
+  await expect(page.locator('.calendar-admin').getByLabel('Season (round 1) starts')).toHaveValue(calendar.seasonStart || '');
+  await expect(page.locator('.calendar-admin').getByLabel('Buffer weeks')).toHaveValue((calendar.buffers || []).map(b => `${b.afterRound}:${b.weeks}`).join(', '));
 }
 const team = (id, captain, utr) => ({
   teamId: id, whatsappPhone: '+15550009101', ace1Phone: '+15550009102', ace2Phone: '+15550009103',
@@ -40,6 +44,8 @@ test('registration closes itself after the last registration day', async ({ page
   await card.getByLabel('Season (round 1) starts').fill('2027-01-04');
   await card.getByRole('button', { name: 'Save calendar' }).click();
   await expect(card.getByText('Calendar saved')).toBeVisible();
+  const publicResponse = await page.request.get('/api/public');
+  expect((await publicResponse.json()).calendar.registrationCloses).toBe('2020-01-01');
   try {
     const refused = await page.request.post('/api/register', { data: team('calendar-closed-team-0001', 'Zoe', 600) });
     expect(refused.status()).toBe(400);
@@ -71,6 +77,14 @@ test('admin adds another admin, who can sign in; resets and removes them', async
 
 test('admin downloads a full backup file with the registrations', async ({ page }) => {
   await adminLogin(page);
+  // Seed this test's own record, so it also works when selected alone or after a worker restart.
+  const calendar = await page.request.post('/api/calendar', { data: { registrationOpens: '', registrationCloses: '', seasonStart: '2027-01-04', roundDays: 7, buffers: [], playoffGapWeeks: 1 } });
+  expect(calendar.ok()).toBeTruthy();
+  const registered = await page.request.post('/api/register', { data: team('backup-test-team-0001', 'Backup', 600) });
+  expect(registered.ok(), await registered.text()).toBeTruthy();
+  await page.reload();
+  await expect(page.locator('.team-card', { hasText: 'Backup' }).first()).toBeVisible();
+  await expect(page.locator('.calendar-admin').getByLabel('Season (round 1) starts')).toHaveValue('2027-01-04');
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: /Download full backup/ }).click();
   const file = await download;

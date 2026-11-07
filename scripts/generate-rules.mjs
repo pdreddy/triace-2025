@@ -21,4 +21,4 @@ if (process.argv.includes('--check')) {
   process.exit(1);
 }
 writeFileSync(file('database.rules.json'), wanted);
-console.log(`database.rules.json written for root “${paths.root || 'traice2_0'}”. Merge it into the shared project's rules, then deploy: npm run rules:deploy`);
+console.log(`database.rules.json written for root “${paths.root || 'traice2_0'}”. Merge it into the shared project's rules, then deploy: npm run rules:deploy -- --project <project-id> --rules <reviewed-merged.json> --confirm-merged`);

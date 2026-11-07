@@ -66,3 +66,9 @@ test('the saved plan is public and survives in the state', () => {
   // the server only turns a ValidationError into a clear refusal; anything else would show as "internal"
   for (const bad of [{}, null, { ...plan, surchargeUsd: -5 }, { ...plan, opens: 'x' }]) assert.throws(() => applyEarlyBird(initialState(), bad), error => error instanceof ValidationError, JSON.stringify(bad));
 });
+
+test('impossible early-bird dates produce validation errors instead of an internal RangeError', () => {
+  for (const day of ['2026-13-01', '2026-00-00', '2026-99-99', '2026-02-30']) {
+    assert.throws(() => validateEarlyBird({ ...DEFAULT_EARLY_BIRD, opens: day }), error => error.name === 'ValidationError');
+  }
+});

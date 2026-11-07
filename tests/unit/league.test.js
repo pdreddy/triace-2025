@@ -457,7 +457,7 @@ test('a PPRC link shows its profile id publicly only when the admin made it publ
   assert.deepEqual(pubOf(refreshed).ace2, { verified: true, rating: 6, singles: 6, doubles: 6, id: 'p_ace_two' }, 'a refresh without the flag keeps it public');
   const hidden = applyLinkPprc(refreshed, { links: [{ teamId, role: 'ace2', player: player('p_ace_two', 12), public: false }] }, true).state;
   assert.equal(pubOf(hidden).ace2.id, undefined, 'the admin can hide it again');
-  assert.throws(() => applyLinkPprc(state, { links: [{ teamId, role: 'ace1', player: player('p_x'), public: 'yes' }] }, true), /public flag/);
+  assert.throws(() => applyLinkPprc(state, { links: [{ teamId, role: 'ace1', player: player('p_xx'), public: 'yes' }] }, true), /public flag/);
   assert.ok(!JSON.stringify(publicState(first)).includes('p_ace_one'), 'a link that is not public never leaks its id');
 });
 

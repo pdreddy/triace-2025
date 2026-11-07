@@ -66,7 +66,7 @@ test('Triace registrations: known players are marked, new full names are created
   assert.equal(writes['pprcMaster/nameIndex/new person here'], 'p_new_person_here');
   assert.equal(writes['pprcMaster/ratings/p_new_person_here'].overall, 6);
   assert.deepEqual(writes['pprcMaster/ratings/p_new_person_here'].played, { singles: 0, doubles: 0 });
-  assert.deepEqual(writes['pprcMaster/playerList/p_new_person_here'], { name: 'New Person Here', overall: 6, played: 0, clubs: ['triace'] });
+  assert.deepEqual(writes['pprcMaster/playerList/p_new_person_here'], { name: 'New Person Here', overall: 6, played: 0, clubs: ['triace'], singles: 5.5, doubles: 6.5, utr: { singles: 5.5, doubles: 6.5 } });
 });
 
 import { runImport, runTriaceImport, ImportRefused } from '../../functions/lib/pprcImport.js';
