@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { SCORE_ERRORS as E, COURTS, validateDoublesSet, validateSinglesSet, validateMatchTiebreak, validateCourt, validateMatchScore, matchResult, standings, isApproved } from '../../functions/lib/scoring.js';
+import { SCORE_ERRORS as E, COURTS, cleanCourt, courtScoreText, validateDoublesSet, validateSinglesSet, validateMatchTiebreak, validateCourt, validateMatchScore, matchResult, standings, isApproved } from '../../functions/lib/scoring.js';
 
 const tb = (home, away) => ({ tiebreak: { home, away } });
 const dset = (home, away, t) => ({ home, away, ...(t ? tb(...t) : {}) });
@@ -102,7 +102,7 @@ test('court: missing scores are incomplete; invalid sets report their own error'
 
 const singles = (a, b, t) => ({ set: { home: a, away: b, ...(t ? tb(...t) : {}) } });
 const straight = (a = 4, b = 1) => ({ sets: [dset(a, b), dset(a, b)] });
-const rr = (s, d1, d2) => ({ singles: s, d1, d2 });
+const rr = (s, d1, d2) => ({ s, d1, d2 });
 
 test('round robin: 2 of 3 courts wins, score and games recorded', () => {
   const r = matchResult('rr', rr(singles(8, 5), straight(4, 2), straight(1, 4)));
@@ -188,4 +188,15 @@ test('standings: three-way tie uses wins among the tied teams, then court differ
   // Each team has 1 win and 1 loss; head-to-head is level, so court difference: C +2, A 0, B 0 (then games, then id).
   assert.equal(rows[0].teamId, 'C');
   assert.deepEqual(rows.map(r => r.position), [1, 2, 3]);
+});
+
+test('court score text is written from the winner\'s side and clean copies drop unknown fields', () => {
+  assert.equal(courtScoreText({ type: 'singles', set: { home: 8, away: 7, tiebreak: { home: 7, away: 5 } } }, 'home'), '8-7(7-5)');
+  assert.equal(courtScoreText({ type: 'singles', set: { home: 3, away: 8 } }, 'away'), '8-3');
+  assert.equal(courtScoreText({ type: 'doubles', sets: [dset(4, 2), dset(1, 4)], third: { format: 'matchTiebreak', home: 7, away: 10 } }, 'away'), '2-4 4-1 10-7');
+  assert.equal(courtScoreText({ type: 'doubles', sets: [dset(4, 3, [7, 4]), dset(4, 0)] }, 'home'), '4-3(7-4) 4-0');
+  assert.equal(courtScoreText({ type: 'super', home: 10, away: 8 }, 'home'), '10-8');
+  const dirty = cleanCourt({ type: 'doubles', evil: 1, sets: [{ home: '4', away: '1', x: 1 }, { home: 4, away: 2 }], third: { format: 'fullSet', set: { home: 1, away: 4 }, y: 2 } });
+  assert.deepEqual(dirty, { type: 'doubles', sets: [{ home: 4, away: 1 }, { home: 4, away: 2 }], third: { format: 'fullSet', set: { home: 1, away: 4 } } });
+  assert.deepEqual(cleanCourt({ type: 'doubles', sets: [dset(4, 2), dset(1, 4)], third: { format: 'fullSet', set: dset(4, 3, [7, 1]) } }).third, { format: 'fullSet', set: dset(4, 3, [7, 1]) });
 });

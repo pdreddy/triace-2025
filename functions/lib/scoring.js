@@ -26,7 +26,7 @@ export const SCORE_ERRORS = {
 // Courts in the order they are played. `super` is the playoff Doubles 3 10-point tiebreak.
 export const COURTS = {
   rr: [
-    { key: 'singles', label: 'Singles', type: 'singles' },
+    { key: 's', label: 'Singles', type: 'singles' },
     { key: 'd1', label: 'Doubles 1', type: 'doubles' },
     { key: 'd2', label: 'Doubles 2', type: 'doubles' }
   ],
@@ -205,4 +205,27 @@ export function standings(teamIds, matches) {
     .map(row => ({ ...row, courtDiff: row.courtsWon - row.courtsLost, gameDiff: row.gamesWon - row.gamesLost, _h2h: headToHead(row) }))
     .sort((a, b) => diff(a.points, b.points) || diff(a._h2h, b._h2h) || diff(a.courtDiff, b.courtDiff) || diff(a.gameDiff, b.gameDiff) || diff(a.gamesWon, b.gamesWon) || String(a.teamId).localeCompare(String(b.teamId)))
     .map(({ _h2h, ...row }, i) => ({ ...row, position: i + 1 }));
+}
+
+// Keeps only the known numeric fields of a validated court, so nothing else is ever stored.
+const n = v => Number(v);
+const cleanSet = set => ({ home: n(set.home), away: n(set.away), ...(set.tiebreak && set.tiebreak.home != null ? { tiebreak: { home: n(set.tiebreak.home), away: n(set.tiebreak.away) } } : {}) });
+export function cleanCourt(court) {
+  if (court.type === 'singles') return { type: 'singles', set: cleanSet(court.set) };
+  if (court.type === 'super') return { type: 'super', home: n(court.home), away: n(court.away) };
+  const third = court.third && (court.third.format === 'matchTiebreak' ? { format: 'matchTiebreak', home: n(court.third.home), away: n(court.third.away) }
+    : court.third.format === 'fullSet' ? { format: 'fullSet', set: cleanSet(court.third.set) } : null);
+  return { type: 'doubles', sets: court.sets.map(cleanSet), ...(third ? { third } : {}) };
+}
+
+// A court's score written from the winner's side, e.g. "4-2 1-4 10-7" or "8-7(7-5)".
+export function courtScoreText(court, winner) {
+  const flip = winner === 'away';
+  const pair = (h, a) => (flip ? `${a}-${h}` : `${h}-${a}`);
+  const set = x => pair(x.home, x.away) + (x.tiebreak ? `(${pair(x.tiebreak.home, x.tiebreak.away)})` : '');
+  if (court.type === 'singles') return set(court.set);
+  if (court.type === 'super') return pair(court.home, court.away);
+  const parts = court.sets.map(set);
+  if (court.third) parts.push(court.third.format === 'matchTiebreak' ? pair(court.third.home, court.third.away) : set(court.third.set));
+  return parts.join(' ');
 }

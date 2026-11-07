@@ -14,7 +14,7 @@ export function playerUtr(singlesUtr, doublesUtr = null, gapLimit = UTR_GAP_LIMI
 }
 // League rules the admin can change. Missing values (older saved data) fall back to these defaults.
 export const DEFAULT_LEAGUE_RULES = {
-  utrGapLimit: 175, pointsPerWin: 2, playoffThreshold: 7, playoffSpotsLarge: 4, playoffSpotsSmall: 3, singlesMinPercent: 40,
+  utrGapLimit: 175, pointsPerWin: 1, playoffThreshold: 7, playoffSpotsLarge: 4, playoffSpotsSmall: 3, singlesMinPercent: 40,
   // Challenge rule (provisional): a team in challengerFrom–challengerTo may challenge one in targetFrom–targetTo once,
   // before the last challengeCutoffRounds rounds; a challenger win swaps the two places in the table.
   challengeEnabled: true, challengerFrom: 5, challengerTo: 6, targetFrom: 2, targetTo: 4, challengeCutoffRounds: 3

@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { Message } from './UI';
 import { Icon } from './Icons';
 import { formatUtr } from '../../functions/lib/tournament.js';
-import { FORMATS, ROLE_LABELS, deriveLineup, encounterWinner, matchPlayers, playoffSpots, isOverdue, onTime } from '../../functions/lib/league.js';
+import { validateCourt, validateDoublesSet, validateMatchScore, matchResult, SCORE_ERRORS } from '../../functions/lib/scoring.js';
+import { FORMATS, ROLE_LABELS, deriveLineup, matchPlayers, playoffSpots, isOverdue, onTime } from '../../functions/lib/league.js';
 
 export const teamName = team => (team ? `${team.captainFirstName}’s team` : 'To be decided');
 // Every public team across all tiers, by ID (a team listed in two tiers appears once).
@@ -48,51 +49,121 @@ function LineupPicker({ team, value, onChange, format }) {
   );
 }
 
+// ---------- Score entry ----------
+// Each court is typed as numbers for the home and away side; scoring.js decides what is valid.
+const blankSet = () => ({ a: '', b: '', ta: '', tb: '' });
+const blankCourt = type => (type === 'singles' ? blankSet() : type === 'super' ? { a: '', b: '' } : { sets: [blankSet(), blankSet()], third: { format: '', ...blankSet() } });
+const num = v => (v === '' || v == null ? null : Number(v));
+const toSet = x => ({ home: num(x.a), away: num(x.b), ...(x.ta !== '' || x.tb !== '' ? { tiebreak: { home: num(x.ta), away: num(x.tb) } } : {}) });
+const fromSet = x => (x ? { a: String(x.home), b: String(x.away), ta: x.tiebreak ? String(x.tiebreak.home) : '', tb: x.tiebreak ? String(x.tiebreak.away) : '' } : blankSet());
+function fromCourt(type, c) {
+  if (!c) return blankCourt(type);
+  if (type === 'singles') return fromSet(c.set);
+  if (type === 'super') return { a: String(c.home), b: String(c.away) };
+  const third = c.third?.format === 'matchTiebreak' ? { format: 'matchTiebreak', ...blankSet(), a: String(c.third.home), b: String(c.third.away) } : c.third?.format === 'fullSet' ? { format: 'fullSet', ...fromSet(c.third.set) } : { format: '', ...blankSet() };
+  return { sets: c.sets.map(fromSet), third };
+}
+const splitSets = sets => { const [x, y] = sets.map(set => validateDoublesSet(toSet(set)).winner); return !!x && !!y && x !== y; };
+function toCourt(type, v) {
+  if (type === 'singles') return { type, set: toSet(v) };
+  if (type === 'super') return { type, home: num(v.a), away: num(v.b) };
+  const split = splitSets(v.sets), t = v.third;
+  const third = !split ? null : t.format === 'matchTiebreak' ? { format: 'matchTiebreak', home: num(t.a), away: num(t.b) } : t.format === 'fullSet' ? { format: 'fullSet', set: toSet(t) } : { format: '' };
+  return { type, sets: v.sets.map(toSet), ...(third ? { third } : {}) };
+}
+
+function Points({ label, a, b, onA, onB, homeName, awayName, max = 99 }) {
+  return (
+    <span className="score-pair">
+      <input type="number" inputMode="numeric" min="0" max={max} aria-label={`${label} ${homeName}`} value={a} onChange={e => onA(e.target.value)} />
+      <span aria-hidden="true">–</span>
+      <input type="number" inputMode="numeric" min="0" max={max} aria-label={`${label} ${awayName}`} value={b} onChange={e => onB(e.target.value)} />
+    </span>
+  );
+}
+
+// One set (or pro set): the games, plus tiebreak points when the score needs them.
+function SetRow({ label, value, onChange, tbAt, games, homeName, awayName }) {
+  const hi = Math.max(Number(value.a), Number(value.b)), lo = Math.min(Number(value.a), Number(value.b));
+  const needsTiebreak = value.a !== '' && value.b !== '' && hi === games && lo === tbAt;
+  const set = patch => onChange({ ...value, ...patch });
+  return (
+    <div className="set-row">
+      <span className="set-label">{label}</span>
+      <Points label={label} a={value.a} b={value.b} onA={a => set({ a })} onB={b => set({ b })} homeName={homeName} awayName={awayName} max={games} />
+      {needsTiebreak && <span className="tiebreak-entry">tiebreak <Points label={`${label} tiebreak`} a={value.ta} b={value.tb} onA={ta => set({ ta })} onB={tb => set({ tb })} homeName={homeName} awayName={awayName} /></span>}
+    </div>
+  );
+}
+
+function CourtEntry({ court, value, onChange, homeName, awayName }) {
+  const names = { homeName, awayName };
+  if (court.type === 'singles') return <SetRow label="Pro set" value={value} onChange={onChange} tbAt={7} games={8} {...names} />;
+  if (court.type === 'super') return <div className="set-row"><span className="set-label">10-point tiebreak</span><Points label="Tiebreak" a={value.a} b={value.b} onA={a => onChange({ ...value, a })} onB={b => onChange({ ...value, b })} {...names} /></div>;
+  const setAt = (i, v) => onChange({ ...value, sets: value.sets.map((x, k) => (k === i ? v : x)) });
+  const t = value.third, split = splitSets(value.sets);
+  return (
+    <>
+      {value.sets.map((set, i) => <SetRow key={i} label={`Set ${i + 1}`} value={set} onChange={v => setAt(i, v)} tbAt={3} games={4} {...names} />)}
+      {split && (
+        <div className="set-row">
+          <label className="set-label">Third set
+            <select aria-label={`${court.label} third-set format`} value={t.format} onChange={e => onChange({ ...value, third: { ...t, format: e.target.value } })}>
+              <option value="">Choose format…</option>
+              <option value="matchTiebreak">10-point match tiebreak</option>
+              <option value="fullSet">Full set</option>
+            </select>
+          </label>
+          {t.format === 'matchTiebreak' && <Points label="Match tiebreak" a={t.a} b={t.b} onA={a => onChange({ ...value, third: { ...t, a } })} onB={b => onChange({ ...value, third: { ...t, b } })} {...names} />}
+          {t.format === 'fullSet' && <SetRow label="Third set" value={t} onChange={v => onChange({ ...value, third: { format: 'fullSet', ...v } })} tbAt={3} games={4} {...names} />}
+        </div>
+      )}
+    </>
+  );
+}
+
 function ScoreForm({ fixture, teams, admin, onSubmit }) {
-  const format = FORMATS[fixture.format || 'rr'], playoff = fixture.format === 'po';
+  const format = FORMATS[fixture.format || 'rr'];
   const start = fixture.submission || fixture.result;
-  const [matches, setMatches] = useState(() => format.map(({ key }, i) => ({ key, winner: start?.matches?.[i]?.winner || '', score: start?.matches?.[i]?.score || '' })));
+  const [courts, setCourts] = useState(() => Object.fromEntries(format.map(({ key, type }) => [key, fromCourt(type, start?.courts?.[key])])));
   const [lineups, setLineups] = useState(() => ({ home: start?.lineups?.home || {}, away: start?.lineups?.away || {} }));
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const home = teams.get(fixture.home), away = teams.get(fixture.away);
-  const set = (i, field, value) => setMatches(old => old.map((m, k) => (k === i ? { ...m, [field]: value } : m)));
-  // In playoffs, matches after a team reaches three wins are not played; the super tiebreak only at 2–2.
-  const open = [], wins = { home: 0, away: 0 };
-  for (const m of matches) {
-    const live = !(playoff && (wins.home === 3 || wins.away === 3)) && !(playoff && m.key === 'stb' && !(wins.home === 2 && wins.away === 2));
-    open.push(live);
-    if (live && m.winner) wins[m.winner]++;
-  }
-  const played = matches.map((m, i) => (open[i] ? m : { ...m, winner: '', score: '' }));
+  const homeName = teamName(home), awayName = teamName(away);
+  const entered = Object.fromEntries(format.map(({ key, type }) => [key, toCourt(type, courts[key])]));
+  const checks = Object.fromEntries(format.map(({ key }) => [key, validateCourt(entered[key])]));
   const lineupsDone = ['home', 'away'].every(side => lineups[side].d1 && lineups[side].d2Partner);
-  const decided = playoff ? wins.home === 3 || wins.away === 3 : played.every(m => m.winner);
-  const complete = lineupsDone && decided && played.every((m, i) => !open[i] || m.winner);
-  const [h, a] = tally(played);
+  const scored = validateMatchScore(fixture.format || 'rr', entered).valid;
+  const total = scored ? matchResult(fixture.format || 'rr', entered) : null;
+  const complete = lineupsDone && scored;
 
   async function submit(event) {
     event.preventDefault();
+    if (!scored) { setError(SCORE_ERRORS.incomplete); return; }
     setBusy(true); setError('');
-    try { await onSubmit({ matches: played, lineups }); } catch (e) { setError(e.message); setBusy(false); }
+    try { await onSubmit({ courts: entered, lineups }); } catch (e) { setError(e.message); setBusy(false); }
   }
   const sidePlayers = side => (lineups[side].d1 && lineups[side].d2Partner ? Object.fromEntries(format.map(m => [m.key, m.players(deriveLineup(lineups[side]))])) : null);
   const names = (side, key) => { const p = sidePlayers(side); return p ? p[key].map(r => playerName(side === 'home' ? home : away, r)).join(' + ') : null; };
 
   return (
-    <form className="score-form" onSubmit={submit} aria-label={`Score for ${teamName(home)} v ${teamName(away)}`}>
+    <form className="score-form" onSubmit={submit} aria-label={`Score for ${homeName} v ${awayName}`}>
       <div className="lineups">
         {['home', 'away'].map(side => <LineupPicker key={side} team={side === 'home' ? home : away} format={format} value={lineups[side]} onChange={value => setLineups(old => ({ ...old, [side]: value }))} />)}
       </div>
-      <p className="small">Write each score from the winner’s side, e.g. 6-4 3-6 10-8.</p>
-      {format.map(({ key, label }, i) => (
-        <fieldset key={key} className={`score-row${open[i] ? '' : ' unplayed'}`} disabled={busy || !open[i]}>
-          <legend>{label}</legend>
-          <div className="segmented wide" role="group" aria-label={`${label} winner`}>
-            {['home', 'away'].map(side => <button key={side} type="button" aria-pressed={played[i].winner === side} onClick={() => set(i, 'winner', side)}>{names(side, key) || teamName(side === 'home' ? home : away)}</button>)}
-          </div>
-          <input type="text" inputMode="numeric" aria-label={`${label} score`} placeholder={open[i] ? 'e.g. 6-4 3-6 10-8' : 'Not played'} maxLength={40} value={played[i].score} onChange={e => set(i, 'score', e.target.value)} />
-        </fieldset>
-      ))}
-      {decided && <p className="score-preview">Encounter: <strong>{teamName(encounterWinner(played) === 'home' ? home : away)}</strong> win {Math.max(h, a)}–{Math.min(h, a)}</p>}
+      <p className="small">Enter each score with {homeName} first, then {awayName}.</p>
+      {format.map(court => {
+        const shown = checks[court.key].errors.filter(e => e !== SCORE_ERRORS.incomplete);
+        return (
+          <fieldset key={court.key} className="score-row" disabled={busy}>
+            <legend>{court.label}</legend>
+            <p className="small court-players">{names('home', court.key) || homeName} <span className="muted">v</span> {names('away', court.key) || awayName}</p>
+            <CourtEntry court={court} value={courts[court.key]} onChange={v => setCourts(old => ({ ...old, [court.key]: v }))} homeName={homeName} awayName={awayName} />
+            {shown.map(message => <p key={message} className="small warn-text" role="alert">{message}</p>)}
+          </fieldset>
+        );
+      })}
+      {total && <p className="score-preview">Encounter: <strong>{teamName(total.winner === 'home' ? home : away)}</strong> win {total.score} on courts · games {total.gamesHome}–{total.gamesAway}</p>}
       {!lineupsDone && <p className="small">Choose both lineups to submit.</p>}
       <Message error>{error}</Message>
       <button className="button small" disabled={busy || !complete}>{busy ? 'Saving…' : admin ? 'Save final result' : 'Submit score for approval'}</button>
@@ -180,7 +251,7 @@ export function StandingsTable({ rows, highlight = new Set(), rules, archived = 
   return (
     <div className="table-wrap">
       <table className="standings league-table">
-        <thead><tr><th scope="col">#</th><th scope="col">Team</th><th scope="col" className="num">P</th><th scope="col" className="num">W</th><th scope="col" className="num">L</th><th scope="col" className="num matches-col">Matches</th><th scope="col" className="num">Pts</th><th scope="col" className="form-col">Form</th></tr></thead>
+        <thead><tr><th scope="col">#</th><th scope="col">Team</th><th scope="col" className="num">P</th><th scope="col" className="num">W</th><th scope="col" className="num">L</th><th scope="col" className="num matches-col">Courts</th><th scope="col" className="num matches-col">Games</th><th scope="col" className="num">Pts</th><th scope="col" className="form-col">Form</th></tr></thead>
         <tbody>
           {rows.map(row => (
             <tr key={row.team.teamId} className={`${row.position <= spots ? 'qualify' : ''}${row.position === spots ? ' cutoff' : ''}${highlight.has(row.team.teamId) ? ' mine' : ''}`}>
@@ -189,14 +260,15 @@ export function StandingsTable({ rows, highlight = new Set(), rules, archived = 
               <td className="num">{row.played}</td>
               <td className="num">{row.won}</td>
               <td className="num">{row.lost}</td>
-              <td className="num matches-col">{row.matchesWon}–{row.matchesLost}</td>
+              <td className="num matches-col">{row.courtsWon ?? row.matchesWon}–{row.courtsLost ?? row.matchesLost}</td>
+              <td className="num matches-col">{row.gamesWon}–{row.gamesLost}</td>
               <td className="num strong">{row.points}</td>
               <td className="form-col"><span className="form">{row.form.map((r, i) => <i key={i} className={r === 'W' ? 'win' : 'loss'}>{r}</i>)}</span></td>
             </tr>
           ))}
         </tbody>
       </table>
-      <p className="table-note">Top {spots} qualify for the playoffs · {rules?.pointsPerWin ?? 2} points per encounter win · ties: match difference, then matches won · ⇅ place changed by a challenge.</p>
+      <p className="table-note">Top {spots} qualify for the playoffs · {rules?.pointsPerWin ?? 1} point per encounter win · ties: head-to-head, court difference, game difference, games won · ⇅ place changed by a challenge.</p>
     </div>
   );
 }

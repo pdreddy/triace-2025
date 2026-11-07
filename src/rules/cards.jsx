@@ -134,6 +134,7 @@ export function ruleCards(tierConfig = DEFAULT_TIERS, rules = DEFAULT_LEAGUE_RUL
       <>
         <Head num="03" title="Match format · round robin" />
         <p className="rule-text">In round robin, <strong>each team meets every other team once</strong>; an odd number of teams means one bye per round. An encounter has <strong>three matches: Doubles 1, Doubles 2, then Singles</strong>. Win two of the three to win the encounter.</p>
+        <p className="rule-text"><strong>Singles</strong> is one 8-game pro set (tiebreak at 7-7, so 8-7 is the longest). <strong>Doubles</strong> is best of three short sets to 4 games, with a 7-point tiebreak at 3-3. If the first two sets split, the third is a 10-point match tiebreak or a full short set. Tiebreak points never count as games.</p>
         <ol className="rule-steps three">
           <li><strong>Doubles 1</strong><span>Any two players pair up.</span><span className="chips"><span className="chip on">P1 + P2</span></span></li>
           <li><strong>Doubles 2</strong><span>The third player pairs with one of the Doubles 1 players. The Doubles 1 pair can’t play together again.</span><span className="chips"><span className="chip on">P1 + P3</span><span className="chip on">P2 + P3</span><span className="chip off">P1 + P2</span></span></li>
@@ -177,7 +178,7 @@ export function ruleCards(tierConfig = DEFAULT_TIERS, rules = DEFAULT_LEAGUE_RUL
           <div className="rule-box qualify"><span className="rule-label">More than {rules.playoffThreshold} teams</span><b className="qualify-num">{rules.playoffSpotsLarge}</b><strong className="rule-big">Top {rules.playoffSpotsLarge} qualify</strong><Seats filled={rules.playoffSpotsLarge} total={rules.playoffThreshold + 1} /></div>
           <div className="rule-box qualify"><span className="rule-label">{rules.playoffThreshold} or fewer teams</span><b className="qualify-num">{rules.playoffSpotsSmall}</b><strong className="rule-big">Top {rules.playoffSpotsSmall} qualify</strong><Seats filled={rules.playoffSpotsSmall} total={rules.playoffThreshold} /></div>
         </div>
-        <p className="rule-text">League standings: <strong>{rules.pointsPerWin} points</strong> per encounter win; ties break on match difference, then matches won.</p>
+        <p className="rule-text">League standings: <strong>{rules.pointsPerWin} {rules.pointsPerWin === 1 ? 'point' : 'points'}</strong> per encounter win; ties break on head-to-head, then court difference, game difference and games won. Only approved results count.</p>
       </>
     )
   },
@@ -253,18 +254,18 @@ export function ruleCards(tierConfig = DEFAULT_TIERS, rules = DEFAULT_LEAGUE_RUL
     body: (
       <>
         <Head num="06" title="Every playoff encounter · best of 5" />
-        <p className="rule-text">Teams share their <strong>lineups upfront</strong>, before the encounter starts. Play in the order below. Stop when one team wins three matches; play the fifth-match super tiebreak only if the score is 2–2.</p>
+        <p className="rule-text">Teams share their <strong>lineups upfront</strong>, before the encounter starts. Play all five courts in the order below; every court needs a completed score. The Doubles 3 court is a single 10-point tiebreak.</p>
         <ol className="rubbers">
           <li><Icon name="users" /><strong>Doubles 1</strong><span>Match 1</span><span className="chip on">P1 + P2</span></li>
           <li><Icon name="user" /><strong>Singles 1</strong><span>Match 2</span><span className="chip on">P3</span></li>
           <li><Icon name="users" /><strong>Doubles 2</strong><span>Match 3 · P3 + P1 or P2</span><span className="chip on">P1 + P3</span></li>
           <li><Icon name="user" /><strong>Singles 2</strong><span>Match 4 · player left out</span><span className="chip on">P2</span></li>
-          <li className="decider"><Icon name="bolt" /><strong>Super tiebreak</strong><span>Match 5 · 10 points · both singles players</span><span className="chip">P3 + P2</span></li>
+          <li className="decider"><Icon name="bolt" /><strong>Doubles 3</strong><span>Match 5 · one 10-point tiebreak · both singles players</span><span className="chip">P3 + P2</span></li>
         </ol>
         <div className="rule-box first-to">
           <strong className="rule-big">First to 3</strong>
           <Seats filled={3} total={5} />
-          <p className="rule-text">The first team to win 3 of the 5 matches advances to the next round.</p>
+          <p className="rule-text">The team that wins 3 of the 5 courts advances to the next round.</p>
         </div>
       </>
     )

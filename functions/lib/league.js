@@ -1,29 +1,25 @@
 // League play: round-robin fixtures, playoffs, captain score submissions with admin approval,
 // standings and player ratings. Like tournament.js, every apply* function takes the whole
 // tournament state and returns { state, result }.
+import { COURTS, validateCourt, cleanCourt, courtScoreText, SCORE_ERRORS, standings as scoreStandings, matchResult } from './scoring.js';
 import { ValidationError, DEFAULT_LEAGUE_RULES, DEFAULT_SEASON_NAME, rulesOf, isOwner, validateRegistration, publicRecord } from './tournament.js';
 
 export const ROLES = ['captain', 'ace1', 'ace2'];
 export const ROLE_LABELS = { captain: 'Captain', ace1: 'Ace 1', ace2: 'Ace 2' };
 // Who plays each match follows from two choices per team: the Doubles 1 pair and the Doubles 2 partner.
 // "third" sat out Doubles 1; "leftOut" is the Doubles 1 player who sits out Doubles 2.
-export const FORMATS = {
-  rr: [
-    { key: 'd1', label: 'Doubles 1', players: l => l.d1 },
-    { key: 'd2', label: 'Doubles 2', players: l => [l.third, l.d2Partner] },
-    { key: 's', label: 'Singles', players: l => [l.leftOut] }
-  ],
-  po: [
-    { key: 'd1', label: 'Doubles 1', players: l => l.d1 },
-    { key: 's1', label: 'Singles 1', players: l => [l.third] },
-    { key: 'd2', label: 'Doubles 2', players: l => [l.third, l.d2Partner] },
-    { key: 's2', label: 'Singles 2', players: l => [l.leftOut] },
-    { key: 'stb', label: 'Super tiebreak', players: l => [l.third, l.leftOut] }
-  ]
+// Courts and their types come from scoring.js; this adds which of a team's players take each court.
+const PLAYERS = {
+  d1: l => l.d1,
+  d2: l => [l.third, l.d2Partner],
+  d3: l => [l.third, l.leftOut],
+  s: l => [l.leftOut],
+  s1: l => [l.third],
+  s2: l => [l.leftOut]
 };
+export const FORMATS = Object.fromEntries(Object.entries(COURTS).map(([format, courts]) => [format, courts.map(c => ({ ...c, players: PLAYERS[c.key] }))]));
 export const MATCHES = FORMATS.rr;
 export const POINTS_PER_WIN = DEFAULT_LEAGUE_RULES.pointsPerWin;
-const SCORE_PATTERN = /^[0-9 ()\-–/,]{0,40}$/;
 const formatOf = fixture => FORMATS[fixture.format || 'rr'];
 
 function assert(condition, message) { if (!condition) throw new ValidationError(message); }
@@ -171,22 +167,21 @@ function advancePlayoffs(fixtures) {
   }
 }
 
-function validMatches(fixture, matches) {
-  const format = formatOf(fixture), playoff = fixture.format === 'po';
-  assert(Array.isArray(matches) && matches.length === format.length, `Enter a result for ${format.map(m => m.label).join(', ')}.`);
-  const wins = { home: 0, away: 0 };
-  return format.map(({ key, label }, i) => {
-    const m = matches[i];
-    assert(m && m.key === key, `Results must be in the order ${format.map(x => x.label).join(', ')}.`);
-    const decided = playoff && (wins.home === 3 || wins.away === 3);
-    if (decided) { assert(!m.winner, `${label} is not played once a team has won three matches.`); return { key, winner: '', score: '' }; }
-    if (playoff && key === 'stb') assert(wins.home === 2 && wins.away === 2, 'The super tiebreak is only played at 2–2.');
-    assert(m.winner === 'home' || m.winner === 'away', `Choose the winner of ${label}.`);
-    const score = typeof m.score === 'string' ? m.score.trim() : '';
-    assert(SCORE_PATTERN.test(score), `${label}: the score can only contain numbers, spaces and - ( ) / , characters.`);
-    wins[m.winner]++;
-    return { key, winner: m.winner, score };
-  });
+// Checks every court with the scoring rules and returns what is stored: the cleaned courts, a
+// per-court summary (`matches`, winner and score text from the winner's side) and the totals.
+function validCourts(fixture, courts) {
+  const format = formatOf(fixture);
+  assert(courts && typeof courts === 'object' && !Array.isArray(courts), SCORE_ERRORS.incomplete);
+  const clean = {};
+  for (const { key, label, type } of format) {
+    const check = validateCourt(courts[key] && { ...courts[key], type });
+    if (!check.valid) throw new ValidationError(check.errors[0] === SCORE_ERRORS.incomplete ? SCORE_ERRORS.incomplete : `${label}: ${check.errors.join(' ')}`);
+    clean[key] = cleanCourt({ ...courts[key], type });
+  }
+  const totals = matchResult(fixture.format || 'rr', clean);
+  const matches = format.map(({ key }) => ({ key, winner: totals.courts[key].winner, score: courtScoreText(clean[key], totals.courts[key].winner) }));
+  const { courts: perCourt, ...summary } = totals;
+  return { courts: clean, matches, summary: { ...summary, perCourt } };
 }
 export function encounterWinner(matches) {
   const home = matches.filter(m => m.winner === 'home').length, away = matches.filter(m => m.winner === 'away').length;
@@ -207,8 +202,8 @@ export function applySubmitResult(current, payload, uid, isAdmin = false, now = 
   const side = owns(fixture.home) ? 'home' : owns(fixture.away) ? 'away' : null;
   assert(isAdmin || side, 'Only the captains of these two teams can submit this score.');
   assert(isAdmin || fixture.status !== 'final', 'This result is final. Ask the admin to correct it.');
-  const matches = validMatches(fixture, payload.matches), lineups = validLineups(payload.lineups);
-  const entry = { matches, winner: encounterWinner(matches), ...(lineups ? { lineups } : {}) };
+  const { courts, matches, summary } = validCourts(fixture, payload.courts), lineups = validLineups(payload.lineups);
+  const entry = { courts, matches, ...summary, ...(lineups ? { lineups } : {}) };
   const state = structuredClone(current), fixtures = state.fixtures[payload.tierId], target = fixtures[payload.fixtureId];
   target.completedAt ??= now;
   if (isAdmin) {
@@ -241,24 +236,22 @@ export function applyReviewResult(current, payload, now = Date.now()) {
   return { state, result: { status: target.status } };
 }
 
-// Standings from final round-robin results: points per encounter win (admin setting, default 2);
-// ties break on match difference, then matches won, then combined UTR.
+// Standings from final (approved) round-robin results: 1 point per encounter win (the admin setting
+// scales the points shown). Order: points, head-to-head, court difference, game difference, games won.
+const resultTotals = result => {
+  if (result.courtsHome != null) return result;
+  const courtsHome = (result.matches || []).filter(m => m.winner === 'home').length, courtsAway = (result.matches || []).filter(m => m.winner === 'away').length;
+  return { ...result, courtsHome, courtsAway, gamesHome: 0, gamesAway: 0 }; // results saved before game totals were recorded
+};
 export function standings(teams, fixtures, rules = DEFAULT_LEAGUE_RULES) {
-  const rows = new Map(teams.map(t => [t.teamId, { team: t, played: 0, won: 0, lost: 0, matchesWon: 0, matchesLost: 0, points: 0, form: [] }]));
   const finals = Object.values(fixtures || {}).filter(f => isLeague(f) && f.status === 'final' && f.result).sort((a, b) => a.round - b.round || a.result.approvedAt - b.result.approvedAt);
+  const byId = new Map(teams.map(t => [t.teamId, t])), form = new Map(teams.map(t => [t.teamId, []]));
   for (const f of finals) {
-    const home = rows.get(f.home), away = rows.get(f.away);
-    if (!home || !away) continue;
-    const homeMatches = f.result.matches.filter(m => m.winner === 'home').length, awayMatches = f.result.matches.filter(m => m.winner === 'away').length;
-    for (const [row, won, mine, theirs] of [[home, f.result.winner === 'home', homeMatches, awayMatches], [away, f.result.winner === 'away', awayMatches, homeMatches]]) {
-      row.played++; row.matchesWon += mine; row.matchesLost += theirs;
-      if (won) { row.won++; row.points += rules.pointsPerWin; } else row.lost++;
-      row.form.push(won ? 'W' : 'L');
-    }
+    if (!byId.has(f.home) || !byId.has(f.away)) continue;
+    form.get(f.home).push(f.result.winner === 'home' ? 'W' : 'L'); form.get(f.away).push(f.result.winner === 'away' ? 'W' : 'L');
   }
-  const table = [...rows.values()]
-    .map(row => ({ ...row, form: row.form.slice(-5) }))
-    .sort((a, b) => b.points - a.points || (b.matchesWon - b.matchesLost) - (a.matchesWon - a.matchesLost) || b.matchesWon - a.matchesWon || b.team.combinedUtr - a.team.combinedUtr);
+  const table = scoreStandings(teams.map(t => t.teamId), finals.map(f => ({ home: f.home, away: f.away, status: 'final', result: resultTotals(f.result) })))
+    .map(row => ({ ...row, team: byId.get(row.teamId), played: row.matchesPlayed, won: row.wins, lost: row.losses, matchesWon: row.courtsWon, matchesLost: row.courtsLost, points: row.wins * (rules.pointsPerWin ?? 1), form: form.get(row.teamId).slice(-5) }));
   return swapChallengers(table, fixtures).map((row, i) => ({ ...row, position: i + 1 }));
 }
 // A challenger who wins takes the challenged team's place and the two swap.
@@ -367,7 +360,7 @@ export const playoffSpots = (teamCount, rules = DEFAULT_LEAGUE_RULES) => Math.mi
 const K = { singles: 0.3, doubles: 0.24, tiebreak: 0.12 }, SPREAD = 0.75;
 export const playerId = (teamId, role) => `${teamId}:${role}`;
 export function gameShare(score) {
-  const sets = [...String(score || '').matchAll(/(\d+)\s*[-–]\s*(\d+)/g)].map(m => [Number(m[1]), Number(m[2])]);
+  const sets = [...String(score || '').replace(/\([^)]*\)/g, '').matchAll(/(\d+)\s*[-–]\s*(\d+)/g)].map(m => [Number(m[1]), Number(m[2])]);
   if (!sets.length) return 0.65;
   let won = 0, lost = 0;
   // Scores are written from the winner's side; a match tiebreak (to 10) counts as one game.
@@ -397,7 +390,7 @@ export function playerRatings(teams, fixturesByTier) {
       const winners = ids(m.winner), losers = ids(m.winner === 'home' ? 'away' : 'home');
       if (!winners.length || !losers.length) return;
       const avg = list => list.reduce((s, id) => s + players.get(id).rating, 0) / list.length;
-      const type = format.key === 'stb' ? 'tiebreak' : winners.length === 1 ? 'singles' : 'doubles';
+      const type = format.key === 'd3' ? 'tiebreak' : winners.length === 1 ? 'singles' : 'doubles';
       const delta = K[type] * (gameShare(m.score) - expected(avg(winners), avg(losers)));
       const record = (list, won, opponents) => list.forEach(id => {
         const p = players.get(id), change = won ? delta : -delta;
