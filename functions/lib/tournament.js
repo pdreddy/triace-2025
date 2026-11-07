@@ -117,8 +117,18 @@ export function validateRegistration(payload, settings, tiers, gapLimit = UTR_GA
   assert(assignedTier, 'Your team does not qualify for the selected tier. Choose an eligible tier or contact the tournament admin.');
   return { teamId: payload.teamId, captain, ace1, ace2, ...(pprcIds ? { pprcIds } : {}), ...Object.fromEntries(['whatsappPhone', 'ace1Phone', 'ace2Phone'].filter(key => Object.hasOwn(payload, key)).map(key => [key, normalizeWhatsAppPhone(payload[key])])), combinedUtr, selectedTier: payload.selectedTier, assignedTier, listedTiers: listedTiers(combinedUtr, tiers, payload.selectedTier), rulesAccepted: true };
 }
+// A PPRC rating counts as verified once the player has played more than this many rated matches; until then it shows as "NR".
+export const PPRC_VERIFIED_AFTER = 5;
+// What the public sees per player: the rating only when verified, otherwise just that it is not rated. The id and the
+// provisional number stay private.
+export function publicPprc(team) {
+  const links = team.pprcLinks;
+  if (!links || !Object.keys(links).length) return null;
+  return Object.fromEntries(['captain', 'ace1', 'ace2'].filter(role => links[role]).map(role => [role, links[role].matches > PPRC_VERIFIED_AFTER ? { verified: true, rating: links[role].overall } : { verified: false }]));
+}
 export function publicRecord(team, settings = DEFAULT_SETTINGS) {
-  return { teamId: team.teamId, captainFirstName: team.captain.firstName, captainUtr: team.captain.utr, ace1Utr: team.ace1.utr, ace2Utr: team.ace2.utr, ...(!settings.aceNameMaskingEnabled && team.rulesAccepted === true ? { ace1Name: team.ace1.fullName, ace2Name: team.ace2.fullName } : {}), combinedUtr: team.combinedUtr, assignedTier: team.assignedTier, registeredAt: team.registeredAt };
+  const pprc = publicPprc(team);
+  return { teamId: team.teamId, captainFirstName: team.captain.firstName, captainUtr: team.captain.utr, ace1Utr: team.ace1.utr, ace2Utr: team.ace2.utr, ...(!settings.aceNameMaskingEnabled && team.rulesAccepted === true ? { ace1Name: team.ace1.fullName, ace2Name: team.ace2.fullName } : {}), combinedUtr: team.combinedUtr, assignedTier: team.assignedTier, registeredAt: team.registeredAt, ...(pprc ? { pprc } : {}) };
 }
 export function initialState() { return { settings: { ...DEFAULT_SETTINGS }, tierConfig: structuredClone(DEFAULT_TIERS), configRevision: 1, registrations: {}, tiers: {} }; }
 // First visitor may trigger this through the callable backend. Preserve any existing tournament

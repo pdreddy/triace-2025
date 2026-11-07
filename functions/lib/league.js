@@ -3,7 +3,7 @@
 // tournament state and returns { state, result }.
 import { computePprc } from './pprc.js';
 import { COURTS, validateCourt, cleanCourt, courtScoreText, SCORE_ERRORS, standings as scoreStandings, matchResult } from './scoring.js';
-import { ValidationError, DEFAULT_LEAGUE_RULES, DEFAULT_SEASON_NAME, rulesOf, isOwner, validateRegistration, publicRecord } from './tournament.js';
+import { PPRC_VERIFIED_AFTER, ValidationError, DEFAULT_LEAGUE_RULES, DEFAULT_SEASON_NAME, rulesOf, isOwner, validateRegistration, publicRecord } from './tournament.js';
 
 export const ROLES = ['captain', 'ace1', 'ace2'];
 export const ROLE_LABELS = { captain: 'Captain', ace1: 'Ace 1', ace2: 'Ace 2' };
@@ -316,6 +316,37 @@ export function applyUpdateTeam(current, payload, uid, isAdmin = false) {
   state.registrations[teamId] = record;
   placeTeam(state, record);
   return { state, result: { teamId, listedTiers: record.listedTiers, combinedUtr: record.combinedUtr } };
+}
+// The admin checks each registered player against the shared PPRC list and links them. `player` is the PPRC player's
+// current figures (read by the admin's browser from the shared database); null removes the link. A rating shows as verified
+// once the player has played more than PPRC_VERIFIED_AFTER rated matches, otherwise as NR.
+const PPRC_PLAYER_ID = /^p_[a-z0-9_]{2,100}$/;
+export function applyLinkPprc(current, payload, isAdmin = false, now = Date.now()) {
+  assert(isAdmin, 'Only the admin can link PPRC players.');
+  const links = payload?.links;
+  assert(Array.isArray(links) && links.length >= 1 && links.length <= 300, 'Choose at least one player to link.');
+  const state = structuredClone(current);
+  const touched = new Set();
+  for (const link of links) {
+    assert(link && typeof link === 'object', 'Invalid PPRC link.');
+    const record = state.registrations?.[link.teamId];
+    assert(record, 'That team no longer exists.');
+    assert(['captain', 'ace1', 'ace2'].includes(link.role), 'Invalid player role.');
+    if (link.player === null) { if (record.pprcLinks) { delete record.pprcLinks[link.role]; if (!Object.keys(record.pprcLinks).length) delete record.pprcLinks; } touched.add(link.teamId); continue; }
+    const p = link.player;
+    assert(p && typeof p === 'object' && PPRC_PLAYER_ID.test(p.id || ''), 'Invalid PPRC player.');
+    for (const key of ['overall', 'singles', 'doubles']) assert(Number.isFinite(p[key]) && p[key] >= 1 && p[key] <= 16.5, 'Invalid PPRC rating.');
+    assert(Number.isInteger(p.matches) && p.matches >= 0 && p.matches <= 100000, 'Invalid PPRC match count.');
+    record.pprcLinks ||= {};
+    record.pprcLinks[link.role] = { id: p.id, overall: Number(p.overall.toFixed(2)), singles: Number(p.singles.toFixed(2)), doubles: Number(p.doubles.toFixed(2)), matches: p.matches, verified: p.matches > PPRC_VERIFIED_AFTER, linkedAt: now };
+    touched.add(link.teamId);
+  }
+  for (const teamId of touched) {
+    const ids = Object.values(state.registrations[teamId].pprcLinks || {}).map(l => l.id);
+    assert(new Set(ids).size === ids.length, 'The same PPRC player cannot be linked twice in one team.');
+    placeTeam(state, state.registrations[teamId]);
+  }
+  return { state, result: { linked: links.filter(l => l.player).length, unlinked: links.filter(l => !l.player).length } };
 }
 // Withdrawing removes the team and its unplayed fixtures; its finished results stop counting.
 export function applyWithdrawTeam(current, payload, uid, isAdmin = false, now = Date.now()) {

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTournament } from '../hooks/useTournament';
-import { TeamCard, Message, Stat, EmptyState, tierTone } from '../components/UI';
+import { TeamCard, Message, Stat, EmptyState, PprcBadge, tierTone } from '../components/UI';
 import { Icon } from '../components/Icons';
 import { orderedTiers, formatUtr } from '../../functions/lib/tournament.js';
 
@@ -18,9 +18,9 @@ function Standings({ teams, ranks }) {
               <td className="rank-cell">{ranks.get(t.teamId)}</td>
               <td><b>{t.captainFirstName}</b></td>
               <td className="muted">{t.ace1Name || 'Ace 1 (masked)'} · {t.ace2Name || 'Ace 2 (masked)'}</td>
-              <td className="num">{formatUtr(t.captainUtr)}</td>
-              <td className="num">{formatUtr(t.ace1Utr)}</td>
-              <td className="num">{formatUtr(t.ace2Utr)}</td>
+              <td className="num">{formatUtr(t.captainUtr)}<br /><PprcBadge info={t.pprc?.captain} /></td>
+              <td className="num">{formatUtr(t.ace1Utr)}<br /><PprcBadge info={t.pprc?.ace1} /></td>
+              <td className="num">{formatUtr(t.ace2Utr)}<br /><PprcBadge info={t.pprc?.ace2} /></td>
               <td className="num strong">{formatUtr(t.combinedUtr)}</td>
             </tr>
           ))}

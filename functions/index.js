@@ -2,7 +2,7 @@ import { initializeApp } from 'firebase-admin/app';
 import { getDatabase } from 'firebase-admin/database';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { applyRegistration, applyConfiguration, applyRecalculation, applyLeagueRules, bootstrapState, ValidationError } from './lib/tournament.js';
-import { applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult, applyManageSeason, applySetSchedule, applyMoveFixture, applyIssueChallenge, applyUpdateTeam, applyWithdrawTeam, applyClaimTeam, applyResetCaptainCode } from './lib/league.js';
+import { applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult, applyManageSeason, applySetSchedule, applyMoveFixture, applyIssueChallenge, applyUpdateTeam, applyLinkPprc, applyWithdrawTeam, applyClaimTeam, applyResetCaptainCode } from './lib/league.js';
 import { newCaptainCode, hashCaptainCode } from './lib/captainCode.js';
 initializeApp();
 const options = { region: 'us-central1', maxInstances: 10, timeoutSeconds: 60 };
@@ -55,6 +55,7 @@ export const setSchedule = onCall(options, async request => { requireAuth(reques
 export const moveFixture = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyMoveFixture(state, request.data)); });
 export const issueChallenge = onCall(options, async request => { requireAuth(request); return mutate(state => applyIssueChallenge(state, request.data, request.auth.uid, isAdmin(request))); });
 export const updateTeam = onCall(options, async request => { requireAuth(request); return mutate(state => applyUpdateTeam(state, request.data, request.auth.uid, isAdmin(request))); });
+export const linkPprc = onCall(options, async request => { requireAuth(request); return mutate(state => applyLinkPprc(state, request.data, isAdmin(request))); });
 export const withdrawTeam = onCall(options, async request => { requireAuth(request); return mutate(state => applyWithdrawTeam(state, request.data, request.auth.uid, isAdmin(request))); });
 export const claimTeam = onCall(options, async request => { requireAuth(request); return mutate(state => applyClaimTeam(state, { teamId: request.data?.teamId, codeHash: hashCaptainCode(request.data?.code) }, request.auth.uid)); });
 export const resetCaptainCode = onCall(options, async request => {

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { initialState, applyRegistration, applyRecalculation, applyLeagueRules, publicState, rulesOf, DEFAULT_LEAGUE_RULES } from '../../functions/lib/tournament.js';
-import { roundRobin, applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult, standings, playoffSpots, encounterWinner, deriveLineup, matchPlayers, playerRatings, playerId, gameShare, singlesEligibility, applyManageSeason } from '../../functions/lib/league.js';
+import { applyLinkPprc, roundRobin, applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult, standings, playoffSpots, encounterWinner, deriveLineup, matchPlayers, playerRatings, playerId, gameShare, singlesEligibility, applyManageSeason } from '../../functions/lib/league.js';
 
 const team = (captain, id, values = [600, 600, 600]) => ({ teamId: id, whatsappPhone:'+15551234567',ace1Phone:'+15551234568',ace2Phone:'+15551234569', captain: { firstName: captain, singlesUtr: values[0], doublesUtr: null }, ace1: { fullName: `${captain} Ace One`, singlesUtr: values[1], doublesUtr: null }, ace2: { fullName: `${captain} Ace Two`, singlesUtr: values[2], doublesUtr: null }, selectedTier: 'goat', consent: true, rulesAccepted: true });
 // Valid courts for the given winners: singles 8-3, doubles 4-1 4-1, playoff Doubles 3 10-5 (written for the home side, mirrored for away).
@@ -331,4 +331,42 @@ test('results saved before the court change (old match order, no totals) still r
   for (const [id, p] of modern) assert.equal(legacy.get(id).rating, p.rating, `${id} rating is the same from an old-order result`);
   const row = standings(Object.values(state.tiers.goat.teams), state.fixtures.goat).find(r => r.team.teamId === f.home);
   assert.deepEqual([row.won, row.matchesWon, row.matchesLost, row.gamesWon], [1, 2, 1, 0]);
+});
+
+test('the admin links registered players to PPRC; verified after more than 5 matches, otherwise NR; the public sees no ids', () => {
+  const state = league(2), teamId = Object.keys(state.registrations)[0];
+  const player = (id, overall, matches) => ({ id, overall, singles: overall, doubles: overall - 0.1, matches });
+  assert.throws(() => applyLinkPprc(state, { links: [{ teamId, role: 'ace1', player: player('p_a', 6, 8) }] }, false), /Only the admin/);
+  const linked = applyLinkPprc(state, { links: [
+    { teamId, role: 'captain', player: player('p_cap', 6.123, 6) },
+    { teamId, role: 'ace1', player: player('p_ace_one', 5.5, 5) },
+    { teamId, role: 'ace2', player: player('p_ace_two', 5.25, 40) }
+  ] }, true, 77);
+  assert.deepEqual(linked.result, { linked: 3, unlinked: 0 });
+  const record = linked.state.registrations[teamId];
+  assert.deepEqual([record.pprcLinks.captain.verified, record.pprcLinks.ace1.verified, record.pprcLinks.ace2.verified], [true, false, true], 'more than 5 matches is verified; exactly 5 is not');
+  assert.equal(record.pprcLinks.captain.overall, 6.12); assert.equal(record.pprcLinks.captain.linkedAt, 77);
+  const pub = Object.values(linked.state.tiers).flatMap(t => Object.values(t.teams)).find(t => t.teamId === teamId);
+  assert.deepEqual(pub.pprc, { captain: { verified: true, rating: 6.12 }, ace1: { verified: false }, ace2: { verified: true, rating: 5.25 } }, 'a rating shows only when verified');
+  const text = JSON.stringify(publicState(linked.state));
+  assert.ok(!text.includes('p_cap') && !text.includes('p_ace') && !text.includes('"matches":5'), 'ids and provisional figures stay private');
+  const again = applyLinkPprc(linked.state, { links: [{ teamId, role: 'ace1', player: player('p_ace_one', 5.9, 6) }, { teamId, role: 'captain', player: null }] }, true).state;
+  assert.equal(again.registrations[teamId].pprcLinks.captain, undefined, 'a link can be removed');
+  const pub2 = Object.values(again.tiers).flatMap(t => Object.values(t.teams)).find(t => t.teamId === teamId);
+  assert.deepEqual(pub2.pprc, { ace1: { verified: true, rating: 5.9 }, ace2: { verified: true, rating: 5.25 } });
+  const none = applyLinkPprc(again, { links: ['captain', 'ace1', 'ace2'].map(role => ({ teamId, role, player: null })) }, true).state;
+  assert.equal(none.registrations[teamId].pprcLinks, undefined); assert.equal(Object.values(none.tiers).flatMap(t => Object.values(t.teams))[0].pprc, undefined);
+});
+
+test('PPRC links are checked: known team and role, a valid player, no duplicate in one team', () => {
+  const state = league(2), teamId = Object.keys(state.registrations)[0], ok = { id: 'p_x_y', overall: 5, singles: 5, doubles: 5, matches: 3 };
+  const link = (extra = {}, player = ok) => applyLinkPprc(state, { links: [{ teamId, role: 'ace1', player, ...extra }] }, true);
+  assert.throws(() => link({ teamId: 'nope' }), /no longer exists/);
+  assert.throws(() => link({ role: 'ace3' }), /Invalid player role/);
+  assert.throws(() => link({}, { ...ok, id: 'Someone Else' }), /Invalid PPRC player/);
+  assert.throws(() => link({}, { ...ok, overall: 99 }), /Invalid PPRC rating/);
+  assert.throws(() => link({}, { ...ok, matches: -1 }), /match count/);
+  assert.throws(() => link({}, { ...ok, matches: 2.5 }), /match count/);
+  assert.throws(() => applyLinkPprc(state, { links: [] }, true), /at least one/);
+  assert.throws(() => applyLinkPprc(state, { links: [{ teamId, role: 'ace1', player: ok }, { teamId, role: 'ace2', player: ok }] }, true), /twice/);
 });

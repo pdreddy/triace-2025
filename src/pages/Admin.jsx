@@ -3,6 +3,7 @@ import { Link, Navigate } from 'react-router-dom';
 import { useTournament, useRegistrations } from '../hooks/useTournament';
 import { Field, Message, TeamCard, Stat } from '../components/UI';
 import { Icon } from '../components/Icons';
+import AdminPprc from '../components/AdminPprc';
 import { FixtureCard, teamIndex } from '../components/League';
 import { LeagueRulesCard, PlayoffPlanner, ScheduleForm, SeasonCard } from '../components/AdminLeague';
 import { TeamEditForm } from '../components/TeamTools';
@@ -12,7 +13,8 @@ const SECTIONS = [
   { id: 'settings', label: 'Registration & privacy', short: 'Settings', icon: 'shield' },
   { id: 'tiers', label: 'Tier configuration', short: 'Tiers', icon: 'trophy' },
   { id: 'teams', label: 'Private registrations', short: 'Teams', icon: 'register' },
-  { id: 'league', label: 'League & results', short: 'League', icon: 'calendar' }
+  { id: 'league', label: 'League & results', short: 'League', icon: 'calendar' },
+  { id: 'pprc', label: 'PPRC players', short: 'PPRC', icon: 'users' }
 ];
 const draftFrom = data => ({
   settings: { ...(data?.settings || DEFAULT_SETTINGS) },
@@ -55,6 +57,7 @@ export default function Admin() {
       setMessage('Rules saved. Public name visibility updates immediately; recalculate tiers if ranges changed.');
     });
   }
+  const linkPprc = links => action(async () => { const r = await service.linkPprc({ links }); setMessage(`PPRC: ${r.linked} linked, ${r.unlinked} unlinked. Public tier lists are updated.`); });
   function reload() { setDraft(draftFrom(data)); setDirty(false); setError(''); }
   function recalculate() {
     return action(async () => { setSummary(await service.recalculate()); setMessage('Tier recalculation completed.'); });
@@ -265,6 +268,9 @@ export default function Admin() {
             })}
             <Link className="secondary" to="/league">Open the League page ↗</Link>
           </div>
+
+          <SectionTitle id="pprc" num="05">PPRC players</SectionTitle>
+          <AdminPprc teams={teams} busy={busy || !connected} onLink={linkPprc} />
         </div>
       </div>
     </section>

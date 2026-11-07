@@ -86,3 +86,20 @@ leaves a record under `importLog/`. Deploy `database.multiclub.rules.json` first
 rules of the `multiclub-890ea` project): player data is publicly readable, nothing can be written from a browser, and the
 import runs with a service account, which is not bound by the rules. The app reads it from `/pprc` and `/pprc/<playerId>`
 (set `VITE_MULTICLUB_DATABASE_URL` to use another database).
+
+## Triace registrations and the PPRC tick
+Admin → **PPRC players** lists every registered player. Link each one to their PPRC profile (the player's own choice from
+registration is offered first; you can also search, and for a captain type the full name). Linking stores the player's
+current PPRC figures privately and puts only this on the public tier list, team page and player page:
+- **PPRC 5.87** with a verified seal (a scalloped badge with a tick) when the player has played more than 5 rated matches;
+- **PPRC NR** (not rated) for everyone else, including players with 5 or fewer matches or no link.
+
+*Refresh linked* re-reads the figures for every linked player (run it after new matches are rated). *Export for PPRC*
+downloads `triace-players.json`; then add those players to the shared list:
+```bash
+node scripts/import-triace-players.mjs triace-players.json --database-url https://multiclub-890ea-default-rtdb.firebaseio.com          # plan only
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json node scripts/import-triace-players.mjs triace-players.json --database-url https://multiclub-890ea-default-rtdb.firebaseio.com --write
+```
+Players already in PPRC are marked as playing in Triace; new players with a full name are created and seeded from their
+UTR; anyone with only a first name is skipped until you give a full name in the admin panel. Deploy the new `linkPprc`
+Cloud Function (`firebase deploy --only functions`) before using the panel on the live site.

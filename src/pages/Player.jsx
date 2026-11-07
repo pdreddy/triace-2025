@@ -1,6 +1,6 @@
 import { Link, useParams } from 'react-router-dom';
 import { useTournament } from '../hooks/useTournament';
-import { EmptyState, Stat } from '../components/UI';
+import { EmptyState, PprcBadge, Stat } from '../components/UI';
 import { playerName, teamName } from '../components/League';
 import { ROLE_LABELS, playerId } from '../../functions/lib/league.js';
 import { splitHistory } from '../../functions/lib/pprc.js';
@@ -49,7 +49,7 @@ export default function Player() {
         <div>
           <p className="eyebrow">{ROLE_LABELS[player.role]} · <Link to={`/team/${teamId}`}>{teamName(team)}</Link></p>
           <h1>{playerName(team, player.role)}</h1>
-          <p className="team-hero-utr"><b>{player.rating.toFixed(2)}</b> Triace rating <span className={`change ${change > 0.004 ? 'up' : change < -0.004 ? 'down' : ''}`}>{total ? signed(change) : ''}</span></p>
+          <p className="team-hero-utr"><b>{player.rating.toFixed(2)}</b> Triace rating <span className={`change ${change > 0.004 ? 'up' : change < -0.004 ? 'down' : ''}`}>{total ? signed(change) : ''}</span> <PprcBadge info={team.pprc?.[player.role]} /></p>
         </div>
         <span className="rating-badge" aria-label={`Ranked ${rank} of ${players.length}`}><small>Rank</small>#{rank}</span>
       </header>

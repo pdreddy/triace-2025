@@ -45,3 +45,43 @@ export function clean(value) {
   if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined).map(([k, v]) => [k, clean(v)]));
   return value;
 }
+
+// ---------- Triace registrations -> the shared player list ----------
+import { PPRC_PARAMS, displayName, nameKey, playerIdFor } from './pprc.js';
+
+// entries: the admin's export of registered players [{ teamId, role, name, firstName?, singlesUtr, doublesUtr, pprcId }].
+// master: { nameIndex: { key: id }, playerList: { id: { clubs: [...] ... } } } as it is today.
+// Players already in the list are only marked as playing in Triace; new players with a full name are created and
+// seeded from their UTR; anyone with just a first name is skipped until the admin gives a full name.
+export function planTriacePlayers(entries, master = {}) {
+  const nameIndex = master.nameIndex || {}, list = master.playerList || {};
+  const writes = {}, summary = { created: [], marked: [], skipped: [] };
+  const seen = new Set();
+  const mark = id => {
+    if (seen.has(`mark:${id}`)) return; seen.add(`mark:${id}`);
+    const clubs = [...new Set([...(list[id]?.clubs || []), 'triace'])];
+    writes[`pprcMaster/players/${id}/clubs/triace`] = true;
+    writes[`pprcMaster/playerList/${id}/clubs`] = clubs;
+  };
+  for (const entry of entries || []) {
+    const label = `${entry.name || entry.firstName || '?'} (${entry.teamId}:${entry.role})`;
+    if (entry.pprcId) {
+      if (list[entry.pprcId] || Object.values(nameIndex).includes(entry.pprcId)) { mark(entry.pprcId); summary.marked.push({ id: entry.pprcId, label }); }
+      else summary.skipped.push({ label, reason: `unknown PPRC id ${entry.pprcId}` });
+      continue;
+    }
+    const key = nameKey(entry.name);
+    if (!key || key.split(' ').length < 2) { summary.skipped.push({ label, reason: 'needs a full name' }); continue; }
+    if (nameIndex[key]) { mark(nameIndex[key]); summary.marked.push({ id: nameIndex[key], label }); continue; }
+    const id = playerIdFor(key);
+    if (seen.has(`new:${id}`)) continue; seen.add(`new:${id}`);
+    const singles = Number(entry.singlesUtr) || PPRC_PARAMS.defaultSeed, doubles = Number(entry.doublesUtr) || singles;
+    const overall = Number(((singles + doubles) / 2).toFixed(2));
+    writes[`pprcMaster/players/${id}`] = { name: displayName(entry.name), nameKey: key, clubs: { triace: true }, seed: { singles, doubles }, seedSource: 'triace registration' };
+    writes[`pprcMaster/nameIndex/${key}`] = id;
+    writes[`pprcMaster/ratings/${id}`] = { singles, doubles, overall, seed: { singles, doubles }, played: { singles: 0, doubles: 0 }, wins: 0, losses: 0, record: { singles: { wins: 0, losses: 0 }, doubles: { wins: 0, losses: 0 } }, lastPlayed: null, version: PPRC_PARAMS.version };
+    writes[`pprcMaster/playerList/${id}`] = { name: displayName(entry.name), overall, played: 0, clubs: ['triace'] };
+    summary.created.push({ id, name: displayName(entry.name), label });
+  }
+  return { writes, summary };
+}

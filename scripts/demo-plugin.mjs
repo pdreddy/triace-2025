@@ -2,7 +2,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
 import path from 'node:path';
 import { initialState, publicState, applyRegistration, applyConfiguration, applyRecalculation, applyLeagueRules, isOwner, ValidationError } from '../functions/lib/tournament.js';
-import { applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult, applyManageSeason, applySetSchedule, applyMoveFixture, applyIssueChallenge, applyUpdateTeam, applyWithdrawTeam, applyClaimTeam, applyResetCaptainCode } from '../functions/lib/league.js';
+import { applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult, applyManageSeason, applySetSchedule, applyMoveFixture, applyIssueChallenge, applyUpdateTeam, applyLinkPprc, applyWithdrawTeam, applyClaimTeam, applyResetCaptainCode } from '../functions/lib/league.js';
 import { newCaptainCode, hashCaptainCode } from '../functions/lib/captainCode.js';
 const digest = value => createHash('sha256').update(value).digest();
 export function demoPlugin(env) {
@@ -67,6 +67,7 @@ export function demoPlugin(env) {
         const signedIn = session && session.uid, admin = session?.admin === true;
         if (endpoint === '/issue-challenge') return signedIn ? send(200, await mutate(current => applyIssueChallenge(current, payload, session.uid, admin))) : send(401, { error: 'Sign in first.' });
         if (endpoint === '/update-team') return signedIn ? send(200, await mutate(current => applyUpdateTeam(current, payload, session.uid, admin))) : send(401, { error: 'Sign in first.' });
+        if (endpoint === '/link-pprc') return signedIn ? send(200, await mutate(current => applyLinkPprc(current, payload, admin))) : send(401, { error: 'Sign in first.' });
         if (endpoint === '/withdraw-team') return signedIn ? send(200, await mutate(current => applyWithdrawTeam(current, payload, session.uid, admin))) : send(401, { error: 'Sign in first.' });
         if (endpoint === '/claim-team') return signedIn ? send(200, await mutate(current => applyClaimTeam(current, { teamId: payload.teamId, codeHash: hashCaptainCode(payload.code) }, session.uid))) : send(401, { error: 'Sign in first.' });
         if (endpoint === '/submit-result') return session ? send(200, await mutate(current => applySubmitResult(current, payload, session.uid, session.admin === true))) : send(401, { error: 'Sign in before submitting a score.' });

@@ -30,6 +30,7 @@ export function createDemoService() {
     moveFixture: payload => request('move-fixture', payload),
     issueChallenge: payload => request('issue-challenge', payload),
     updateTeam: payload => request('update-team', payload),
+    linkPprc: payload => request('link-pprc', payload),
     withdrawTeam: payload => request('withdraw-team', payload),
     claimTeam: payload => request('claim-team', payload),
     resetCaptainCode: payload => request('reset-captain-code', payload),
