@@ -18,7 +18,7 @@ export default function AdminPprc({ teams, busy, onLink, onSync, publicByDefault
   const [search, setSearch] = useState({}), [fullNames, setFullNames] = useState({});
   const [upload, setUpload] = useState({ name: '', errors: [], plan: null }), [syncing, setSyncing] = useState(false);
   const [view, setView] = useState('registered'), [allQuery, setAllQuery] = useState(''), [allClub, setAllClub] = useState('all');
-  useEffect(() => { fetchPlayerList().then(setList).catch(e => setError(e.message)); }, []);
+  useEffect(() => { fetchPlayerList({ fresh: true }).then(setList).catch(e => setError(e.message)); }, []);
   const byId = useMemo(() => new Map((list || []).map(p => [p.id, p])), [list]);
 
   const rows = useMemo(() => Object.values(teams || {}).sort((a, b) => (a.registeredAt || 0) - (b.registeredAt || 0)).flatMap(team => ROLES.map(([role, label]) => {
@@ -44,7 +44,7 @@ export default function AdminPprc({ teams, busy, onLink, onSync, publicByDefault
       if (summary) {
         setNote(`PPRC updated: ${summary.updated} UTRs changed, ${summary.created} players added, ${summary.reRated} ratings moved (largest move ${summary.biggestChange}). Press “Refresh linked” to update the Triace badges.`);
         setUpload({ name: '', errors: [], plan: null });
-        fetchPlayerList().then(setList).catch(e => setError(e.message));
+        fetchPlayerList({ fresh: true }).then(setList).catch(e => setError(e.message));
       }
     } finally { setSyncing(false); }
   }

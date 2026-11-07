@@ -1,5 +1,5 @@
 // Checks the built app (dist/) is installable and works offline. Run after `npm run build`:  npm run check:pwa
-import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
 const dist = path.resolve(process.argv[2] || 'dist');

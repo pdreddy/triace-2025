@@ -6,8 +6,7 @@ import { useEffect, useState } from 'react';
 import { makeResolver } from '../data/nameResolver.js';
 import { fetchPlayerList } from './pprc.js';
 
-let loading = null;
-const listOnce = () => (loading ||= fetchPlayerList().catch(() => { loading = null; return []; }));
+const listOnce = () => fetchPlayerList().catch(() => []);
 export { makeResolver };
 
 // A resolver that starts with the migration decisions and gets the PPRC list as soon as it has loaded.

@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useTournament, useRegistrations } from '../hooks/useTournament';
 import { Field, Message, TeamCard } from '../components/UI';
-import { Icon } from '../components/Icons';
 import AdminPprc from '../components/AdminPprc';
 import AdminOverview from '../components/AdminOverview';
 import AdminTeams from '../components/AdminTeams';

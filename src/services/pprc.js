@@ -10,7 +10,17 @@ async function read(path) {
   return response.json();
 }
 
-export const fetchPlayerList = async () => Object.entries((await read('pprcMaster/playerList')) || {}).map(([id, p]) => ({ id, ...p }));
+// The list is shared by the player directory, profile ranks, names on Champions and the admin screen, so it is
+// downloaded once and reused for a few minutes (pass { fresh: true } after changing data).
+const LIST_TTL = 5 * 60 * 1000;
+let listCache = null;
+export function fetchPlayerList({ fresh = false } = {}) {
+  if (!fresh && listCache && Date.now() - listCache.at < LIST_TTL) return listCache.promise;
+  const promise = read('pprcMaster/playerList').then(tree => Object.entries(tree || {}).map(([id, p]) => ({ id, ...p })));
+  listCache = { at: Date.now(), promise };
+  promise.catch(() => { if (listCache?.promise === promise) listCache = null; }); // never cache a failure
+  return promise;
+}
 export async function fetchPlayer(id) {
   const [info, rating, recent, years] = await Promise.all([read(`pprcMaster/players/${id}`), read(`pprcMaster/ratings/${id}`), read(`pprcMaster/recent/${id}`), read(`pprcMaster/historyYears/${id}`)]);
   return info ? { id, info, rating, recent: recent || [], years: years || {} } : null;

@@ -4,7 +4,7 @@
 import { computePprc } from './pprc.js';
 import { COURTS, validateCourt, cleanCourt, courtScoreText, SCORE_ERRORS, standings as scoreStandings, matchResult } from './scoring.js';
 import { addDays, roundStart, validateBuffers, calendarOf } from './calendar.js';
-import { guard, seatTeam, promoteWaitlist, PPRC_VERIFIED_AFTER, ValidationError, DEFAULT_LEAGUE_RULES, DEFAULT_SEASON_NAME, rulesOf, isOwner, validateRegistration, publicRecord } from './tournament.js';
+import { guard, seatTeam, promoteWaitlist, PPRC_VERIFIED_AFTER, ValidationError, DEFAULT_LEAGUE_RULES, DEFAULT_SEASON_NAME, rulesOf, isOwner, validateRegistration } from './tournament.js';
 
 export const ROLES = ['captain', 'ace1', 'ace2'];
 export const ROLE_LABELS = { captain: 'Captain', ace1: 'Ace 1', ace2: 'Ace 2' };
@@ -20,8 +20,7 @@ const PLAYERS = {
   s2: l => [l.leftOut]
 };
 export const FORMATS = Object.fromEntries(Object.entries(COURTS).map(([format, courts]) => [format, courts.map(c => ({ ...c, players: PLAYERS[c.key] }))]));
-export const MATCHES = FORMATS.rr;
-export const POINTS_PER_WIN = DEFAULT_LEAGUE_RULES.pointsPerWin;
+
 const formatOf = fixture => FORMATS[fixture.format || 'rr'];
 
 function assert(condition, message) { if (!condition) throw new ValidationError(message); }
