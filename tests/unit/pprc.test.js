@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PPRC_PARAMS, nameKey, playerIdFor, createRegistry, resolveName, computePprc, splitHistory } from '../../functions/lib/pprc.js';
+import { PPRC_PARAMS, displayName, nameKey, playerIdFor, createRegistry, resolveName, computePprc, splitHistory } from '../../functions/lib/pprc.js';
 
 test('name keys ignore case, accents, punctuation and spacing', () => {
   assert.equal(nameKey('  José  O’Neil-Smith '), 'jose o neil smith');
@@ -128,4 +128,15 @@ test('a preferred list settles a name only when exactly one preferred player fit
   assert.equal(resolveName(r, 'Vinod', { preferred: new Set(['p_vinod_a', 'p_vinod_m']) }).how, 'ambiguous');
   assert.equal(resolveName(r, 'Vinod', { preferred: new Set(['p_dinkar']) }).how, 'ambiguous');
   assert.equal(resolveName(r, 'Vinod', { roster: ['p_vinod_m'], preferred: new Set(['p_vinod_a']) }).id, 'p_vinod_m', 'the team beats the preferred list');
+});
+
+test('every name is written like "Vivekvardhan Reddy Mereddy"', () => {
+  assert.equal(displayName('VIVEKVARDHAN reddy   MEREDDY'), 'Vivekvardhan Reddy Mereddy');
+  assert.equal(displayName('  dinkar bhardwaj '), 'Dinkar Bhardwaj');
+  assert.equal(displayName('Satish K'), 'Satish K', 'initials stay');
+  assert.equal(displayName('KP Krishna'), 'KP Krishna');
+  assert.equal(displayName('vijay v'), 'Vijay V');
+  assert.equal(displayName("mary-anne o'neil"), "Mary-Anne O'Neil");
+  assert.equal(displayName(null), '');
+  assert.equal(nameKey(displayName('DINKAR  bhardwaj')), nameKey('Dinkar Bhardwaj'), 'the same person either way');
 });

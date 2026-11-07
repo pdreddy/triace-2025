@@ -1075,3 +1075,8 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
 @media (display-mode: standalone) {
   .topbar { padding-top: max(env(safe-area-inset-top), 4px); }
 }
+
+.game-koc { background: #e6f3ec; color: #0b6e4f; }
+.game-triace { background: #e8eefc; color: #2446a6; }
+.toolbar { display: flex; gap: 10px; flex-wrap: wrap; margin: 0 0 12px; }
+.toolbar input[type=search] { flex: 1 1 220px; }

@@ -63,3 +63,26 @@ Confirmed decisions live in `scripts/migration/name-decisions.json` (keys are `T
 Names are compared ignoring capitalisation, so "Durga" and "DURGA" are one name and one row in the fixer page.
 A decision that gives a single name (e.g. "Shivaji") creates a profile flagged `needsFullName`; give it a full name later
 and re-run, and the same id and history carry over only if the name key is unchanged, so rename by adding the old name as an alias.
+
+## Names
+Every stored name is written like "Vivekvardhan Reddy Mereddy": single spaces, each part capitalised, initials kept
+(`displayName` in `pprc.js`). Matching ignores capitalisation, so "DINKAR  bhardwaj" is the same person.
+
+## Match history
+Every history entry names the game it came from: `competition` (KOC, Triace), `seasonLabel`, `stageLabel` (League or
+Playoffs), `title` ("KOC · Season 3 · League"), the date, both team names, the partner and the opponents. A profile shows
+the latest 10 (`recent`), then older matches by year (`historyYears` lists the years; one year loads only when opened).
+
+## Importing into the multi-club database
+```bash
+node scripts/migrate-pprc.mjs <export.json> <out-dir> scripts/migration/name-decisions.json
+node scripts/import-pprc.mjs <out-dir>/multiclub.json --database-url https://multiclub-890ea-default-rtdb.firebaseio.com          # plan only
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json \
+  node scripts/import-pprc.mjs <out-dir>/multiclub.json --database-url https://multiclub-890ea-default-rtdb.firebaseio.com --write
+```
+Plan only is the default and sends nothing. `--write` refuses to touch a section that already has data unless `--replace`
+is added, and `--replace` first saves the existing data to `.local-migration/`. It writes in batches of 200 paths and
+leaves a record under `importLog/`. Deploy `database.multiclub.rules.json` first (paste it into the Realtime Database
+rules of the `multiclub-890ea` project): player data is publicly readable, nothing can be written from a browser, and the
+import runs with a service account, which is not bound by the rules. The app reads it from `/pprc` and `/pprc/<playerId>`
+(set `VITE_MULTICLUB_DATABASE_URL` to use another database).

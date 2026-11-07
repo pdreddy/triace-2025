@@ -20,6 +20,13 @@ const round = (v, n = 2) => Number(v.toFixed(n));
 export function nameKey(name) {
   return String(name ?? '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
+// How every name is written: "Vivekvardhan Reddy Mereddy". Single spaces, each part capitalised, initials
+// ("K", "KP") kept as typed. The name key (above) ignores all of this, so "DINKAR  bhardwaj" is still one person.
+export function displayName(name) {
+  return String(name ?? '').normalize('NFC').trim().replace(/\s+/g, ' ').split(' ')
+    .map(part => (/^[A-Z]{1,2}\.?$/.test(part) ? part : part.toLowerCase().replace(/(^|[-'\u2019])(\p{L})/gu, (m, sep, ch) => sep + ch.toUpperCase())))
+    .join(' ');
+}
 export const playerIdFor = key => `p_${nameKey(key).replace(/ /g, '_')}`;
 
 // entries: [{ id, name, aliases?: string[] }]. overrides: { [nameKey]: playerId } confirmed by an admin.

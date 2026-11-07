@@ -2,7 +2,7 @@
 //   pprcMaster/  one record per person (unique name across every club), their PPRC rating and history
 //   clubs/<club>/seasons/<season>/  teams and matches, with players stored as ids
 // Pure (no I/O): feed it the parsed export, get back the tree to write and a report to review.
-import { PPRC_PARAMS, nameKey, playerIdFor, createRegistry, resolveName, computePprc, splitHistory } from './pprc.js';
+import { PPRC_PARAMS, displayName, nameKey, playerIdFor, createRegistry, resolveName, computePprc, splitHistory } from './pprc.js';
 
 // Where each club's matches live in the old database, and which season they belong to. Earlier
 // sources win when the same match appears twice (e.g. KOC2DB keeps full names, KOC2DBPONEW abbreviates them).
@@ -42,7 +42,7 @@ export function buildMaster(data, notes = {}) {
   const upsert = (name, patch) => {
     const key = nameKey(name); if (!key) return null;
     const id = playerIdFor(key);
-    const cur = players[id] || { id, name: String(name).trim().replace(/\s+/g, ' '), nameKey: key, clubs: {}, seed: {} };
+    const cur = players[id] || { id, name: displayName(name), nameKey: key, clubs: {}, seed: {} };
     players[id] = { ...cur, ...patch, seed: { ...cur.seed, ...(patch.seed || {}) } };
     return id;
   };
@@ -104,7 +104,7 @@ export function buildMultiClub(data, { overrides = {}, createMissing = true, sou
     const name = typeof value === 'string' ? value : value.name;
     if (typeof value === 'string' && master[value]) return value;
     const id = playerIdFor(name), seed = typeof value === 'object' ? { singles: num(value.singles), doubles: num(value.doubles) } : {};
-    master[id] ||= { id, name: String(name).trim().replace(/\s+/g, ' '), nameKey: nameKey(name), clubs: {}, seed, seedSource: 'override', ...(nameKey(name).split(' ').length < 2 ? { needsFullName: true } : {}) };
+    master[id] ||= { id, name: displayName(name), nameKey: nameKey(name), clubs: {}, seed, seedSource: 'override', ...(nameKey(name).split(' ').length < 2 ? { needsFullName: true } : {}) };
     return id;
   };
   const resolvedOverrides = {}, scopedOverrides = {}, ignored = new Set();
@@ -192,7 +192,7 @@ export function buildMultiClub(data, { overrides = {}, createMissing = true, sou
     const similar = looksLikeFullName(key) ? allKeys().find(k => k.length >= 8 && editDistance(k, key) <= 2) : null;
     if (createMissing && looksLikeFullName(key) && !similar) {
       const id = playerIdFor(key);
-      if (!master[id]) { master[id] = { id, name: String(slot.rawName).trim().replace(/\s+/g, ' '), nameKey: key, clubs: {}, seed: {}, provisional: true }; registry.add({ id, name: master[id].name }); report.names.provisional.push(master[id].name); }
+      if (!master[id]) { master[id] = { id, name: displayName(slot.rawName), nameKey: key, clubs: {}, seed: {}, provisional: true }; registry.add({ id, name: master[id].name }); report.names.provisional.push(master[id].name); }
       learn(slot, id); report.names.how.created = (report.names.how.created || 0) + 1; continue;
     }
     report.decisions.push({ raw: slot.rawName, team: slot.teamName, kind: similar ? 'similar' : 'unknown', candidates: similar ? [playerIdFor(similar)] : closest(slot.rawName), ctx: context(slot) });
@@ -229,6 +229,19 @@ export function buildMultiClub(data, { overrides = {}, createMissing = true, sou
   for (const m of ratedMatches) { const s = report.seasons[`${m.club}/${m.season}`] ||= { matches: 0, courts: 0 }; s.matches++; s.courts += m.courts.length; }
 
   // Stored by calendar year so a player's page can load the latest ten and open one year at a time.
+  // Every history entry says which game it was: the club (KOC, Triace), season, league or playoffs, the date, who
+  // played with and against, so a profile reads as a plain list without further lookups.
+  const byMatch = new Map(ratedMatches.map(m => [m.id, m])), nameOf = id => master[id]?.name || id;
+  const describe = (pid, e) => {
+    const m = byMatch.get(e.matchId), court = m?.courts.find(c => c.label === e.court && [...(c.home || []), ...(c.away || [])].includes(pid));
+    const side = court?.home?.includes(pid) ? 'home' : 'away', competition = CLUBS[e.club]?.name || e.club, seasonLabel = CLUBS[e.club]?.seasons[e.season] || e.season, stageLabel = e.stage === 'po' ? 'Playoffs' : 'League';
+    return {
+      ...e, competition, seasonLabel, stageLabel, title: `${competition} · ${seasonLabel} · ${stageLabel}`, date: new Date(e.ts).toISOString().slice(0, 10),
+      team: m?.[side]?.name || null, opponentTeam: m?.[side === 'home' ? 'away' : 'home']?.name || null,
+      partnerName: e.partner ? nameOf(e.partner) : null, opponentNames: e.opponents.map(nameOf)
+    };
+  };
+  for (const [pid, entries] of Object.entries(rated.history)) rated.history[pid] = entries.map(e => describe(pid, e));
   const ratingHistory = {}, recent = {};
   for (const [pid, entries] of Object.entries(rated.history)) {
     if (!entries.length) continue;
@@ -243,7 +256,11 @@ export function buildMultiClub(data, { overrides = {}, createMissing = true, sou
   tree.pprcMaster = {
     meta: { algorithm: params, builtFrom: sources.map(s => s.path), players: Object.keys(master).length },
     players: Object.fromEntries(Object.values(master).map(({ id, ...p }) => [id, p])),
-    nameIndex, ratings: rated.ratings, ratingHistory, recent
+    nameIndex, ratings: rated.ratings, ratingHistory, recent,
+    // Matches per year for each player (all of them, the latest ten included), so a profile can list the years without loading them.
+    historyYears: Object.fromEntries(Object.entries(ratingHistory).map(([pid, years]) => [pid, Object.fromEntries(Object.entries(years).map(([y, items]) => [y, Object.keys(items).length]))])),
+    // A small list for search boxes, so a page does not have to download every profile.
+    playerList: Object.fromEntries(Object.values(master).map(p => [p.id, { name: p.name, overall: rated.ratings[p.id].overall, played: rated.ratings[p.id].played.singles + rated.ratings[p.id].played.doubles, clubs: Object.keys(p.clubs || {}).concat(rated.history[p.id].some(e => e.club === 'triace') ? ['triace'] : []).filter((c, i, a) => a.indexOf(c) === i) }]))
   };
   report.players = { total: Object.keys(master).length, provisional: report.names.provisional.length, rated: Object.values(rated.ratings).filter(r => r.played.singles + r.played.doubles > 0).length };
   report.names.similarRoster = notes.similarRoster || {};

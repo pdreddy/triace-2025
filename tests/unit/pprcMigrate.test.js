@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildMultiClub, reportText } from '../../functions/lib/pprcMigrate.js';
+import { displayName } from '../../functions/lib/pprc.js';
 
 const line = (label, type, t1, t2, g1, g2, extra = {}) => ({ label, type, players: { team1: t1, team2: t2 }, g1, g2, ...extra });
 const day = n => Date.UTC(2026, 0, n);
@@ -142,4 +143,21 @@ test('a single-name decision creates a profile flagged as needing a full name', 
   assert.equal(m.players.p_kalam_shaik.needsFullName, undefined);
   assert.equal(m.nameIndex.shivaji, 'p_shivaji');
   assert.ok(m.ratings.p_shivaji, 'the profile has a rating record from the start');
+});
+
+test('names are stored in one pattern and every history entry says which game it was', () => {
+  const data = exportData();
+  data.koc_users_grades.push({ name: 'SATISH  kumar', s: 4, d: 4 });
+  const { tree } = buildMultiClub(data, { overrides: { Vinod: 'p_vinod_aripaka', Krishna: 'p_krishna_vennapusa', 'Hari Mothkuri': 'p_hari_mothukuri', Kalam: 'kalam SHAIK' } });
+  const m = tree.pprcMaster;
+  assert.equal(m.players.p_satish_kumar.name, 'Satish Kumar');
+  assert.equal(m.players.p_kalam_shaik.name, 'Kalam Shaik');
+  assert.ok(Object.values(m.players).every(p => p.name === displayName(p.name)), 'no name is off-pattern');
+  const all = Object.values(m.recent).flat(), titles = new Set(all.map(e => e.title));
+  assert.deepEqual([...titles].sort(), ['KOC · Season 1 · League', 'KOC · Season 3 · League', 'Triace · Season 1 · League']);
+  const e = m.recent.p_dinkar_bhardwaj.find(x => x.club === 'triace' && x.court === 'D1');
+  assert.deepEqual([e.competition, e.seasonLabel, e.stageLabel, e.date, e.team, e.opponentTeam], ['Triace', 'Season 1', 'League', '1970-01-01'.replace('1970-01-01', new Date(e.ts).toISOString().slice(0, 10)), 'Team A', 'Team B']);
+  assert.deepEqual(e.partnerName, 'Krishna Vennapusa'); assert.deepEqual(e.opponentNames, ['Hari Mothukuri', 'Kalam Shaik']);
+  assert.equal(m.playerList.p_dinkar_bhardwaj.name, 'Dinkar Bhardwaj');
+  assert.ok(m.playerList.p_dinkar_bhardwaj.clubs.includes('koc') && m.playerList.p_dinkar_bhardwaj.clubs.includes('triace'));
 });
