@@ -11,7 +11,7 @@
 # Options combine, e.g. bash check-local.sh --browser --demo
 # Settings (environment): BRANCH (default codex/tier-card-improvements), DIR (default: this folder if it is a Triace checkout, otherwise ./triace-2025),
 #   REPO (default the GitHub repo), TRAICE_ADMIN_PASSWORD (demo admin password, default local-demo-password).
-# Needs: git and Node 22+ (https://nodejs.org). Works on macOS, Linux and Windows Git Bash/WSL.
+# Needs: git and Node 24.12+ (<25) (https://nodejs.org). Works on macOS, Linux and Windows Git Bash/WSL.
 set -uo pipefail
 
 REPO="${REPO:-https://github.com/pdreddy/triace-2025.git}"
@@ -45,9 +45,8 @@ summary() {
 }
 
 command -v git >/dev/null || { echo "git is not installed."; exit 1; }
-command -v node >/dev/null || { echo "Node is not installed. Install Node 22+ from https://nodejs.org"; exit 1; }
-NODE_MAJOR=$(node -p "process.versions.node.split('.')[0]")
-[ "$NODE_MAJOR" -ge 22 ] || { echo "Node $NODE_MAJOR found; Triace needs Node 22 or newer."; exit 1; }
+command -v node >/dev/null || { echo "Node is not installed. Install Node 24.12+ (<25) from https://nodejs.org"; exit 1; }
+node -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit(major === 24 && minor >= 12 ? 0 : 1)' || { echo "This app requires Node 24.12+ (below 25)."; exit 1; }
 
 say "Fetching $REPO ($BRANCH) into $DIR"
 if [ -d "$DIR/.git" ]; then

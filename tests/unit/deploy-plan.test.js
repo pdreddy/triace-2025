@@ -49,7 +49,7 @@ test('rules changes are flagged, never deployed silently', () => {
 });
 
 test('anything that can affect every screen, or that is not recognised, runs every browser test', () => {
-  for (const file of ['functions/index.js', 'functions/lib/tournament.js', 'src/App.jsx', 'src/services/firebase.js', 'src/hooks/useTournament.jsx', 'src/components/UI.jsx', 'vite.config.js', 'package-lock.json', 'scripts/demo-plugin.mjs', 'src/pages/BrandNewPage.jsx']) {
+  for (const file of ['tests/browser/fixtures.js', 'functions/index.js', 'functions/lib/tournament.js', 'src/App.jsx', 'src/services/firebase.js', 'src/hooks/useTournament.jsx', 'src/components/UI.jsx', 'vite.config.js', 'package-lock.json', 'scripts/demo-plugin.mjs', 'src/pages/BrandNewPage.jsx']) {
     assert.equal(plan([file]).specs, 'all', file);
   }
 });

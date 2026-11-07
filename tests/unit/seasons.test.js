@@ -122,3 +122,26 @@ test('rules follow a custom root and Season 1 path', () => {
   for (const rules of [custom, outside]) assert.equal(JSON.stringify(rules).includes('"\\.write": true'), false);
   assert.throws(() => buildRules(template, { season1: 'traice2_0/registrations' }), /inside/);
 });
+
+test('private withdrawn data and local credentials cannot be published as Season 1', () => {
+  for (const child of ['withdrawn', 'demoLogins', 'demoAdmins']) {
+    for (const suffix of ['', '/s1']) {
+      assert.throws(() => buildRules(template, { season1: `traice2_0/${child}${suffix}` }), /inside/);
+    }
+  }
+});
+test('tournament paths cannot inherit public access from shared PPRC roots or overwrite those records', () => {
+  for (const shared of ['pprcMaster', 'pprcClubs']) {
+    for (const path of [shared, `${shared}/season2`]) {
+      assert.throws(() => buildRules(template, { root: path }), /shared public data/);
+      assert.throws(() => buildRules(template, { season1: path }), /shared public data/);
+    }
+  }
+});
+test('rule path generation rejects prototype-sensitive segments without modifying shared object prototypes', () => {
+  for (const part of ['__proto__', 'constructor', 'prototype']) {
+    assert.throws(() => buildRules(template, { root: `${part}/polluted` }), /not a valid database path/);
+    assert.throws(() => buildRules(template, { season1: `legacy/${part}/polluted` }), /not a valid database path/);
+  }
+  assert.equal(Object.prototype.polluted, undefined);
+});

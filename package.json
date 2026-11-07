@@ -24,7 +24,7 @@
     "backup": "node scripts/backup.cjs",
     "rules:generate": "node scripts/generate-rules.mjs",
     "rules:check": "node scripts/generate-rules.mjs --check",
-    "rules:deploy": "node scripts/generate-rules.mjs && firebase deploy --only database"
+    "rules:deploy": "node scripts/deploy-rules.mjs"
   },
   "dependencies": {
     "firebase": "^13.1.0",
@@ -41,6 +41,6 @@
     "vite": "^8.3.5"
   },
   "engines": {
-    "node": ">=22.12.0 <25"
+    "node": ">=24.12.0 <25"
   }
 }

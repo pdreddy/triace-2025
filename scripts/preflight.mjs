@@ -15,7 +15,8 @@ const parseEnv = text => Object.fromEntries(text.split('\n').map(l => l.trim()).
 const git = cmd => { try { return execSync(`git ${cmd}`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); } catch { return ''; } };
 
 console.log('Runtime');
-check('Node 22.12 or newer', Number(process.versions.node.split('.')[0]) >= 22, `this is ${process.version}`);
+const [nodeMajor, nodeMinor] = process.versions.node.split('.').map(Number);
+check('Web tooling uses Node 24.12+ (below 25)', nodeMajor === 24 && nodeMinor >= 12, `this is ${process.version}`);
 
 console.log('\nFirebase web configuration');
 const KEYS = ['VITE_FIREBASE_API_KEY', 'VITE_FIREBASE_AUTH_DOMAIN', 'VITE_FIREBASE_DATABASE_URL', 'VITE_FIREBASE_PROJECT_ID', 'VITE_FIREBASE_STORAGE_BUCKET', 'VITE_FIREBASE_MESSAGING_SENDER_ID', 'VITE_FIREBASE_APP_ID'];

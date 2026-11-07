@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 // Files under functions/lib that the web app also imports (a change there needs a new site build as well as new functions).
 const SHARED_WITH_BROWSER = ['tournament', 'league', 'earlyBird', 'partners', 'paths', 'captainAccount'];
 // Files whose change can affect any screen: run every browser test.
-const EVERYTHING = [/^vite\.config\.js$/, /^package(-lock)?\.json$/, /^playwright(\.pwa)?\.config\.js$/, /^src\/(App|main)\.jsx$/, /^src\/(hooks|services)\//, /^src\/components\/UI\.jsx$/, /^functions\/(index\.js|lib\/(tournament|league)\.js)$/, /^scripts\/demo-plugin\.mjs$/, /^\.env/];
+const EVERYTHING = [/^tests\/browser\/fixtures\.js$/,/^vite\.config\.js$/, /^package(-lock)?\.json$/, /^playwright(\.pwa)?\.config\.js$/, /^src\/(App|main)\.jsx$/, /^src\/(hooks|services)\//, /^src\/components\/UI\.jsx$/, /^functions\/(index\.js|lib\/(tournament|league)\.js)$/, /^scripts\/demo-plugin\.mjs$/, /^\.env/];
 
 // [pattern, browser spec files it affects]
 const SPECS = [

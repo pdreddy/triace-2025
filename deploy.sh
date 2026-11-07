@@ -7,10 +7,10 @@
 #   --only-functions a,b deploy just those functions (for example registerTeam,createPartnerPost); skips hosting
 #   --dry-run            run the checks and the build, print what would be deployed, deploy nothing
 #   --no-hosting         functions only (use this when Netlify builds the site from git)
-#   --rules              ALSO deploy the Realtime Database rules (read the warning first)
+#   --rules              deprecated: refuses and points to the separate reviewed-rules command
 #   --skip-browser-tests skip the browser tests (unit tests, build, PWA and preflight checks still run)
 #   --allow-dirty        deploy even though git shows uncommitted files (they are listed first)
-# Needs: Node 22+, and `npx firebase login` done once on this machine by someone with deploy rights.
+# Needs: Node 24.12+ (<25), and `npx firebase login` done once on this machine by someone with deploy rights.
 set -uo pipefail
 cd "$(dirname "$0")"
 
@@ -25,6 +25,8 @@ while [ $# -gt 0 ]; do
 done
 step() { printf '\n\033[1m== %s\033[0m\n' "$1"; }
 fail() { printf '\033[31m%s\033[0m\n' "$1"; exit 1; }
+
+[ "$RULES" = 0 ] || fail "Deploy database rules separately from a reviewed merged file: npm run rules:deploy -- --project <project-id> --rules <merged.json> --confirm-merged. This command must preserve the shared project's other rules."
 
 PROJECT=$(grep -E '^VITE_FIREBASE_PROJECT_ID=' .env | cut -d= -f2)
 [ -n "$PROJECT" ] || fail "VITE_FIREBASE_PROJECT_ID is missing from .env"
@@ -54,6 +56,10 @@ fi
 
 # Quick mode: work out what changed since the last deploy from this machine.
 Q_FULL=1; Q_WHY=""; Q_FUNCTIONS=1; Q_SITE=$HOSTING; Q_RULES=0; Q_BUILD=1; Q_OFFLINE=1; Q_NOTHING=0; Q_SPECS="all"
+if [ "$QUICK" = 1 ] && [ -n "$CHANGES" ]; then
+  echo "Quick mode disabled: uncommitted changes require full validation and deployment selection."
+  QUICK=0
+fi
 if [ "$QUICK" = 1 ]; then
   if [ -n "$ONLY_FN" ]; then eval "$(node scripts/plan-deploy.mjs --quick "$PROJECT" --no-hosting --shell)"; else
     eval "$(node scripts/plan-deploy.mjs --quick "$PROJECT" $([ "$HOSTING" = 0 ] && echo --no-hosting) --shell)"; fi
@@ -63,25 +69,36 @@ fi
 [ -z "$ONLY_FN" ] || { Q_FUNCTIONS=1; Q_SITE=0; Q_NOTHING=0; Q_BUILD=0; Q_OFFLINE=0; }   # named functions: the site is not touched
 
 step "2/6 Dependencies"
-LOCKS=$(cat package-lock.json functions/package-lock.json 2>/dev/null | (shasum 2>/dev/null || sha1sum) | cut -d' ' -f1)
-if [ "$QUICK" = 1 ] && [ -d node_modules ] && [ -d functions/node_modules ] && [ "$(cat .firebase/lock-hash 2>/dev/null)" = "$LOCKS" ]; then
-  echo "unchanged since the last install, skipping npm ci"
-else
-  npm ci --no-audit --no-fund || fail "npm ci failed"
-  npm --prefix functions ci --no-audit --no-fund || fail "functions npm ci failed"
-  mkdir -p .firebase && echo "$LOCKS" > .firebase/lock-hash
-fi
+# Cache each install separately, including runtime and manifests in its key.
+# A backend dependency change no longer reinstalls the web toolchain (or vice versa).
+mkdir -p .firebase
+for directory in . functions; do
+  label=web; [ "$directory" = . ] || label=functions
+  HASH=$( { node --version; npm --version; cat "$directory/package.json" "$directory/package-lock.json"; } | (shasum 2>/dev/null || sha1sum) | cut -d' ' -f1)
+  MARKER=".firebase/install-$label-hash"
+  if [ -d "$directory/node_modules" ] && [ "$(cat "$MARKER" 2>/dev/null)" = "$HASH" ]; then
+    echo "$label dependencies unchanged, skipping npm ci"
+  else
+    npm --prefix "$directory" ci --no-audit --no-fund || fail "$label npm ci failed"
+    echo "$HASH" > "$MARKER"
+  fi
+done
+
+ensure_browser() {
+  [ -z "${CHROMIUM_PATH:-}" ] || return 0
+  npx --no-install playwright install chromium || fail "Chromium installation failed"
+}
 
 step "3/6 Tests"
 npm test || fail "Unit tests failed"
 if [ "$BROWSER" = 1 ]; then
   if [ "$Q_SPECS" = "all" ]; then
-    npx playwright install chromium >/dev/null 2>&1
+    ensure_browser
     npm run test:browser || fail "Browser tests failed"
   elif [ -n "$Q_SPECS" ]; then
     FILES=""; for spec in $Q_SPECS; do [ -f "tests/browser/$spec.spec.js" ] && FILES="$FILES tests/browser/$spec.spec.js"; done
     echo "browser tests for what changed:$FILES"
-    npx playwright install chromium >/dev/null 2>&1
+    ensure_browser
     # shellcheck disable=SC2086
     npx playwright test $FILES || fail "Browser tests failed"
   else echo "(no browser tests are affected by these changes)"; fi
@@ -103,38 +120,27 @@ else
   [ "$Q_FUNCTIONS" = 1 ] && add "functions:traice"
   [ "$HOSTING" = 1 ] && [ "$Q_SITE" = 1 ] && add "hosting"
 fi
-[ "$RULES" = 1 ] && add "database"
 echo "project:  $PROJECT"
 echo "deploy:   ${TARGETS:-nothing}"
 [ "$HOSTING" = 1 ] || echo "hosting:  not deployed by this script (Netlify builds the site from git)"
 if [ "$QUICK" = 1 ] && [ "$Q_FULL" = 0 ]; then
   [ "$Q_FUNCTIONS" = 1 ] || echo "functions: unchanged since the last deploy, skipped"
   [ "$Q_SITE" = 1 ] || [ "$HOSTING" = 0 ] || echo "hosting:  unchanged since the last deploy, skipped"
-  [ "$Q_RULES" = 0 ] || [ "$RULES" = 1 ] || echo "!! database rules changed since the last deploy: merge them into the live rules and run again with --rules"
+  [ "$Q_RULES" = 0 ] || echo "!! database rules changed: generate separately, merge with the live rules, then use npm run rules:deploy with an explicit reviewed file"
 fi
-if [ "$RULES" = 1 ]; then
-  cat <<'WARN'
-
-  !! DATABASE RULES !!  firebase deploy --only database REPLACES the whole rules file of this project's database.
-  If other apps share it, merge database.rules.json into the live rules first, or you will break them.
-WARN
-else echo "rules:    not deployed (add --rules after merging them into the live rules)"; fi
+echo "rules:    deployed separately with npm run rules:deploy and a reviewed merged file"
 if [ -z "$TARGETS" ]; then echo; echo "Nothing to deploy: the tests passed and nothing in the backend or site changed."; exit 0; fi
 if [ "$DRY" = 1 ]; then echo; echo "Dry run: nothing deployed."; exit 0; fi
 
 step "6/6 Deploy"
 read -r -p "Type the project id ($PROJECT) to deploy to PRODUCTION: " ANSWER
 [ "$ANSWER" = "$PROJECT" ] || fail "Cancelled."
-if [ "$RULES" = 1 ]; then
-  npm run rules:check || fail "database.rules.json does not match the configured paths. Run: npm run rules:generate"
-  read -r -p "Type MERGED to confirm the rules were merged with the live ones: " MERGED
-  [ "$MERGED" = "MERGED" ] || fail "Cancelled."
-fi
+
 npx firebase deploy --project "$PROJECT" --only "$TARGETS" || fail "Deploy failed"
 
 # Remember what is live, so --quick can compare next time. Deploying a few named functions does not count as "all functions deployed".
-if [ -z "$ONLY_FN" ] && [ "$Q_FUNCTIONS" = 1 ]; then node scripts/plan-deploy.mjs --mark functions "$PROJECT"; fi
-if [ "$HOSTING" = 1 ] && [ "$Q_SITE" = 1 ]; then node scripts/plan-deploy.mjs --mark site "$PROJECT"; fi
+if [ -z "$CHANGES" ] && [ -z "$ONLY_FN" ] && [ "$Q_FUNCTIONS" = 1 ]; then node scripts/plan-deploy.mjs --mark functions "$PROJECT"; fi
+if [ -z "$CHANGES" ] && [ "$HOSTING" = 1 ] && [ "$Q_SITE" = 1 ]; then node scripts/plan-deploy.mjs --mark site "$PROJECT"; fi
 
 cat <<EOF2
 

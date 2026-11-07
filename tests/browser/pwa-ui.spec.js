@@ -12,7 +12,9 @@ for (const [width, height] of SIZES) {
     page.on('pageerror', error => errors.push(error.message));
     for (const route of ROUTES) {
       await page.goto(route);
-      await page.waitForTimeout(500);
+      await expect(page.locator('main > :not(.page-loading)').first()).toBeVisible();
+      await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
+      await page.evaluate(() => document.fonts.ready);
       const result = await page.evaluate(() => ({
         overflowX: document.documentElement.scrollWidth - innerWidth,
         smallInputs: [...document.querySelectorAll('input:not([type=checkbox]):not([type=radio]), select, textarea')].filter(e => e.offsetParent && parseFloat(getComputedStyle(e).fontSize) < 16).map(e => e.getAttribute('aria-label') || e.id || e.name),
@@ -63,7 +65,7 @@ test('signed in as admin with the install button showing, the top bar still fits
   await expect(page.getByRole('button', { name: 'Install app' })).toBeVisible();
   for (const width of [820, 900, 1024, 1100, 1180, 1280, 1366, 1440, 1536, 1600, 1700, 1920, 2560]) {
     await page.setViewportSize({ width, height: 800 });
-    await page.waitForTimeout(150);
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     const box = async name => page.getByRole('button', { name }).boundingBox();
     const signOut = await box('Sign out'), install = await box('Install app');
     expect(signOut, `Sign out is on screen at ${width}px`).toBeTruthy();

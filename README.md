@@ -4,7 +4,7 @@ A mobile-friendly tennis tournament app built with React, Vite, Firebase Authent
 
 ## Quick local test — no Firebase account required
 
-Use Node.js 22.12+ (Node 24 is also supported for the web app; deployed functions use Node 22).
+Use Node.js 24.12+ (below 25) for the web app and tooling; deployed Functions use Node 22. The locked Firebase web SDK requires Node 24.12 or newer.
 
 ```sh
 npm run setup
@@ -43,7 +43,7 @@ On a Linux machine with system Chromium, run `CHROMIUM_PATH=/usr/bin/chromium np
 
 ## Firebase Emulators — real local Firebase integration
 
-Install Java **21+** and use Node **22** for Functions runtime parity. Run `npm run setup` first. Firebase CLI must be able to download its emulator JAR from `storage.googleapis.com`.
+Install Java **21+** and retain Node **22** for Functions runtime parity; web tooling uses Node **24.12+**. Run `npm run setup` first. Firebase CLI must be able to download its emulator JAR from `storage.googleapis.com`.
 
 Terminal 1:
 
@@ -107,7 +107,7 @@ npx firebase deploy --project multiclub-890ea --only functions:traice,hosting
 Deploy database rules after merging them with the shared project’s existing rules. **Do not blindly replace a shared database’s rules with this repository’s whole rules file.** Preserve other apps’ paths, and ensure no permissive parent read/write grants cover `traice2_0`. RTDB permissions cascade; a public root read would expose private records despite restrictive child rules. After reviewing the merged file, deploy it with:
 
 ```sh
-npx firebase deploy --project multiclub-890ea --only database
+npm run rules:deploy -- --project multiclub-890ea --rules /path/to/reviewed-merged.json --confirm-merged
 ```
 
 The supplied project’s previous rules, users, billing, functions and hosting have not been changed by this work. Before going live, execute the Firebase integration suite, verify the merged rules, test the real admin account and an authorized registration, and confirm public name visibility follows the saved masking setting.
@@ -211,8 +211,34 @@ The homepage shows the official rules as ten native flash cards (`src/rules/card
 
 ## Deploy the web app to Netlify
 
-Connect this repository to Netlify. `netlify.toml` builds with Node 22, publishes `dist`, supplies the public Firebase web configuration, and rewrites client routes to `index.html`. The exact uploaded `triace-rules.html` is included as a static file and cached for the installed PWA. Netlify serves existing static files before the SPA rewrite.
+Connect this repository to Netlify. `netlify.toml` builds with Node 24, publishes `dist`, supplies the public Firebase web configuration, and rewrites client routes to `index.html`. The exact uploaded `triace-rules.html` is included as a static file and cached for the installed PWA. Netlify serves existing static files before the SPA rewrite.
 
 Netlify hosts only the web app. Before live registration, deploy the Firebase callable functions (including `bootstrapTournament`) and reviewed Realtime Database rules described above, enable Anonymous and Email/Password Authentication, and add the Netlify hostname to Firebase Authentication authorized domains. Create the admin account with the admin claim for later rule changes; initial GOAT/Rising setup happens automatically. Set `VITE_ADMIN_EMAIL` in Netlify if the admin's actual Authentication email differs from the app default, then rebuild. Netlify environment variables are build-time values. Do not use `npm run demo` as the Netlify build command; demo data stays local.
 
 The supplied HTML shows GOAT 17.50–22.00 and Rising 11.50–17.00 and says teams are always placed in the highest eligible tier. Current saved registration defaults are GOAT 17.00–22.00 and Rising 11.50–16.50, with an option to enter both. The uploaded document is preserved exactly, so these differences must be resolved by the tournament owner before publishing live enrollment. Admin tier changes do not edit the HTML file.
+
+### Faster local checks and Functions deployments
+
+Browser tests start a demo server only for each worker actually used. A single spec starts one server; the full suite keeps separate state per spec file, reusing a server within each file. Use `PW_WORKERS=1` to reduce resource usage, or `PW_BASE_PORT=3300` to run a separate suite without colliding with the default ports. `CHROMIUM_PATH=/usr/bin/chromium` reuses system Chromium without a download.
+
+```sh
+CHROMIUM_PATH=/usr/bin/chromium npm run test:browser -- tests/browser/pwa-ui.spec.js
+./deploy.sh --quick --no-hosting --dry-run
+./deploy.sh --only-functions registerTeam --dry-run
+```
+
+Deployment caches web and Functions dependency installs separately, keyed by each manifest and lockfile plus Node/npm versions. Remove `.firebase/install-web-hash` or `.firebase/install-functions-hash` to force a fresh install if dependencies were manually altered. The first run installs dependencies; later runs reuse unchanged installs, including outside quick mode. Named Functions deployments retain unit/browser validation while skipping the site build and hosting. Remove `--dry-run` to use the existing production confirmation flow after reviewing the plan.
+
+Quick deployment selection requires committed changes. With `--allow-dirty`, quick mode falls back to full validation/selection and does not record a successful commit marker, so later deployments cannot silently miss uncommitted changes. Changing shared browser fixtures runs the full browser suite.
+
+### Deploying shared database rules safely
+
+`npm run rules:generate` writes the tournament rules for review. It does not deploy. Merge that output into a separate copy of the project's existing rules, preserving every other application's nodes, then use:
+
+```sh
+npm run rules:deploy -- --project multiclub-890ea --rules /path/to/reviewed-merged.json --confirm-merged
+```
+
+For a custom database root or Season 1 location, also pass `--root <root>` and `--season1 <path>` matching the generated rules. The command validates the tournament subtree and inherited permissions, uses the reviewed file directly, and never regenerates it. The former `deploy.sh --rules` path now refuses deployment and points to this command. Review the whole merged file before setting `--confirm-merged`; the validator cannot know which unrelated rules exist in the live project.
+
+The live setup checker now uses the read-only `healthCheck` callable. Deploy that function with this change. It no longer sends test writes or attempts to sign in; sign-in provider configuration and individual endpoint behavior require separate verification.

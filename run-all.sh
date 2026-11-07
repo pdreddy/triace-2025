@@ -13,8 +13,8 @@ for arg in "$@"; do
   case "$arg" in --full) FULL=1 ;; --no-open) OPEN=0 ;; *) echo "Unknown option: $arg"; exit 1 ;; esac
 done
 
-if ! command -v node >/dev/null; then echo "Node.js 22.12+ is required. Install it from https://nodejs.org"; exit 1; fi
-if [ "$(node -p "process.versions.node.split('.')[0]")" -lt 22 ]; then echo "Node $(node -v) is too old; this app needs 22.12 or newer."; exit 1; fi
+if ! command -v node >/dev/null; then echo "Node.js 24.12+ (<25) is required. Install it from https://nodejs.org"; exit 1; fi
+node -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit(major === 24 && minor >= 12 ? 0 : 1)' || { echo "This app requires Node 24.12+ (below 25)."; exit 1; }
 step() { printf '\n\033[1m== %s\033[0m\n' "$1"; }
 RESULT=0
 

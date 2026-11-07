@@ -207,7 +207,15 @@ export function applyRegistration(current, payload, uid, now = Date.now(), login
   if (previous) {
     const { ownerUid, registeredAt, owners, captainUid, captainUsername, ...saved } = previous;
     assert(ownerUid === uid && canonical(saved) === canonical(team), 'This registration identifier is already in use.');
-    return { state, result: { teamId: previous.teamId, assignedTier: previous.assignedTier, combinedUtr: previous.combinedUtr, listedTiers: previous.listedTiers || [previous.assignedTier], waitlisted: waitlistInfo(state, previous, Object.keys(state.tiers || {}).filter(id => state.tiers[id].waitlist?.[previous.teamId])) } };
+    // A simultaneous retry can save the team while the request that created
+    // its Auth account is still running. Attach that account atomically instead
+    // of treating it as an orphan and deleting it in runRegistration.
+    if (login) {
+      assert(!previous.captainUid || previous.captainUid === login.uid, 'This team already has a different captain login.');
+      Object.assign(previous, { captainUid: login.uid, captainUsername: login.username, owners: { ...(previous.owners || {}), [login.uid]: true } });
+      state.teamsByOwner ||= {}; state.teamsByOwner[login.uid] ||= {}; state.teamsByOwner[login.uid][team.teamId] = true;
+    }
+    return { state, result: { ...(login ? { loginAttached: true } : {}), teamId: previous.teamId, assignedTier: previous.assignedTier, combinedUtr: previous.combinedUtr, listedTiers: previous.listedTiers || [previous.assignedTier], waitlisted: waitlistInfo(state, previous, Object.keys(state.tiers || {}).filter(id => state.tiers[id].waitlist?.[previous.teamId])) } };
   }
   const already = Object.values(state.registrations || {}).filter(r => r.ownerUid === uid).length;
   assert(already < MAX_TEAMS_PER_BROWSER, `You have already registered ${MAX_TEAMS_PER_BROWSER} teams from this browser. Ask the tournament admin if you need to register more.`);

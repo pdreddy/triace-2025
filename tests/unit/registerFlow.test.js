@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runRegistration } from '../../functions/lib/registerFlow.js';
-import { initialState, applyRegistration, MAX_TEAMS_PER_BROWSER } from '../../functions/lib/tournament.js';
+import { initialState, applyRegistration, MAX_TEAMS_PER_BROWSER, ValidationError } from '../../functions/lib/tournament.js';
 
 const base = { teamId: 'team_abcdefghijklmnop', names: { firstName: 'Arjun', lastName: 'Rana', ace2Name: 'Raj Mehta' } };
 const fakes = (over = {}) => {
@@ -52,7 +52,7 @@ test('a repeated request (the login already exists) creates nothing new and retu
 });
 
 test('a refused registration deletes the login it just created, and the error still reaches the caller', async () => {
-  const { deps, calls } = fakes({ register: async () => { throw new Error('Registration is currently closed.'); } });
+  const { deps, calls } = fakes({ register: async () => { throw new ValidationError('Registration is currently closed.'); } });
   await assert.rejects(() => runRegistration({ ...base, ...deps }), /currently closed/);
   assert.deepEqual(calls.deleted, ['cap_team_abcdefghijklmnop']);
 });
@@ -60,7 +60,7 @@ test('a refused registration deletes the login it just created, and the error st
 test('a refused registration with no login created deletes nothing', async () => {
   const { deps, calls } = fakes({
     createAccount: async () => { throw new Error('down'); },
-    register: async () => { throw new Error('Registration is currently closed.'); }
+    register: async () => { throw new ValidationError('Registration is currently closed.'); }
   });
   await assert.rejects(() => runRegistration({ ...base, ...deps }), /currently closed/);
   assert.deepEqual(calls.deleted, []);
@@ -82,4 +82,48 @@ test('one browser can register only a few teams; others and repeats are unaffect
   assert.throws(() => applyRegistration(state, team(99), 'browser-1', 2000), /already registered 3 teams from this browser/);
   assert.ok(applyRegistration(state, team(99), 'browser-2', 2000), 'another browser can still register');
   assert.equal(applyRegistration(state, team(0), 'browser-1', 3000).result.created, undefined, 'repeating an earlier registration is not blocked');
+});
+
+test('an uncertain database failure does not delete an account that may already be committed', async () => {
+  const { deps, calls } = fakes({ register: async () => { throw new Error('connection lost after commit'); } });
+  await assert.rejects(() => runRegistration({ ...base, ...deps }), /connection lost/);
+  assert.deepEqual(calls.deleted, []);
+});
+
+test('simultaneous registration retries keep the captain account when the account creator commits second', async () => {
+  let state = initialState(), accountExists = false, releaseFirst;
+  const firstMayCommit = new Promise(resolve => { releaseFirst = resolve; });
+  let firstAccountCreated;
+  const created = new Promise(resolve => { firstAccountCreated = resolve; });
+  const deleted = [], payload = team(500), credentials = { username: 'captain', password: 'test-only-password' };
+  const dependencies = {
+    teamId: payload.teamId, names: base.names,
+    createAccount: async () => {
+      if (accountExists) throw Object.assign(new Error('exists'), { code: 'auth/uid-already-exists' });
+      accountExists = true; firstAccountCreated(); await firstMayCommit; return credentials;
+    },
+    deleteAccount: async uid => { deleted.push(uid); accountExists = false; },
+    register: async login => { const next = applyRegistration(state, payload, 'browser', 1000, login); state = next.state; return next.result; }
+  };
+  const first = runRegistration(dependencies);
+  await created;
+  const retry = await runRegistration(dependencies);
+  assert.equal(retry.created, true);
+  assert.equal(retry.loginPending, true, 'a concurrent in-flight account is not promised as ready');
+  releaseFirst();
+  const result = await first;
+  assert.deepEqual(result.login, credentials);
+  assert.equal(result.loginAttached, true);
+  assert.equal(accountExists, true);
+  assert.deepEqual(deleted, []);
+  assert.equal(state.registrations[payload.teamId].captainUid, `cap_${payload.teamId}`);
+  assert.equal(state.teamsByOwner[`cap_${payload.teamId}`][payload.teamId], true);
+});
+
+test('a replay cannot attach captain credentials to another browser’s registration', () => {
+  const payload = team(501), original = applyRegistration(initialState(), payload, 'original-owner', 1000).state;
+  assert.throws(() => applyRegistration(original, payload, 'different-owner', 1001,
+    { uid: `cap_${payload.teamId}`, username: 'attacker' }), /already in use/);
+  assert.equal(original.registrations[payload.teamId].captainUid, undefined);
+  assert.equal(original.teamsByOwner[`cap_${payload.teamId}`], undefined);
 });

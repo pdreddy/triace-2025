@@ -25,7 +25,7 @@ export default function Status() {
       <header className="page-head">
         <p className="eyebrow">Admin tools</p>
         <h1>Setup <em>check.</em></h1>
-        <p>Checks the live Firebase setup: database rules, sign-in methods and deployed functions. It changes nothing.</p>
+        <p>Checks database access, backend availability, and your current account. It sends no configuration changes.</p>
       </header>
       {service.setupError && <p className="message error" role="alert">{service.setupError}</p>}
       <div className={`status-summary ${running ? 'running' : failed.length ? 'fail' : warned.length ? 'warn' : 'ok'}`} role="status">

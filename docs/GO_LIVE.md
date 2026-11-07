@@ -18,10 +18,10 @@ npm run check         # everything: unit, build, PWA, browser tests
 ./deploy.sh --dry-run     # runs every check and the build, deploys nothing
 ./deploy.sh               # checks, build, then deploys Cloud Functions and Firebase Hosting after you type the project id
 ./deploy.sh --no-hosting  # functions only, when Netlify builds the site from git
-./deploy.sh --rules       # also publishes the database rules (merge them with the live rules first)
+npm run rules:deploy -- --project <project> --rules <reviewed-merged.json> --confirm-merged
 ```
 
-It refuses to deploy with uncommitted changes, failing tests, a failing PWA or preflight check. Database rules are never deployed unless you pass `--rules` and type `MERGED`, because the project's database may be shared with other apps.
+It refuses to deploy with uncommitted changes, failing tests, a failing PWA or preflight check. Database rules use the separate command above, which requires an explicit reviewed merged file and project. Never regenerate the merged file during deployment; the database may be shared with other apps.
 
 ## Where to enter data (live site)
 
@@ -42,7 +42,7 @@ All of this is in the browser, on the **Admin** page (sign in at `/admin/login`)
 | Firebase project, database paths | `.env` / `functions/.env` (see README), then deploy |
 | The admin password | Firebase Console → Authentication → Users |
 
-> **After adding the partner board you must redeploy the backend and the rules:** `./deploy.sh --no-hosting` (new functions `createPartnerPost`, `expressInterest`, `closePartnerPost`) and publish the updated rules (`./deploy.sh --no-hosting --rules` after merging them into the live rules). New nodes: `partnerPosts` (public read), `partnerPrivate` and `partnerByOwner` (owner or admin only).
+> **After adding the partner board you must redeploy the backend and the rules:** `./deploy.sh --no-hosting` (new functions `createPartnerPost`, `expressInterest`, `closePartnerPost`) and publish the updated rules (`npm run rules:deploy -- --project <project> --rules <reviewed-merged.json> --confirm-merged` after merging them into the live rules). New nodes: `partnerPosts` (public read), `partnerPrivate` and `partnerByOwner` (owner or admin only).
 
 > **Registration safeguards:** one browser can register at most 3 teams (ask the admin for more). If a captain login cannot be created (for example Email/Password is switched off), the team is still registered with a "login pending" note and the admin creates the login later with **Reset login** on the team card. Teams without a login show "not created yet" there.
 
@@ -68,7 +68,7 @@ All of this is in the browser, on the **Admin** page (sign in at `/admin/login`)
 Rules first, merged with any other apps' rules in the same database (never replace a shared rules file blindly).
 
 ```bash
-npx firebase deploy --project <project> --only database
+npm run rules:deploy -- --project <project> --rules <reviewed-merged.json> --confirm-merged
 npx firebase deploy --project <project> --only functions:traice
 npm run build
 npx firebase deploy --project <project> --only hosting      # or let Netlify build from git
@@ -104,7 +104,7 @@ Deploy the functions **before** the web app goes live: the first visit calls `bo
 - **Auto-schedule all tiers** creates round-robin fixtures for every tier with two or more teams and dates every round from the calendar. Run it again after changing the calendar: fixtures with results are never deleted, and a tier whose teams changed after results exist is skipped (regenerate it by hand).
 - **Add buffer** pushes every later round back by the weeks you choose (rain-off, holiday). A single match can still be moved from the League tab.
 - **Admins tab**: add an administrator by sign-in name (they sign in at `/admin/login` with that name); the 12-character password is shown once. Reset password and Remove are there too; you cannot remove yourself or the last admin.
-- New backend functions: `saveCalendar`, `autoSchedule`, `addBufferWeeks`, `listAdmins`, `createAdmin`, `resetAdminPassword`, `removeAdmin`. Deploy with `./deploy.sh --no-hosting --rules` (the `calendar` node needs the new database rule), then the site.
+- New backend functions: `saveCalendar`, `autoSchedule`, `addBufferWeeks`, `listAdmins`, `createAdmin`, `resetAdminPassword`, `removeAdmin`. Deploy Functions with `./deploy.sh --no-hosting`. Deploy a reviewed merged rules file separately (the `calendar` node needs the new rule), then the site.
 
 ## Backups
 

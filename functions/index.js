@@ -45,6 +45,9 @@ async function mutate(operation) {
   } finally { if (listener) root.off('value', listener); }
 }
 
+// Read-only deployment probe. It intentionally does not initialize data or require a sign-in.
+export const healthCheck = onCall(options, async () => ({ ok: true, service: 'traice' }));
+
 export const bootstrapTournament = onCall(options, async () => {
   if ((await getDatabase().ref(`${paths.root}/settings`).get()).exists()) return { created: false };
   return mutate(bootstrapState);
@@ -79,7 +82,7 @@ export const registerTeam = onCall(options, async request => {
     createAccount: createCaptainAccount,
     deleteAccount: uid => getAuth().deleteUser(uid),
     register: login => mutate(state => applyRegistration(state, request.data, request.auth.uid, Date.now(), login)),
-    log: error => console.error('Captain login could not be created; the team is registered without one', { code: error?.code })
+    log: error => console.error('Captain login provisioning needs reconciliation', { code: error?.code })
   });
 });
 export const saveConfiguration = onCall(options, async request => { requireAuth(request, true); return mutate(state => applyConfiguration(state, request.data)); });
