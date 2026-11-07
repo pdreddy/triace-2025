@@ -70,12 +70,12 @@ before Register unlocks.
 ## 3. Registration
 Step-by-step form (Tier → each player → Confirm) with a live preview: each player's counted
 UTR ("AVG" tag when averaged), combined UTR, SVG tier meter, assigned tier, and the exact
-reason when registration is unavailable. On success show a one-time captain code (stored
-only as a server-side hash) and links to the team page.
+reason when registration is unavailable. On success show the captain's generated username (first 4 letters of the captain's first name + first 3 of Ace 2) and password (first 3 letters of the last name + first 3 of the first name + 4 random digits) once (copy, download, print;
+the captain confirms it is saved) and links to the team page.
 
 ## 4. Captains and teams
-- Captain = the device that registered, plus any device that enters the captain code.
-- The admin can issue a new captain code.
+- Captain = the device that registered, plus any device signed in with the team's username and password (`/captain`).
+- The admin sees each team's username and can reset its password.
 - Captains can edit or withdraw their team until fixtures exist; the admin can at any time
   (tier changes blocked once fixtures exist; withdrawal removes unplayed fixtures and its
   results stop counting; keep a private archive).
@@ -119,7 +119,7 @@ config in .env; never commit secrets or passwords.
 - Every setting in section 1 is editable in Admin and visibly changes behaviour.
 - `grep -rn "style=" src` returns nothing.
 - `npm test` and `npx playwright test` pass, including browser tests for: rules gate,
-  registration with averaging, captain code on a second device, captain edit/withdraw,
+  registration with averaging, captain login on a second device and admin reset, captain edit/withdraw,
   admin config reflected in rules cards, fixtures with dates, score submission with lineups
   and approval, a challenge swap, manual playoffs to a champion, closing a season and
   viewing history.

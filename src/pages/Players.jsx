@@ -5,6 +5,7 @@ import { EmptyState, Stat, tierTone } from '../components/UI';
 import { Icon } from '../components/Icons';
 import { playerName, teamIndex, teamName } from '../components/League';
 import { orderedTiers } from '../../functions/lib/tournament.js';
+import { PprcDirectory } from './Pprc';
 import { ROLE_LABELS, playerRatings } from '../../functions/lib/league.js';
 
 export const signed = value => (Math.abs(value) < 0.005 ? '0.00' : `${value > 0 ? '+' : '−'}${Math.abs(value).toFixed(2)}`);
@@ -19,7 +20,7 @@ export function useRatings() {
 export default function Players() {
   const { data } = useTournament();
   const { teams, players } = useRatings();
-  const [query, setQuery] = useState(''), [tier, setTier] = useState('all'), [sort, setSort] = useState('rating');
+  const [query, setQuery] = useState(''), [tier, setTier] = useState('all'), [sort, setSort] = useState('rating'), [scope, setScope] = useState('triace');
   const tiers = orderedTiers(data?.tierConfig || {}).filter(t => Object.keys(data?.tiers?.[t.id]?.teams || {}).length);
   const inTier = (p, id) => !!data?.tiers?.[id]?.teams?.[p.teamId];
   const q = query.trim().toLowerCase();
@@ -37,8 +38,14 @@ export default function Players() {
       <header className="page-head">
         <p className="eyebrow">Triace rating · live from every approved match</p>
         <h1>The <em>players.</em></h1>
+        <div className="view-switch" role="group" aria-label="Which players to show">
+          <button type="button" className={scope === 'triace' ? 'on' : ''} aria-pressed={scope === 'triace'} onClick={() => setScope('triace')}>Triace 2.0 players</button>
+          <button type="button" className={scope === 'pprc' ? 'on' : ''} aria-pressed={scope === 'pprc'} onClick={() => setScope('pprc')}>All PPRC players</button>
+        </div>
         <p>Each player starts at their counted UTR. After every approved match the rating moves by how many games they won compared with what the rating gap predicted.</p>
       </header>
+      {scope === 'pprc' ? <PprcDirectory /> : (
+        <>
       <div className="stat-row">
         <Stat value={players.length} label="Players" />
         <Stat value={rated.length} label="Rated in play" />
@@ -84,6 +91,8 @@ export default function Players() {
           </table>
           <p className="table-note">Triace rating is this league’s own rating, seeded from each player’s counted UTR. It is not an official UTR.</p>
         </div>
+      )}
+        </>
       )}
     </section>
   );

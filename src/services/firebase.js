@@ -1,9 +1,19 @@
+import { loginIdentifier } from '../../functions/lib/admins.js';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInAnonymously, signInWithEmailAndPassword, signOut, getIdTokenResult, connectAuthEmulator } from 'firebase/auth';
 import { getDatabase, ref, onValue, get, connectDatabaseEmulator } from 'firebase/database';
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/functions';
 import { rulesOf, DEFAULT_SEASON_NAME } from '../../functions/lib/tournament.js';
+import { dbPaths } from '../config/dbPaths.js';
+import { isCaptainEmail, loginEmail, normalizePassword } from '../../functions/lib/captainAccount.js';
+import { runSetupChecks } from './setupChecks.js';
 const env = import.meta.env;
+function rulesHint(error, root) {
+  const message = errorMessage(error);
+  return /permission[_ ]denied/i.test(`${error?.code} ${message}`)
+    ? `The database rules do not allow reading “${root}”. After changing a database path, run npm run rules:deploy to publish matching rules.`
+    : message;
+}
 function errorMessage(error) { return error?.message?.replace(/^Firebase:\s*/, '').replace(/\s*\(auth\/[^)]+\)\.?$/, '') || 'The operation failed. Please retry.'; }
 // Sign-in failures worth telling the admin apart (Firebase reports wrong password and unknown user the same way).
 const LOGIN_ERRORS = {
@@ -18,6 +28,7 @@ const LOGIN_ERRORS = {
 export function createFirebaseService() {
   const config = { apiKey: env.VITE_FIREBASE_API_KEY, authDomain: env.VITE_FIREBASE_AUTH_DOMAIN, databaseURL: env.VITE_FIREBASE_DATABASE_URL, projectId: env.VITE_FIREBASE_PROJECT_ID, storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET, messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID, appId: env.VITE_FIREBASE_APP_ID };
   if (!config.apiKey || !config.databaseURL || !config.projectId) throw new Error('Firebase setup is missing. Add the web configuration to .env.local, or run npm run demo.');
+  const paths = dbPaths(), ROOT = paths.root;
   const app = initializeApp(config), auth = getAuth(app), database = getDatabase(app), functions = getFunctions(app, 'us-central1');
   if (env.VITE_USE_EMULATORS === 'true') {
     if (!['localhost', '127.0.0.1'].includes(location.hostname) || !config.projectId.startsWith('demo-')) throw new Error('Emulators require a loopback hostname and a demo- project.');
@@ -28,12 +39,13 @@ export function createFirebaseService() {
   const withError = fn => async (...args) => { try { return await fn(...args); } catch (error) { throw new Error(errorMessage(error)); } };
   return {
     mode: env.VITE_USE_EMULATORS === 'true' ? 'Firebase Emulators' : 'Firebase',
+    info: { projectId: config.projectId, authDomain: config.authDomain, databaseURL: config.databaseURL, root: paths.root, season1Path: paths.season1, emulators: env.VITE_USE_EMULATORS === 'true' },
     subscribePublic(callback, onError) {
       const state = {}, ready = new Set(), keys = ['settings', 'tierConfig', 'configRevision', 'tiers'];
       let bootstrapAttempted = false;
       const emit = () => {
         if (ready.size !== keys.length) return;
-        callback({ ...state, fixtures: state.fixtures || {}, leagueRules: rulesOf(state), season: state.season || { name: DEFAULT_SEASON_NAME }, seasons: state.seasons || {}, schedules: state.schedules || {} });
+        callback({ ...state, legacySeasons: state.legacySeasons, fixtures: state.fixtures || {}, leagueRules: rulesOf(state), season: state.season || { name: DEFAULT_SEASON_NAME }, seasons: state.seasons || {}, schedules: state.schedules || {} });
         if (!state.settings && !bootstrapAttempted) {
           bootstrapAttempted = true;
           httpsCallable(functions, 'bootstrapTournament')({}).catch(error => {
@@ -45,11 +57,21 @@ export function createFirebaseService() {
           });
         }
       };
-      const off = keys.map(key => onValue(ref(database, `traice2_0/${key}`), snapshot => { state[key] = snapshot.val() ?? (key === 'configRevision' ? 0 : key === 'settings' ? null : {}); ready.add(key); emit(); }, error => onError(new Error(errorMessage(error)))));
+      const off = keys.map(key => onValue(ref(database, `${ROOT}/${key}`), snapshot => { state[key] = snapshot.val() ?? (key === 'configRevision' ? 0 : key === 'settings' ? null : {}); ready.add(key); emit(); }, error => onError(new Error(rulesHint(error, ROOT)))));
       // League data loads on its own so a missing database rule for it never blocks the core tournament data.
-      for (const key of ['fixtures', 'leagueRules', 'season', 'seasons', 'schedules']) off.push(onValue(ref(database, `traice2_0/${key}`), snapshot => { state[key] = snapshot.val() || undefined; emit(); }, () => { state[key] = undefined; emit(); }));
+      for (const key of ['fixtures', 'leagueRules', 'season', 'seasons', 'schedules', 'earlyBird', 'calendar', 'partnerPosts']) off.push(onValue(ref(database, `${ROOT}/${key}`), snapshot => { state[key] = snapshot.val() || undefined; emit(); }, () => { state[key] = undefined; emit(); }));
+      // Season 1 (legacy) lives in the same database at its own configurable path.
+      off.push(onValue(ref(database, paths.season1), snapshot => { state.legacySeasons = snapshot.exists() ? { s1: snapshot.val() } : undefined; emit(); }, () => { state.legacySeasons = undefined; emit(); }));
       return () => off.forEach(unsubscribe => unsubscribe());
     },
+    // No sign-in probes or write commands: diagnostics preserve the current account and tournament.
+    runChecks: report => runSetupChecks({
+      report, config, paths,
+      read: async path => (await get(ref(database, path))).val(),
+      currentUser: () => auth.currentUser,
+      claims: async user => (await getIdTokenResult(user)).claims,
+      health: async () => (await httpsCallable(functions, 'healthCheck')({})).data
+    }),
     subscribeConnection(callback) { return onValue(ref(database, '.info/connected'), snapshot => callback(snapshot.val() === true)); },
     subscribeAuth(callback, onError) {
       stopped = false;
@@ -59,18 +81,22 @@ export function createFirebaseService() {
           if (!anonymousPromise) anonymousPromise = signInAnonymously(auth).catch(error => { if (!stopped) onError(new Error(errorMessage(error))); }).finally(() => { anonymousPromise = null; });
           return;
         }
-        try { const token = await getIdTokenResult(user); if (!stopped && auth.currentUser?.uid === user.uid) callback({ uid: user.uid, email: user.email, admin: token.claims.admin === true, anonymous: user.isAnonymous }); }
+        try {
+          let token = await getIdTokenResult(user);
+          // A sign-in made before the admin role was granted keeps an old token without it: ask for a fresh one once.
+          if (!user.isAnonymous && token.claims.admin !== true && !isCaptainEmail(user.email)) token = await getIdTokenResult(user, true);
+          if (!stopped && auth.currentUser?.uid === user.uid) callback({ uid: user.uid, email: user.email, admin: token.claims.admin === true, anonymous: user.isAnonymous, captain: isCaptainEmail(user.email) }); }
         catch (error) { if (!stopped) onError(new Error(errorMessage(error))); }
       });
       return () => { stopped = true; unsubscribe(); };
     },
-    getMyRegistration: withError(async teamId => (await get(ref(database, `traice2_0/registrations/${teamId}`))).val()),
-    subscribeMyTeams(uid, callback) { return onValue(ref(database, `traice2_0/teamsByOwner/${uid}`), snapshot => callback(snapshot.val() || {}), () => callback({})); },
-    subscribePrivate(callback, onError) { return onValue(ref(database, 'traice2_0/registrations'), snapshot => callback(snapshot.val() || {}), error => onError(new Error(errorMessage(error)))); },
+    getMyRegistration: withError(async teamId => (await get(ref(database, `${ROOT}/registrations/${teamId}`))).val()),
+    subscribeMyTeams(uid, callback) { return onValue(ref(database, `${ROOT}/teamsByOwner/${uid}`), snapshot => callback(snapshot.val() || {}), () => callback({})); },
+    subscribePrivate(callback, onError) { return onValue(ref(database, `${ROOT}/registrations`), snapshot => callback(snapshot.val() || {}), error => onError(new Error(errorMessage(error)))); },
     async login(username, password) {
       const alias = env.VITE_ADMIN_USERNAME || 'reddi2026', email = env.VITE_ADMIN_EMAIL || 'reddi2026@traice.local';
-      try { await signInWithEmailAndPassword(auth, username.trim().toLowerCase() === alias.toLowerCase() ? email : username.trim(), password); }
-      catch (error) { throw new Error(LOGIN_ERRORS[error?.code] || errorMessage(error)); }
+      try { await signInWithEmailAndPassword(auth, username.trim().toLowerCase() === alias.toLowerCase() ? email : loginIdentifier(username), password); }
+      catch (error) { throw new Error(`${LOGIN_ERRORS[error?.code] || errorMessage(error)}${error?.code ? ` (${error.code})` : ''}`); }
     },
     logout: withError(() => signOut(auth)),
     register: withError(async payload => (await httpsCallable(functions, 'registerTeam')(payload)).data),
@@ -78,14 +104,46 @@ export function createFirebaseService() {
     recalculate: withError(async () => (await httpsCallable(functions, 'recalculateTiers')({})).data),
     generateFixtures: withError(async payload => (await httpsCallable(functions, 'generateFixtures')(payload)).data),
     generatePlayoffs: withError(async payload => (await httpsCallable(functions, 'generatePlayoffs')(payload)).data),
+    createPartnerPost: withError(async payload => (await httpsCallable(functions, 'createPartnerPost')(payload)).data),
+    expressInterest: withError(async payload => (await httpsCallable(functions, 'expressInterest')(payload)).data),
+    closePartnerPost: withError(async payload => (await httpsCallable(functions, 'closePartnerPost')(payload)).data),
+    markPartnerPicked: withError(async payload => (await httpsCallable(functions, 'markPartnerPicked')(payload)).data),
+    reopenPartnerPost: withError(async payload => (await httpsCallable(functions, 'reopenPartnerPost')(payload)).data),
+    // The poster's private side of their own posts: who replied. Ids come from partnerByOwner, then each post is read on its own.
+    subscribeMyPartnerPosts(uid, callback) {
+      const posts = {}, offs = new Map();
+      const push = () => callback({ ...posts });
+      const off = onValue(ref(database, `${ROOT}/partnerByOwner/${uid}`), snapshot => {
+        const ids = Object.keys(snapshot.val() || {});
+        for (const id of [...offs.keys()]) if (!ids.includes(id)) { offs.get(id)(); offs.delete(id); delete posts[id]; }
+        for (const id of ids) if (!offs.has(id)) offs.set(id, onValue(ref(database, `${ROOT}/partnerPrivate/${id}`), s => { if (s.exists()) posts[id] = s.val(); else delete posts[id]; push(); }, () => {}));
+        push();
+      }, () => callback({}));
+      return () => { off(); offs.forEach(stop => stop()); };
+    },
+    backupNow: withError(async () => (await httpsCallable(functions, 'backupNow')({})).data),
+    saveCalendar: withError(async payload => (await httpsCallable(functions, 'saveCalendar')(payload)).data),
+    autoSchedule: withError(async payload => (await httpsCallable(functions, 'autoSchedule')(payload)).data),
+    addBufferWeeks: withError(async payload => (await httpsCallable(functions, 'addBufferWeeks')(payload)).data),
+    listAdmins: withError(async () => (await httpsCallable(functions, 'listAdmins')({})).data),
+    createAdmin: withError(async payload => (await httpsCallable(functions, 'createAdmin')(payload)).data),
+    resetAdminPassword: withError(async payload => (await httpsCallable(functions, 'resetAdminPassword')(payload)).data),
+    removeAdmin: withError(async payload => (await httpsCallable(functions, 'removeAdmin')(payload)).data),
+    saveEarlyBird: withError(async payload => (await httpsCallable(functions, 'saveEarlyBird')(payload)).data),
     saveLeagueRules: withError(async payload => (await httpsCallable(functions, 'saveLeagueRules')(payload)).data),
     setSchedule: withError(async payload => (await httpsCallable(functions, 'setSchedule')(payload)).data),
     moveFixture: withError(async payload => (await httpsCallable(functions, 'moveFixture')(payload)).data),
     issueChallenge: withError(async payload => (await httpsCallable(functions, 'issueChallenge')(payload)).data),
     updateTeam: withError(async payload => (await httpsCallable(functions, 'updateTeam')(payload)).data),
+    syncPprcUtr: withError(async payload => (await httpsCallable(functions, 'syncPprcUtr')(payload)).data),
+    linkPprc: withError(async payload => (await httpsCallable(functions, 'linkPprc')(payload)).data),
     withdrawTeam: withError(async payload => (await httpsCallable(functions, 'withdrawTeam')(payload)).data),
-    claimTeam: withError(async payload => (await httpsCallable(functions, 'claimTeam')(payload)).data),
-    resetCaptainCode: withError(async payload => (await httpsCallable(functions, 'resetCaptainCode')(payload)).data),
+    resetCaptainLogin: withError(async payload => (await httpsCallable(functions, 'resetCaptainLogin')(payload)).data),
+    async captainLogin(username, password) {
+      try { await signInWithEmailAndPassword(auth, loginEmail(username), normalizePassword(password)); }
+      catch (error) { throw new Error(['auth/invalid-credential', 'auth/wrong-password', 'auth/user-not-found', 'auth/invalid-email'].includes(error?.code) ? 'Wrong username or password.' : error?.code === 'auth/too-many-requests' ? 'Too many attempts. Wait a few minutes, then try again.' : errorMessage(error)); }
+    },
+    importSeason1: withError(async season => (await httpsCallable(functions, 'importSeason1')({ season })).data),
     manageSeason: withError(async payload => (await httpsCallable(functions, 'manageSeason')(payload)).data),
     submitResult: withError(async payload => (await httpsCallable(functions, 'submitResult')(payload)).data),
     reviewResult: withError(async payload => (await httpsCallable(functions, 'reviewResult')(payload)).data)

@@ -81,8 +81,10 @@ export default function League() {
             <div className="toolbar-controls">
               <div className="segmented labelled" role="tablist" aria-label="League view">
                 <button type="button" role="tab" aria-selected={view === 'standings'} onClick={() => setView('standings')}>Standings</button>
+                <button type="button" role="tab" aria-selected={view === 'schedule'} onClick={() => setView('schedule')}>Schedule</button>
                 <button type="button" role="tab" aria-selected={view === 'fixtures'} onClick={() => setView('fixtures')}>Fixtures</button>
                 <button type="button" role="tab" aria-selected={view === 'playoffs'} onClick={() => setView('playoffs')}>Playoffs</button>
+                <button type="button" role="tab" aria-selected={view === 'score'} onClick={() => setView('score')}>Score entry</button>
               </div>
             </div>
           </div>
@@ -93,6 +95,35 @@ export default function League() {
               {myTierTeams.map(id => <ChallengePanel key={id} data={data} tierId={tier.id} teamId={id} teams={teams} service={service} onDone={setMessage} />)}
               {rows.length ? <StandingsTable rows={rows} highlight={mine} rules={data?.leagueRules} /> : <EmptyState title="No teams in this tier yet." />}
             </>
+          )}
+
+          {view === 'schedule' && (
+            fixtures.length ? (
+              <div className="schedule-view">
+                {[...new Set(fixtures.map(f => f.round))].map(round => {
+                  const inRound = fixtures.filter(f => f.round === round), first = inRound[0];
+                  return (
+                    <section key={round} className="round schedule-round">
+                      <h2 className="round-title">Round {round}{first?.startsOn && <span> · {shortDate(first.startsOn)} – {shortDate(first.dueBy)}</span>}</h2>
+                      <ul className="schedule-list">
+                        {inRound.map(f => (
+                          <li key={f.id} className={isMine(f) ? 'mine' : ''}>
+                            <b>{teamName(teams.get(f.home))}</b><i>vs</i><b>{teamName(teams.get(f.away))}</b>
+                            <span className={`pill ${f.status === 'final' ? 'good' : ''}`}>{f.status === 'final' ? 'Played' : f.status === 'submitted' ? 'Awaiting approval' : 'Scheduled'}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  );
+                })}
+              </div>
+            ) : <EmptyState icon="calendar" title="No schedule yet.">The admin creates the round-robin schedule once the teams are final.</EmptyState>
+          )}
+
+          {view === 'score' && (
+            <EmptyState icon="calendar" title="Score entry is coming in the next version.">
+              A dedicated score-entry screen arrives next. Until then, captains submit scores from their team’s encounter on the <button type="button" className="text-link" onClick={() => setView('fixtures')}>Fixtures tab</button>, and the admin approves them in Admin → League &amp; results.
+            </EmptyState>
           )}
 
           {view === 'playoffs' && (playoffs.length

@@ -10,3 +10,12 @@ firebase-config.json
 .local-demo/
 test-results/
 playwright-report/
+.local-migration/
+backups/
+dist-pwa/
+
+# Editor and OS files
+.idea/
+.vscode/
+.DS_Store
+*.swp

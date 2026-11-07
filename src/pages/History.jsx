@@ -1,34 +1,120 @@
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useTournament } from '../hooks/useTournament';
 import { EmptyState, Stat, tierTone } from '../components/UI';
 import { Icon } from '../components/Icons';
 import { Bracket, StandingsTable, teamName } from '../components/League';
-import { orderedTiers } from '../../functions/lib/tournament.js';
-import { standings } from '../../functions/lib/league.js';
+import { WinnerCard, PlayerName } from '../components/Winners';
+import { seasonList, seasonsOf, seasonTeams, seasonTable, seasonTiers, championTiers, tierResult } from '../data/seasons.js';
 
 const date = ms => (ms ? new Date(ms).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—');
 const span = s => (s.startedAt ? `${date(s.startedAt)} – ${date(s.archivedAt)}` : `Closed ${date(s.archivedAt)}`);
-const seasonTeams = season => new Map(Object.values(season.tiers || {}).flatMap(t => Object.values(t.teams || {})).map(t => [t.teamId, t]));
+
+export function PageTabs({ active }) {
+  return (
+    <nav className="subtabs" aria-label="Seasons">
+      <Link to="/champions" className={active === 'champions' ? 'active' : ''}>Champions</Link>
+      <Link to="/history" className={active === 'history' ? 'active' : ''}>Past seasons</Link>
+    </nav>
+  );
+}
+
+const Form = ({ results }) => <span className="form">{results.map((r, i) => <i key={i} className={r === 'W' ? 'win' : 'loss'}>{r}</i>)}</span>;
+const signed = n => (n > 0 ? `+${n}` : String(n));
+const Names = ({ text, teamId }) => String(text).split('/').map(n => n.trim()).filter(Boolean).map((n, i) => <span key={n}>{i > 0 && ' · '}<PlayerName name={n} teamId={teamId} /></span>);
+export const Members = ({ team, superSix = false }) => {
+  const names = (superSix && team?.superSixMembers) || team?.members;
+  return names ? <small className="members"><Names text={names} teamId={team.teamId} /></small> : null;
+};
+
+// Season 1's Super Six: the top six teams of each tier play a three-week round robin.
+function SuperSix({ season, teams }) {
+  const { tiers, weeks, scoring } = season.superSix, tierIds = Object.keys(tiers);
+  const squad = id => teams.get(id)?.superSixMembers || teams.get(id)?.members || '';
+  return (
+    <div className="super-six">
+      <div className="podiums">
+        {tierIds.map(id => (
+          <WinnerCard key={id} tier={{ id, name: tiers[id].name }} result={tierResult(season, id)} teams={teams} members={team => (team?.superSixMembers || team?.members || '').split('/').map(n => n.trim()).join(' · ')} empty="To be announced.">
+            <ul className="six-teams">{tiers[id].teams.map(t => <li key={t}><b>{teamName(teams.get(t))}</b> <small><Names text={squad(t)} teamId={t} /></small></li>)}</ul>
+          </WinnerCard>
+        ))}
+      </div>
+      <section className="scoring-card">
+        <h3 className="round-title">Scoring system &amp; ranking</h3>
+        <div className="scoring-grid">
+          <div><b>1 · Match result points</b><ul>{scoring.matchPoints.map(([k, v]) => <li key={k}>{k} <i>{v}</i></li>)}</ul><small>{scoring.note}</small></div>
+          <div><b>2 · Game difference</b><ul><li>Base: game margin (8–1 = +7)</li><li>Bonus: D1/D2 straight (2–0) = +5</li><li>D3: no bonus</li></ul></div>
+          <div><b>3 · Singles game diff</b><ul><li>Count S1 + S2 games</li><li>Used only if tied</li></ul><small>Then head-to-head.</small></div>
+        </div>
+      </section>
+      <h3 className="round-title">Schedule</h3>
+      {weeks.map(week => (
+        <section key={week.label} className="six-week">
+          <h4>{week.date} — {week.label}</h4>
+          <div className="six-week-tiers">
+            {tierIds.map(id => (
+              <div key={id} className={`six-card ${tierTone(id)}`}>
+                <h5>{tiers[id].name}</h5>
+                <ul>
+                  {week.matches[id].map(m => (
+                    <li key={m.home + m.away}>
+                      <span><Names text={squad(m.home)} teamId={m.home} /></span><i>vs</i><span><Names text={squad(m.away)} teamId={m.away} /></span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+
+// Season 1's published table: matches, wins, losses, game and singles difference, points.
+function PublishedTable({ rows, teams }) {
+  return (
+    <div className="table-wrap">
+      <table className="standings league-table published">
+        <thead><tr><th scope="col">#</th><th scope="col">Team</th><th scope="col" className="num">M</th><th scope="col" className="num">W</th><th scope="col" className="num">L</th><th scope="col" className="num"><span className="long">Game +/-</span><span className="short">Gm</span></th><th scope="col" className="num"><span className="long">Singles +/-</span><span className="short">Sg</span></th><th scope="col" className="num">Pts</th><th scope="col" className="form-col">Form</th></tr></thead>
+        <tbody>
+          {rows.map((row, i) => (
+            <tr key={row.teamId} className={i < 3 ? 'qualify' : ''}>
+              <td className="rank-cell">{i + 1}</td>
+              <td><b>{teamName(teams.get(row.teamId))}</b><Members team={teams.get(row.teamId)} /><span className="form-inline"><Form results={row.form} /></span></td>
+              <td className="num">{row.m}</td><td className="num">{row.w}</td><td className="num">{row.l}</td>
+              <td className="num">{signed(row.game)}</td><td className="num">{signed(row.singles)}</td><td className="num strong">{row.pts}</td>
+              <td className="form-col"><Form results={row.form} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="table-note">Top 3 teams advance · ranking: match points, game difference (+ doubles bonus), singles game difference, head-to-head.</p>
+    </div>
+  );
+}
 
 function SeasonList({ data }) {
-  const seasons = Object.values(data.seasons || {}).sort((a, b) => b.archivedAt - a.archivedAt);
+  const seasons = seasonList(data);
   return (
     <section className="page history-screen">
       <header className="page-head">
-        <p className="eyebrow">Now playing · {data.season?.name}</p>
+        <p className="eyebrow">{data?.season?.name ? `Now playing · ${data.season.name}` : 'Season history'}</p>
         <h1>Past <em>seasons.</em></h1>
         <p>Every closed season keeps its final standings, playoffs and champions.</p>
       </header>
+      <PageTabs active="history" />
       {!seasons.length && <EmptyState icon="trophy" title="No past seasons yet.">When the admin closes a season, it appears here with its champions and final tables.</EmptyState>}
       <div className="season-list">
         {seasons.map(season => {
-          const teams = seasonTeams(season), tiers = orderedTiers(season.tierConfig || {});
+          const teams = seasonTeams(season), tiers = championTiers(season);
           return (
             <Link key={season.id} className="season-tile" to={`/history/${season.id}`}>
               <div className="season-tile-top"><h2>{season.name}</h2><span className="muted">{span(season)}</span></div>
               <ul className="champions">
                 {tiers.map(t => {
-                  const champ = season.champions?.[t.id];
+                  const champ = tierResult(season, t.id);
                   return <li key={t.id} className={tierTone(t.id)}><Icon name="trophy" size={18} /><span>{t.name}</span><b>{champ ? teamName(teams.get(champ.winner)) : 'No champion recorded'}</b></li>;
                 })}
               </ul>
@@ -42,7 +128,9 @@ function SeasonList({ data }) {
 }
 
 function SeasonDetail({ season }) {
-  const teams = seasonTeams(season), tiers = orderedTiers(season.tierConfig || {}).filter(t => season.tiers?.[t.id] || season.fixtures?.[t.id]);
+  const [params, setParams] = useSearchParams();
+  const stage = season.legacy && params.get('stage') !== 'groups' ? 'super-six' : 'groups';
+  const teams = seasonTeams(season), tiers = seasonTiers(season);
   const encounters = Object.values(season.fixtures || {}).flatMap(f => Object.values(f || {})).filter(f => f.status === 'final').length;
   return (
     <section className="page history-screen">
@@ -57,17 +145,24 @@ function SeasonDetail({ season }) {
         <Stat value={teams.size} label="Teams" />
         <Stat value={tiers.length} label="Tiers" />
         <Stat value={encounters} label="Encounters played" />
-        <Stat value={Object.keys(season.champions || {}).length} label="Champions" tone="accent" />
+        <Stat value={season.legacy ? season.championTiers.filter(t => tierResult(season, t.id)).length : tiers.filter(t => tierResult(season, t.id)).length} label="Champions" tone="accent" />
       </div>
-      {tiers.map(tier => {
-        const tierFixtures = season.fixtures?.[tier.id] || {}, champ = season.champions?.[tier.id];
-        const rows = standings(Object.values(season.tiers?.[tier.id]?.teams || {}), tierFixtures, season.leagueRules);
+      {season.legacy && (
+        <nav className="subtabs" aria-label="Season stages">
+          <button type="button" className={stage === 'super-six' ? 'active' : ''} onClick={() => setParams({})}>Super Six</button>
+          <button type="button" className={stage === 'groups' ? 'active' : ''} onClick={() => setParams({ stage: 'groups' })}>Group stage</button>
+        </nav>
+      )}
+      {stage === 'super-six' && <SuperSix season={season} teams={teams} />}
+      {stage === 'groups' && tiers.map(tier => {
+        const tierFixtures = season.fixtures?.[tier.id] || {}, champ = tierResult(season, tier.id);
+        const rows = season.legacy ? season.table[tier.id] : seasonTable(season, tier.id);
         const playoffs = Object.values(tierFixtures).filter(f => f.stage);
         return (
           <section key={tier.id} className={`tier-group ${tierTone(tier.id)}`}>
             <div className="tier-head"><div><h2>{tier.name}</h2><span>{rows.length} teams</span></div></div>
             {champ && <p className="champion-banner"><Icon name="trophy" size={22} /><span>Champions</span><b>{teamName(teams.get(champ.winner))}</b><em>Runners-up: {teamName(teams.get(champ.runnerUp))}</em></p>}
-            {rows.length > 0 && <StandingsTable rows={rows} rules={season.leagueRules} archived />}
+            {rows.length > 0 && (season.legacy ? <PublishedTable rows={rows} teams={teams} /> : <StandingsTable rows={rows} rules={season.leagueRules} archived />)}
             {playoffs.length > 0 && <><h3 className="round-title">Playoffs</h3><Bracket fixtures={playoffs} teams={teams} archived /></>}
           </section>
         );
@@ -79,8 +174,7 @@ function SeasonDetail({ season }) {
 export default function History() {
   const { seasonId } = useParams();
   const { data } = useTournament();
-  if (!data) return <div className="page-loading" aria-busy="true"><span className="spinner" /> Loading history…</div>;
   if (!seasonId) return <SeasonList data={data} />;
-  const season = data.seasons?.[seasonId];
+  const season = seasonsOf(data)[seasonId];
   return season ? <SeasonDetail season={season} /> : <section className="page"><EmptyState title="Season not found."><Link className="secondary" to="/history">All seasons</Link></EmptyState></section>;
 }

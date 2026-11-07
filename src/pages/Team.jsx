@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useTournament, useMyTeams } from '../hooks/useTournament';
-import { EmptyState, Message, Stat, tierTone } from '../components/UI';
-import { CaptainClaim, TeamEditForm } from '../components/TeamTools';
+import { EmptyState, Message, PprcBadge, Stat, pprcPair, tierTone, utrPair } from '../components/UI';
+import { CaptainSignIn, TeamEditForm } from '../components/TeamTools';
 import { FixtureCard, teamIndex, teamName, playerName } from '../components/League';
 import { Icon } from '../components/Icons';
-import { orderedTiers, formatUtr } from '../../functions/lib/tournament.js';
+import { orderedTiers, formatUtr, DEFAULT_LEAGUE_RULES } from '../../functions/lib/tournament.js';
 import { standings, playerId, singlesEligibility, ROLES } from '../../functions/lib/league.js';
 import { useRatings } from './Players';
 
@@ -58,7 +58,7 @@ export default function Team() {
               : <div className="card-actions"><button type="button" className="secondary small" onClick={startEdit}>Edit players</button><button type="button" className="danger" onClick={withdraw}>Withdraw team</button></div>}
         </section>
       )}
-      {!owned && !user?.admin && <CaptainClaim teamId={teamId} service={service} onClaimed={() => setNote('This device is now linked to your team. You can submit scores and manage the team here.')} />}
+      {!owned && !user?.admin && <CaptainSignIn />}
       <div className="stat-row">
         <Stat value={`${total.won}–${total.lost}`} label="Win–loss" tone="accent" />
         {records.map(r => <Stat key={r.tier.id} value={r.row ? `#${r.row.position}` : '—'} label={`${r.tier.name} position`} />)}
@@ -69,17 +69,17 @@ export default function Team() {
         <h2>Players</h2>
         <ul>{players.map(([role, label, name, utr]) => {
           const r = ratingOf(role);
-          return <li key={role}><span>{label}</span><Link to={`/player/${teamId}/${role}`}><b>{name}</b></Link><small>UTR {formatUtr(utr)}</small><em>{r ? r.rating.toFixed(2) : formatUtr(utr)}</em></li>;
+          return <li key={role}><span>{label}</span><Link to={`/player/${teamId}/${role}`}><b>{name}</b></Link><small>UTR {formatUtr(utr)} <PprcBadge info={team.pprc?.[role]} /><br />UTR S/D {utrPair(team.utrs?.[role])} · PPRC S/D {pprcPair(team.pprc?.[role])}</small><em>{r ? r.rating.toFixed(2) : formatUtr(utr)}</em></li>;
         })}</ul>
         <p className="small">Right: live Triace rating. Starting point is the counted UTR: the higher of singles and doubles, or their average when they are more than {formatUtr(data.leagueRules?.utrGapLimit ?? 175)} apart.</p>
       </section>
 
       {records.map(({ tier, row, fixtures }) => (
         <section key={tier.id} className="tier-group">
-          <div className="tier-head"><div><h2>{tier.name} fixtures</h2>{row && <span>Form {row.form.join(' ') || '—'} · {row.matchesWon}–{row.matchesLost} matches</span>}</div></div>
+          <div className="tier-head"><div><h2>{tier.name} fixtures</h2>{row && <span>Form {row.form.join(' ') || '—'} · {row.matchesWon}–{row.matchesLost} courts</span>}</div></div>
           {!fixtures.length && <EmptyState icon="calendar" title="No fixtures yet." />}
           {fixtures.length > 0 && (() => {
-            const check = singlesEligibility(teamId, data.fixtures?.[tier.id], data.leagueRules), pct = data.leagueRules?.singlesMinPercent ?? 40;
+            const check = singlesEligibility(teamId, data.fixtures?.[tier.id], data.leagueRules), pct = data.leagueRules?.singlesMinPercent ?? DEFAULT_LEAGUE_RULES.singlesMinPercent;
             return (
               <div className="singles-check">
                 <p className="small">Singles minimum: {pct}% of {check.matchDays} match days = <strong>{check.required}</strong> singles days each{check.left ? ` · ${check.left} match days left` : ''}.</p>

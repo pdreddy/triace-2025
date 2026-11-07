@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTournament } from '../hooks/useTournament';
-import { TeamCard, Message, Stat, EmptyState, tierTone } from '../components/UI';
+import { TeamCard, Message, Stat, EmptyState, PprcBadge, pprcPair, tierTone, utrPair } from '../components/UI';
 import { Icon } from '../components/Icons';
 import { orderedTiers, formatUtr } from '../../functions/lib/tournament.js';
 
@@ -18,9 +18,9 @@ function Standings({ teams, ranks }) {
               <td className="rank-cell">{ranks.get(t.teamId)}</td>
               <td><b>{t.captainFirstName}</b></td>
               <td className="muted">{t.ace1Name || 'Ace 1 (masked)'} · {t.ace2Name || 'Ace 2 (masked)'}</td>
-              <td className="num">{formatUtr(t.captainUtr)}</td>
-              <td className="num">{formatUtr(t.ace1Utr)}</td>
-              <td className="num">{formatUtr(t.ace2Utr)}</td>
+              <td className="num">{formatUtr(t.captainUtr)}<br /><PprcBadge info={t.pprc?.captain} /><br /><small className="utr-detail">S/D {utrPair(t.utrs?.captain)}<br />PPRC {pprcPair(t.pprc?.captain)}</small></td>
+              <td className="num">{formatUtr(t.ace1Utr)}<br /><PprcBadge info={t.pprc?.ace1} /><br /><small className="utr-detail">S/D {utrPair(t.utrs?.ace1)}<br />PPRC {pprcPair(t.pprc?.ace1)}</small></td>
+              <td className="num">{formatUtr(t.ace2Utr)}<br /><PprcBadge info={t.pprc?.ace2} /><br /><small className="utr-detail">S/D {utrPair(t.utrs?.ace2)}<br />PPRC {pprcPair(t.pprc?.ace2)}</small></td>
               <td className="num strong">{formatUtr(t.combinedUtr)}</td>
             </tr>
           ))}
@@ -103,6 +103,9 @@ export default function Tiers() {
             {view === 'cards'
               ? <div className="team-list">{teams.map(team => <TeamCard key={team.teamId} team={team} tierName={tier.name} tierId={tier.id} rank={ranks.get(team.teamId)} />)}</div>
               : teams.length > 0 && <Standings teams={teams} ranks={ranks} />}
+            {Object.keys(data?.tiers?.[tier.id]?.waitlist || {}).length > 0 && (
+              <p className="small note waitlist-public"><b>Waitlist ({Object.keys(data.tiers[tier.id].waitlist).length}):</b> {Object.values(data.tiers[tier.id].waitlist).sort((a, b) => a.registeredAt - b.registeredAt).map((w, i) => `${i + 1}. ${w.captainFirstName}’s team`).join(' · ')}. They move up if a team withdraws.</p>
+            )}
             {!teams.length && (
               <EmptyState title={members.length ? 'No teams match your search.' : 'No teams in this tier yet.'}>
                 {!members.length && <Link className="secondary" to="/register">Be the first to register</Link>}
