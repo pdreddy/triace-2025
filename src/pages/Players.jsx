@@ -37,6 +37,7 @@ export default function Players() {
       <header className="page-head">
         <p className="eyebrow">Triace rating · live from every approved match</p>
         <h1>The <em>players.</em></h1>
+        <p><Link className="text-link" to="/pprc">All PPRC players and match history →</Link></p>
         <p>Each player starts at their counted UTR. After every approved match the rating moves by how many games they won compared with what the rating gap predicted.</p>
       </header>
       <div className="stat-row">

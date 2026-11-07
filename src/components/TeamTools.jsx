@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Field, Message } from './UI';
+import { Icon } from './Icons';
 import { formatUtr, orderedTiers, parseUtr } from '../../functions/lib/tournament.js';
 
 const utrText = value => (value == null ? '' : formatUtr(value));
@@ -9,7 +11,7 @@ const toUtr = text => (String(text).trim() ? parseUtr(text) : null);
 export function TeamEditForm({ registration, tierConfig, onSave, onCancel }) {
   const r = registration;
   const [form, setForm] = useState({
-    captain: r.captain.firstName, captainSingles: utrText(r.captain.singlesUtr), captainDoubles: utrText(r.captain.doublesUtr),
+    captain: r.captain.firstName, captainLast: r.captain.lastName || '', captainSingles: utrText(r.captain.singlesUtr), captainDoubles: utrText(r.captain.doublesUtr),
     ace1: r.ace1.fullName, ace1Singles: utrText(r.ace1.singlesUtr), ace1Doubles: utrText(r.ace1.doublesUtr),
     ace2: r.ace2.fullName, ace2Singles: utrText(r.ace2.singlesUtr), ace2Doubles: utrText(r.ace2.doublesUtr),
     selectedTier: r.selectedTier, captainPhone: r.whatsappPhone || '', ace1Phone: r.ace1Phone || '', ace2Phone: r.ace2Phone || ''
@@ -22,7 +24,7 @@ export function TeamEditForm({ registration, tierConfig, onSave, onCancel }) {
     setBusy(true); setError('');
     try {
       const player = (nameKey, key, nameField) => ({ [nameField]: form[nameKey].trim(), singlesUtr: parseUtr(form[`${key}Singles`]), doublesUtr: toUtr(form[`${key}Doubles`]) });
-      await onSave({ teamId: r.teamId, captain: player('captain', 'captain', 'firstName'), ace1: player('ace1', 'ace1', 'fullName'), ace2: player('ace2', 'ace2', 'fullName'), selectedTier: form.selectedTier, ...Object.fromEntries([['captainPhone', 'whatsappPhone'], ['ace1Phone', 'ace1Phone'], ['ace2Phone', 'ace2Phone']].filter(([key]) => form[key].trim()).map(([key, name]) => [name, form[key]])) });
+      await onSave({ teamId: r.teamId, captain: { ...player('captain', 'captain', 'firstName'), ...(form.captainLast.trim() ? { lastName: form.captainLast.trim() } : {}) }, ace1: player('ace1', 'ace1', 'fullName'), ace2: player('ace2', 'ace2', 'fullName'), selectedTier: form.selectedTier, ...Object.fromEntries([['captainPhone', 'whatsappPhone'], ['ace1Phone', 'ace1Phone'], ['ace2Phone', 'ace2Phone']].filter(([key]) => form[key].trim()).map(([key, name]) => [name, form[key]])) });
     } catch (e) { setError(e.message); setBusy(false); }
   }
   const rows = [['captain', 'Captain first name'], ['ace1', 'Ace 1 full name'], ['ace2', 'Ace 2 full name']];
@@ -32,6 +34,7 @@ export function TeamEditForm({ registration, tierConfig, onSave, onCancel }) {
         {rows.map(([key, label]) => (
           <div className="team-edit-row" key={key}>
             <Field id={id(key)} label={label} value={form[key]} onChange={set(key)} required />
+            {key === 'captain' && <Field id={id('captain-last')} label="Captain last name (private)" value={form.captainLast} onChange={set('captainLast')} placeholder="Optional" />}
             <Field id={id(`${key}-phone`)} label={`${key === 'captain' ? 'Captain' : key === 'ace1' ? 'Ace 1' : 'Ace 2'} WhatsApp number (private)`} type="tel" inputMode="tel" value={form[`${key}Phone`]} onChange={set(`${key}Phone`)} placeholder="+15551234567" />
             <Field id={id(`${key}-s`)} label="Singles UTR" type="number" step="0.01" min="0.01" value={form[`${key}Singles`]} onChange={set(`${key}Singles`)} required />
             <Field id={id(`${key}-d`)} label="Doubles UTR" type="number" step="0.01" min="0.01" value={form[`${key}Doubles`]} onChange={set(`${key}Doubles`)} placeholder="Optional" />
@@ -56,23 +59,13 @@ export function TeamEditForm({ registration, tierConfig, onSave, onCancel }) {
   );
 }
 
-// A captain on a new phone or browser enters the captain code shown when the team registered.
-export function CaptainClaim({ teamId, service, onClaimed }) {
-  const [code, setCode] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState('');
-  async function submit(event) {
-    event.preventDefault();
-    setBusy(true); setError('');
-    try { await service.claimTeam({ teamId, code }); setCode(''); onClaimed?.(); } catch (e) { setError(e.message); } finally { setBusy(false); }
-  }
+// Shown to visitors who don't manage this team: captains sign in with their team login.
+export function CaptainSignIn() {
   return (
-    <details className="card claim">
-      <summary>Captain of this team on a new device?</summary>
-      <form onSubmit={submit} className="inline-form">
-        <Field id={`claim-${teamId}`} label="Captain code" placeholder="e.g. K7QM-4XPA" autoComplete="off" value={code} onChange={e => setCode(e.target.value)} required />
-        <button className="button small" disabled={busy || !code.trim()}>{busy ? 'Checking…' : 'Claim team'}</button>
-      </form>
-      <Message error>{error}</Message>
-      <p className="small">The captain code was shown once when the team registered. If it’s lost, ask the admin for a new one.</p>
-    </details>
+    <aside className="card claim">
+      <p><strong>Captain of this team?</strong> Sign in with your team login to edit the team or submit scores.</p>
+      <Link className="button small" to="/captain">Captain sign in <Icon name="arrow" size={16} /></Link>
+      <p className="small">Lost your login? Ask the tournament admin to reset it.</p>
+    </aside>
   );
 }

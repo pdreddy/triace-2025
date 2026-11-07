@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { initialState, applyRegistration, applyRecalculation, applyLeagueRules, publicState, rulesOf, DEFAULT_LEAGUE_RULES } from '../../functions/lib/tournament.js';
+import { initialState, applyRegistration, applyRecalculation, applyLeagueRules, publicState, rulesOf, DEFAULT_LEAGUE_RULES, isOwner } from '../../functions/lib/tournament.js';
 import { applyLinkPprc, roundRobin, applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyReviewResult, standings, playoffSpots, encounterWinner, deriveLineup, matchPlayers, playerRatings, playerId, gameShare, singlesEligibility, applyManageSeason } from '../../functions/lib/league.js';
 
 const team = (captain, id, values = [600, 600, 600]) => ({ teamId: id, whatsappPhone:'+15551234567',ace1Phone:'+15551234568',ace2Phone:'+15551234569', captain: { firstName: captain, singlesUtr: values[0], doublesUtr: null }, ace1: { fullName: `${captain} Ace One`, singlesUtr: values[1], doublesUtr: null }, ace2: { fullName: `${captain} Ace Two`, singlesUtr: values[2], doublesUtr: null }, selectedTier: 'goat', consent: true, rulesAccepted: true });
@@ -12,6 +12,18 @@ function league(count = 4) {
   for (let i = 0; i < count; i++) state = applyRegistration(state, team(`Cap${i}`, `team_${String(i).padStart(16, '0')}`), `owner${i}`, 1000 + i).state;
   return applyGenerateFixtures(state, { tierId: 'goat' }).state;
 }
+
+test('a captain signed in with their team login can submit scores, and nobody else can', () => {
+  let state = initialState();
+  const ids = ['team_0000000000000000', 'team_0000000000000001'], logins = ids.map(id => ({ uid: `cap_${id}`, username: `cap-${id.slice(-1)}222` }));
+  ids.forEach((id, i) => { state = applyRegistration(state, team(`Cap${i}`, id), `anon${i}`, 1000 + i, logins[i]).state; });
+  state = applyGenerateFixtures(state, { tierId: 'goat' }).state;
+  const fixture = Object.values(state.fixtures.goat)[0], entry = { tierId: 'goat', fixtureId: fixture.id, courts: result('home', 'home', 'away') };
+  assert.throws(() => applySubmitResult(state, entry, 'a-stranger'), /Only the captains/);
+  const mine = state.registrations[fixture.home].captainUid;                 // the home captain's login, not the browser that registered
+  assert.notEqual(mine, state.registrations[fixture.home].ownerUid);
+  assert.equal(applySubmitResult(state, entry, mine).state.fixtures.goat[fixture.id].status, 'submitted');
+});
 
 test('round robin pairs every team exactly once, with byes for odd counts', () => {
   for (const n of [2, 3, 4, 5, 8]) {
@@ -197,7 +209,7 @@ test('singles minimum counts singles days against the share of scheduled match d
   assert.equal(mine.length, 5);
   for (const f of mine.slice(0, 3)) state = applySubmitResult(state, { tierId: 'goat', fixtureId: f.id, courts: result('home', 'home', 'home'), lineups: { home: { d1: ['ace1', 'ace2'], d2Partner: 'ace2' }, away: { d1: ['ace1', 'ace2'], d2Partner: 'ace2' } } }, 'admin', true).state;
   const check = singlesEligibility(teamId, state.fixtures.goat);
-  assert.deepEqual([check.matchDays, check.required, check.left], [5, 2, 2]);
+  assert.deepEqual([check.matchDays, check.required, check.left], [5, 1, 2]);
   assert.deepEqual(check.players.ace1, { days: 3, met: true, possible: true }, 'ace1 is left out of Doubles 2 and plays every singles');
   assert.deepEqual(check.players.captain, { days: 0, met: false, possible: true });
   assert.equal(singlesEligibility(teamId, state.fixtures.goat, { ...DEFAULT_LEAGUE_RULES, singlesMinPercent: 100 }).players.captain.possible, false);
@@ -224,7 +236,7 @@ test('closing a season archives it publicly and privately, then starts a clean s
 });
 
 // ---------- dates, challenges, team management ----------
-import { applySetSchedule, applyMoveFixture, addDays, deadlineEnd, isOverdue, onTime, challengeStatus, applyIssueChallenge, applyUpdateTeam, applyWithdrawTeam, applyClaimTeam, applyResetCaptainCode } from '../../functions/lib/league.js';
+import { applySetSchedule, applyMoveFixture, addDays, deadlineEnd, isOverdue, onTime, challengeStatus, applyIssueChallenge, applyUpdateTeam, applyWithdrawTeam, applySetCaptainLogin } from '../../functions/lib/league.js';
 const day = date => Date.parse(`${date}T12:00:00Z`);
 
 test('a schedule dates every round, deadlines last to the end of the day anywhere, and results record whether they were on time', () => {
@@ -307,17 +319,51 @@ test('captains and the admin can edit or withdraw teams within the limits', () =
 });
 function initialStateWith(state) { const copy = structuredClone(state); delete copy.fixtures; return copy; }
 
-test('a captain code lets a new device claim the team; the admin can issue a new code', () => {
-  let state = initialState();
-  state = applyRegistration(state, team('Claim', 'team_claim00000000000000'), 'phone-1', 1, 'a'.repeat(64)).state;
-  assert.equal(applyRegistration(state, team('Claim', 'team_claim00000000000000'), 'phone-1', 2, 'b'.repeat(64)).result.created, undefined, 'repeating a registration keeps the first code');
-  assert.throws(() => applyClaimTeam(state, { teamId: 'team_claim00000000000000', codeHash: 'b'.repeat(64) }, 'phone-2'), /doesn’t match/);
-  const claimed = applyClaimTeam(state, { teamId: 'team_claim00000000000000', codeHash: 'a'.repeat(64) }, 'phone-2').state;
-  assert.deepEqual(claimed.teamsByOwner['phone-2'], { team_claim00000000000000: true });
-  assert.deepEqual(applyRecalculation(claimed).state.teamsByOwner['phone-2'], { team_claim00000000000000: true }, 'recalculation keeps claimed devices');
-  const reset = applyResetCaptainCode(claimed, { teamId: 'team_claim00000000000000', codeHash: 'c'.repeat(64) }).state;
-  assert.throws(() => applyClaimTeam(reset, { teamId: 'team_claim00000000000000', codeHash: 'a'.repeat(64) }, 'phone-3'), /doesn’t match/);
-  assert.ok(applyClaimTeam(reset, { teamId: 'team_claim00000000000000', codeHash: 'c'.repeat(64) }, 'phone-3'));
+test('a captain login owns the team on any device, survives recalculation, and the admin can set one', () => {
+  const id = 'team_claim00000000000000', login = { uid: `cap_${id}`, username: 'claim-k7q2' };
+  const state = applyRegistration(initialState(), team('Claim', id), 'phone-1', 1, login).state, record = state.registrations[id];
+  assert.equal(record.captainUsername, 'claim-k7q2');
+  assert.equal(record.captainUid, login.uid);
+  assert.deepEqual(record.owners, { [login.uid]: true });
+  assert.deepEqual(state.teamsByOwner[login.uid], { [id]: true });
+  assert.ok(isOwner(record, login.uid) && isOwner(record, 'phone-1') && !isOwner(record, 'someone-else'));
+  assert.equal(applyRegistration(state, team('Claim', id), 'phone-1', 2, null).result.created, undefined, 'repeating a registration changes nothing');
+  assert.deepEqual(applyRecalculation(state).state.teamsByOwner[login.uid], { [id]: true }, 'recalculation keeps the login’s teams');
+  assert.equal(JSON.stringify(state.tiers).includes('claim-k7q2'), false, 'the username is not in public data');
+  // a team registered without a login (or whose login was removed) can be given one by the admin
+  const bare = applyRegistration(initialState(), team('Bare', 'team_bare000000000000000'), 'phone-1', 1).state;
+  assert.equal(bare.registrations.team_bare000000000000000.captainUsername, undefined);
+  const given = applySetCaptainLogin(bare, { teamId: 'team_bare000000000000000', uid: 'cap_x', username: 'bare-2222' }).state;
+  assert.ok(isOwner(given.registrations.team_bare000000000000000, 'cap_x'));
+  assert.deepEqual(given.teamsByOwner.cap_x, { team_bare000000000000000: true });
+  assert.throws(() => applySetCaptainLogin(bare, { teamId: 'team_gone0000000000000', uid: 'cap_y', username: 'gone-1' }), /no longer exists/);
+  assert.throws(() => applySetCaptainLogin(bare, { teamId: 'team_bare000000000000000', uid: '', username: '' }), /Invalid captain login/);
+});
+
+// ---- singles minimum must be satisfiable by all three players ----
+import { MAX_SINGLES_PERCENT, validateLeagueRules } from '../../functions/lib/tournament.js';
+test('the singles minimum is something every player of a three-player team can reach', () => {
+  assert.equal(MAX_SINGLES_PERCENT, 33);
+  assert.equal(DEFAULT_LEAGUE_RULES.singlesMinPercent, 30);
+  for (let percent = 0; percent <= MAX_SINGLES_PERCENT; percent++) {
+    for (let matchDays = 1; matchDays <= 40; matchDays++) {
+      const each = Math.floor((matchDays * percent) / 100);
+      assert.ok(each * 3 <= matchDays, `${percent}% of ${matchDays} match days needs ${each * 3} singles slots but there are only ${matchDays}`);
+    }
+  }
+  // the old 40% could not work: 8 match days need 3 singles days each = 9 singles matches, but there are 8
+  assert.ok(3 * Math.floor((8 * 40) / 100) > 8);
+});
+
+test('an impossible singles minimum can neither be saved nor applied', () => {
+  for (const bad of [34, 40, 50, 100]) assert.throws(() => validateLeagueRules({ ...DEFAULT_LEAGUE_RULES, singlesMinPercent: bad }), /0–33%/, `${bad}`);
+  assert.doesNotThrow(() => validateLeagueRules({ ...DEFAULT_LEAGUE_RULES, singlesMinPercent: 33 }));
+  assert.equal(rulesOf({}).singlesMinPercent, 30, 'nothing saved: the default');
+  assert.equal(rulesOf({ leagueRules: { singlesMinPercent: 40 } }).singlesMinPercent, 33, 'an older saved 40% is capped');
+  assert.equal(rulesOf({ leagueRules: { singlesMinPercent: 28 } }).singlesMinPercent, 28);
+  // a team can really meet it: 8 match days at the default 30% need 2 singles days each (6 of the 8 singles matches)
+  const state = league(2), id = Object.keys(state.registrations)[0];
+  assert.equal(singlesEligibility(id, state.fixtures.goat, rulesOf(state)).required, Math.floor((Object.values(state.fixtures.goat).length * 30) / 100));
 });
 
 test('results saved before the court change (old match order, no totals) still rate and rank correctly', () => {

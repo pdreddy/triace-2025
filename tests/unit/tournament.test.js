@@ -41,3 +41,4 @@ test('a registration can link its players to the shared PPRC list; the links sta
   assert.ok(!text.includes('p_vivekvardhan') && !text.includes('pprcIds'), 'never part of the public data');
   assert.equal(publicRecord(saved.registrations.team_1234567890123456, saved.settings).pprcIds, undefined);
 });
+test('captain-only CSV leaves out both Aces',()=>{const {state}=applyRegistration(initialState(),payload(),'u',1000);const full=registrationsCsv(state.registrations,state.tierConfig),captain=registrationsCsv(state.registrations,state.tierConfig,{captainOnly:true});assert.match(full,/Ace 1 full name/);assert.doesNotMatch(captain,/Ace|Secret|WhatsApp"?,"?Ace/);assert.match(captain.split('\r\n')[0],/Captain first name.*Captain UTR.*Combined UTR/);assert.equal(captain.split('\r\n')[0].split(',').length,full.split('\r\n')[0].split(',').length-6);});

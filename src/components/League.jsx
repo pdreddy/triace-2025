@@ -6,7 +6,7 @@ import { formatUtr } from '../../functions/lib/tournament.js';
 import { validateCourt, validateDoublesSet, validateMatchScore, matchResult, SCORE_ERRORS } from '../../functions/lib/scoring.js';
 import { FORMATS, ROLE_LABELS, deriveLineup, matchPlayers, playoffSpots, isOverdue, onTime } from '../../functions/lib/league.js';
 
-export const teamName = team => (team ? `${team.captainFirstName}’s team` : 'To be decided');
+export const teamName = team => (team ? team.name || `${team.captainFirstName}’s team` : 'To be decided');
 // Every public team across all tiers, by ID (a team listed in two tiers appears once).
 export const teamIndex = data => new Map(Object.values(data?.tiers || {}).flatMap(tier => Object.values(tier.teams || {})).map(t => [t.teamId, t]));
 export function playerName(team, role) {
@@ -256,7 +256,7 @@ export function StandingsTable({ rows, highlight = new Set(), rules, archived = 
           {rows.map(row => (
             <tr key={row.team.teamId} className={`${row.position <= spots ? 'qualify' : ''}${row.position === spots ? ' cutoff' : ''}${highlight.has(row.team.teamId) ? ' mine' : ''}`}>
               <td className="rank-cell">{row.position}</td>
-              <td>{row.swappedBy && <span className="swap" title="Place changed by a challenge" aria-label="Place changed by a challenge">⇅ </span>}{archived ? <b>{teamName(row.team)}</b> : <Link to={`/team/${row.team.teamId}`}><b>{teamName(row.team)}</b></Link>}<span className="muted team-utr"> · {formatUtr(row.team.combinedUtr)}</span></td>
+              <td>{row.swappedBy && <span className="swap" title="Place changed by a challenge" aria-label="Place changed by a challenge">⇅ </span>}{archived ? <b>{teamName(row.team)}</b> : <Link to={`/team/${row.team.teamId}`}><b>{teamName(row.team)}</b></Link>}{row.team.combinedUtr != null && <span className="muted team-utr"> · {formatUtr(row.team.combinedUtr)}</span>}</td>
               <td className="num">{row.played}</td>
               <td className="num">{row.won}</td>
               <td className="num">{row.lost}</td>
@@ -268,7 +268,7 @@ export function StandingsTable({ rows, highlight = new Set(), rules, archived = 
           ))}
         </tbody>
       </table>
-      <p className="table-note">Top {spots} qualify for the playoffs · {rules?.pointsPerWin ?? 1} point per encounter win · ties: head-to-head, court difference, game difference, games won · ⇅ place changed by a challenge.</p>
+      <p className="table-note">{!archived || rules?.playoffThreshold < 99 ? `Top ${spots} qualify for the playoffs · ` : ''}{rules?.pointsPerWin ?? 1} {(rules?.pointsPerWin ?? 1) === 1 ? 'point' : 'points'} per encounter win · ties: head-to-head, court difference, game difference, games won · ⇅ place changed by a challenge.</p>
     </div>
   );
 }

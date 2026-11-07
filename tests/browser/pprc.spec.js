@@ -60,6 +60,10 @@ test('PPRC pages explain when the data cannot be read', async ({ page }) => {
   await expect(page.getByText('The player data is not readable yet.')).toBeVisible();
 });
 
+// The demo server is shared by every spec and a tier holds a limited number of teams, so a test that registers a team
+// withdraws it afterwards instead of leaving later specs without room.
+const withdraw = (page, teamId) => page.request.post('/api/withdraw-team', { data: { teamId } });
+
 async function acceptRules(page) {
   await page.goto('/');
   for (let i = 0; i < 9; i++) await page.getByRole('button', { name: 'Next rule card' }).click();
@@ -78,6 +82,7 @@ test('registration finds players already in PPRC, links them, and carries their 
   await page.goto('/register');
   await expect(page.getByRole('button', { name: 'Register team ↗' })).toBeEnabled();
   await page.getByLabel('Captain first name', { exact: true }).fill('John');
+  await page.getByLabel('Captain last name (private)').fill('Tester');
   await page.getByLabel('Captain WhatsApp number (private)').fill('+15551234567');
   await page.getByLabel('Ace 1 WhatsApp number (private)').fill('+15551234568');
   await page.getByLabel('Ace 2 WhatsApp number (private)').fill('+15551234569');
@@ -101,8 +106,10 @@ test('registration finds players already in PPRC, links them, and carries their 
   await page.getByRole('checkbox', { name: /permission to register/ }).check();
   const sent = page.waitForRequest(r => r.url().includes('register') && r.method() === 'POST');
   await page.getByRole('button', { name: 'Register team ↗' }).click();
-  expect(JSON.parse((await sent).postData()).pprcIds).toEqual({ ace1: 'p_krishna_vennapusa' });
+  const body = JSON.parse((await sent).postData());
+  expect(body.pprcIds).toEqual({ ace1: 'p_krishna_vennapusa' });
   await expect(page.getByRole('status').filter({ hasText: 'Team registered successfully' })).toBeVisible();
+  expect((await withdraw(page, body.teamId)).ok()).toBe(true);
 });
 
 test('registration still works when the shared player list cannot be read', async ({ page }) => {
@@ -137,6 +144,7 @@ test('admin links registered players to PPRC; the tier list shows PPRC with a ti
   await player.goto('/register');
   await expect(player.getByRole('button', { name: 'Register team ↗' })).toBeEnabled();
   await player.getByLabel('Captain first name', { exact: true }).fill('LinkCap');
+  await player.getByLabel('Captain last name (private)').fill('Tester');
   await player.getByLabel('Captain WhatsApp number (private)').fill('+15551234567');
   await player.getByLabel('Ace 1 WhatsApp number (private)').fill('+15551234568');
   await player.getByLabel('Ace 2 WhatsApp number (private)').fill('+15551234569');
@@ -144,7 +152,9 @@ test('admin links registered players to PPRC; the tier list shows PPRC with a ti
   await player.getByLabel('Ace 2 full name').fill('Newbie Player');
   for (const key of ['captain', 'ace1', 'ace2']) await player.locator(`#${key}-utr`).fill('6');
   await player.getByRole('checkbox', { name: /permission to register/ }).check();
+  const registered = player.waitForRequest(r => r.url().includes('register') && r.method() === 'POST');
   await player.getByRole('button', { name: 'Register team ↗' }).click();
+  const teamId = JSON.parse((await registered).postData()).teamId;
   await expect(player.getByRole('status').filter({ hasText: 'Team registered successfully' })).toBeVisible();
 
   await login(admin);
@@ -181,4 +191,5 @@ test('admin links registered players to PPRC; the tier list shows PPRC with a ti
   await visitor.reload();
   await expect(card(visitor).getByLabel(/PPRC .*verified/)).toHaveCount(0);
   await expect(card(visitor).getByLabel('PPRC not rated')).toHaveCount(3);
+  expect((await withdraw(player, teamId)).ok()).toBe(true);
 });
