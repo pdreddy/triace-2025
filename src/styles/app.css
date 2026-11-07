@@ -704,6 +704,10 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
 .history p { font-size: 13px; }
 .history em { font-family: var(--mono); font-size: 12.5px; font-style: normal; color: var(--muted); }
 .history .change { text-align: right; }
+.history-years { display: grid; gap: 8px; margin-top: 16px; }
+.history-years h3 { font-size: 14px; color: var(--muted); }
+.history-year > summary { cursor: pointer; padding: 10px 14px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--line); font-weight: 600; }
+.history-year[open] > summary { margin-bottom: 8px; }
 .history-result { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; font-family: var(--display); font-weight: 700; color: var(--ink); background: var(--good); }
 .history li.loss .history-result { color: #fff; background: #ff8a6b99; }
 .singles-check { margin-bottom: 12px; padding: 12px 14px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--line); }

@@ -3,6 +3,7 @@ import { useTournament } from '../hooks/useTournament';
 import { EmptyState, Stat } from '../components/UI';
 import { playerName, teamName } from '../components/League';
 import { ROLE_LABELS, playerId } from '../../functions/lib/league.js';
+import { splitHistory } from '../../functions/lib/pprc.js';
 import { signed, useRatings } from './Players';
 
 // Rating trend as an SVG line: one point per rated match, starting from the seed rating.
@@ -28,6 +29,19 @@ export default function Player() {
   const rank = [...players].sort((a, b) => b.rating - a.rating).findIndex(p => p.id === player.id) + 1;
   const change = player.rating - player.start, name = id => { const [t, r] = id.split(':'); return playerName(teams.get(t), r); };
   const total = player.wins + player.losses;
+  // The latest ten matches show straight away; older ones are grouped by year and open on click.
+  const { recent, years } = splitHistory(player.history);
+  const item = (h, i) => (
+    <li key={`${h.fixtureId}-${h.match}-${i}`} className={h.won ? 'win' : 'loss'}>
+      <span className="history-result">{h.won ? 'W' : 'L'}</span>
+      <div>
+        <b>{h.match}</b> <span className="muted">· {h.stage || `Round ${h.round}`}</span>
+        <p>{h.partner ? `With ${name(h.partner)} ` : ''}{h.won ? 'beat' : 'lost to'} {h.opponents.map(name).join(' + ')} <span className="muted">({teamName(teams.get(h.opponents[0].split(':')[0]))})</span></p>
+      </div>
+      <em>{h.score}</em>
+      <span className={`change ${h.change > 0 ? 'up' : 'down'}`}>{signed(h.change)}</span>
+    </li>
+  );
 
   return (
     <section className="page player-screen">
@@ -54,21 +68,20 @@ export default function Player() {
       </section>
 
       <section className="tier-group">
-        <div className="tier-head"><div><h2>Match history</h2><span>Newest first. Scores are from the winner’s side.</span></div></div>
+        <div className="tier-head"><div><h2>Match history</h2><span>Latest 10 first, older matches by year. Scores are from the winner’s side.</span></div></div>
         {!player.history.length && <EmptyState icon="calendar" title="No rated matches yet." />}
-        <ul className="history">
-          {[...player.history].reverse().map((h, i) => (
-            <li key={`${h.fixtureId}-${h.match}-${i}`} className={h.won ? 'win' : 'loss'}>
-              <span className="history-result">{h.won ? 'W' : 'L'}</span>
-              <div>
-                <b>{h.match}</b> <span className="muted">· {h.stage || `Round ${h.round}`}</span>
-                <p>{h.partner ? `With ${name(h.partner)} ` : ''}{h.won ? 'beat' : 'lost to'} {h.opponents.map(name).join(' + ')} <span className="muted">({teamName(teams.get(h.opponents[0].split(':')[0]))})</span></p>
-              </div>
-              <em>{h.score}</em>
-              <span className={`change ${h.change > 0 ? 'up' : 'down'}`}>{signed(h.change)}</span>
-            </li>
-          ))}
-        </ul>
+        <ul className="history" data-testid="history-recent">{recent.map(item)}</ul>
+        {years.length > 0 && (
+          <div className="history-years" data-testid="history-years">
+            <h3>Earlier matches</h3>
+            {years.map(y => (
+              <details key={y.year} className="history-year">
+                <summary>{y.year} <span className="muted">· {y.count} {y.count === 1 ? 'match' : 'matches'}</span></summary>
+                <ul className="history">{y.items.map(item)}</ul>
+              </details>
+            ))}
+          </div>
+        )}
       </section>
     </section>
   );

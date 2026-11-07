@@ -1,6 +1,7 @@
 // League play: round-robin fixtures, playoffs, captain score submissions with admin approval,
 // standings and player ratings. Like tournament.js, every apply* function takes the whole
 // tournament state and returns { state, result }.
+import { computePprc } from './pprc.js';
 import { COURTS, validateCourt, cleanCourt, courtScoreText, SCORE_ERRORS, standings as scoreStandings, matchResult } from './scoring.js';
 import { ValidationError, DEFAULT_LEAGUE_RULES, DEFAULT_SEASON_NAME, rulesOf, isOwner, validateRegistration, publicRecord } from './tournament.js';
 
@@ -357,7 +358,6 @@ export const playoffSpots = (teamCount, rules = DEFAULT_LEAGUE_RULES) => Math.mi
 // A Triace rating starts at the player's counted UTR and moves after every final match that has a
 // lineup, by how the share of games won compares with what the rating gap predicted. Doubles use
 // the pair's average; both partners move by the same amount. Ratings are in UTR units (e.g. 6.42).
-const K = { singles: 0.3, doubles: 0.24, tiebreak: 0.12 }, SPREAD = 0.75;
 export const playerId = (teamId, role) => `${teamId}:${role}`;
 export function gameShare(score) {
   const sets = [...String(score || '').replace(/\([^)]*\)/g, '').matchAll(/(\d+)\s*[-–]\s*(\d+)/g)].map(m => [Number(m[1]), Number(m[2])]);
@@ -367,44 +367,46 @@ export function gameShare(score) {
   for (const [a, b] of sets) { if (Math.max(a, b) >= 10) { won += a > b ? 1 : 0; lost += a > b ? 0 : 1; } else { won += a; lost += b; } }
   return won + lost ? Math.max(0.5, won / (won + lost)) : 0.65;
 }
-const expected = (mine, theirs) => 1 / (1 + Math.exp(-(mine - theirs) / SPREAD));
 
+// Ratings come from the shared PPRC algorithm (pprc.js), so a Triace court is rated exactly like a court in any other club.
 export function playerRatings(teams, fixturesByTier) {
-  const players = new Map();
+  const players = new Map(), seeds = {};
   for (const team of teams) {
     const starts = { captain: team.captainUtr, ace1: team.ace1Utr, ace2: team.ace2Utr };
     for (const role of ROLES) {
       const id = playerId(team.teamId, role), start = (starts[role] || 0) / 100;
+      seeds[id] = { singles: start || undefined, doubles: start || undefined };
       players.set(id, { id, teamId: team.teamId, role, start, rating: start, wins: 0, losses: 0, singles: { wins: 0, losses: 0 }, doubles: { wins: 0, losses: 0 }, history: [] });
     }
   }
-  const finals = Object.values(fixturesByTier || {}).flatMap(tier => Object.values(tier || {}))
-    .filter(f => f.status === 'final' && f.result?.lineups)
-    .sort((a, b) => a.result.approvedAt - b.result.approvedAt || (a.round || 99) - (b.round || 99));
-  for (const f of finals) {
+  const finals = Object.values(fixturesByTier || {}).flatMap(tier => Object.values(tier || {})).filter(f => f.status === 'final' && f.result?.lineups);
+  const matches = finals.map(f => {
     const sides = { home: matchPlayers(f, 'home'), away: matchPlayers(f, 'away') };
-    formatOf(f).forEach(format => {
+    const courts = formatOf(f).flatMap(format => {
       const m = f.result.matches.find(x => x.key === format.key); // by key: results saved before the court order changed list courts differently
-      if (!m?.winner) return;
+      if (!m?.winner) return [];
       const ids = side => (sides[side][format.key] || []).map(role => playerId(f[side], role)).filter(id => players.has(id));
-      const winners = ids(m.winner), losers = ids(m.winner === 'home' ? 'away' : 'home');
-      if (!winners.length || !losers.length) return;
-      const avg = list => list.reduce((s, id) => s + players.get(id).rating, 0) / list.length;
-      const type = format.key === 'd3' ? 'tiebreak' : winners.length === 1 ? 'singles' : 'doubles';
-      const delta = K[type] * (gameShare(m.score) - expected(avg(winners), avg(losers)));
-      const record = (list, won, opponents) => list.forEach(id => {
-        const p = players.get(id), change = won ? delta : -delta;
-        p.rating = Math.max(0.01, p.rating + change);
-        won ? p.wins++ : p.losses++;
-        const bucket = type === 'singles' ? p.singles : p.doubles;
-        won ? bucket.wins++ : bucket.losses++;
-        p.history.push({ fixtureId: f.id, tierId: f.tierId, round: f.round, stage: f.label || null, match: format.label, won, score: m.score, partner: list.find(x => x !== id) || null, opponents, change, after: p.rating, at: f.result.approvedAt });
-      });
-      record(winners, true, losers);
-      record(losers, false, winners);
+      const exact = f.result.perCourt?.[format.key];
+      const [winnerGames, loserGames] = scoreGames(m.score), homeWon = m.winner === 'home'; // old results only have the winner-side score text
+      const games = exact ? { home: exact.gamesHome, away: exact.gamesAway } : { home: homeWon ? winnerGames : loserGames, away: homeWon ? loserGames : winnerGames };
+      return [{ label: format.label, type: format.type === 'singles' ? 'singles' : 'doubles', home: ids('home'), away: ids('away'), homeGames: games.home, awayGames: games.away, winner: m.winner, score: m.score }];
     });
+    return { id: `${f.tierId}:${f.id}`, club: 'triace', season: 'current', stage: f.label || null, ts: f.result.approvedAt, round: f.round, courts };
+  });
+  const { history, ratings } = computePprc({ players: seeds, matches });
+  const byMatch = new Map(matches.map(m => [m.id, m]));
+  for (const [id, p] of players) {
+    const r = ratings[id];
+    p.rating = Math.max(0.01, r.overall); p.wins = r.wins; p.losses = r.losses; p.singles = r.record.singles; p.doubles = r.record.doubles;
+    p.history = history[id].map(h => { const [tierId, fixtureId] = h.matchId.split(':'); return { fixtureId, tierId, round: byMatch.get(h.matchId).round, stage: h.stage, match: h.court, won: h.won, score: h.score, partner: h.partner, opponents: h.opponents, change: h.change, after: h.overall, at: h.ts, ts: h.ts, matchId: h.matchId }; });
   }
   return players;
+}
+// Winner-side games from a score string (tiebreak points in brackets are not games, a match tiebreak to 10 counts as one).
+function scoreGames(score) {
+  let won = 0, lost = 0;
+  for (const [, a, b] of String(score || '').replace(/\([^)]*\)/g, '').matchAll(/(\d+)\s*[-–]\s*(\d+)/g)) { const [x, y] = [Number(a), Number(b)]; if (Math.max(x, y) >= 10) { x > y ? won++ : lost++; } else { won += x; lost += y; } }
+  return [won, lost];
 }
 
 // ---------- Singles minimum ----------
