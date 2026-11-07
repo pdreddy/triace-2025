@@ -35,7 +35,7 @@ export function buildDemoState(tree, { teams = 8, now = Date.now(), base = null 
     ['captain', 'ace1', 'ace2'].forEach((role, k) => {
       const p = picks[k], r = p.rating;
       // Most players are linked; every fourth is left unlinked so the NR badge shows too.
-      if (r && p.id && (i * 3 + k) % 4 !== 3) links.push({ teamId, role, player: { id: p.id, overall: r.overall, singles: r.singles, doubles: r.doubles, matches: (r.played?.singles || 0) + (r.played?.doubles || 0) } });
+      if (r && p.id && (i * 3 + k) % 4 !== 3) links.push({ teamId, role, public: true, player: { id: p.id, overall: r.overall, singles: r.singles, doubles: r.doubles, matches: (r.played?.singles || 0) + (r.played?.doubles || 0) } });
     });
   }
   if (links.length) state = applyLinkPprc(state, { links }, true, now).state;

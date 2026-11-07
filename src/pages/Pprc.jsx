@@ -44,6 +44,38 @@ function Year({ id, year, count, skip }) {
   );
 }
 
+// The profile of one PPRC player, loaded once (null while loading or when it cannot be read).
+export function usePprcProfile(playerId) {
+  const [state, setState] = useState({ loading: !!playerId, profile: null, error: '' });
+  useEffect(() => {
+    if (!playerId) { setState({ loading: false, profile: null, error: '' }); return undefined; }
+    let live = true;
+    setState({ loading: true, profile: null, error: '' });
+    fetchPlayer(playerId).then(profile => live && setState({ loading: false, profile, error: '' })).catch(e => live && setState({ loading: false, profile: null, error: e.message }));
+    return () => { live = false; };
+  }, [playerId]);
+  return state;
+}
+
+// Every match a PPRC player has played, in any club: the latest ten, then older ones by year (a year opens on click).
+export function PprcHistory({ playerId, state }) {
+  const own = usePprcProfile(state ? null : playerId), { loading, profile, error } = state || own;
+  if (loading) return <p className="small" aria-busy="true">Loading the PPRC history…</p>;
+  if (error) return <p className="small warn-text">{error}</p>;
+  if (!profile) return <p className="small">This player is not in the shared PPRC list.</p>;
+  const { recent, years } = profile;
+  const shown = new Set(recent.map(h => `${h.matchId}|${h.court}|${h.ts}`));
+  const byYear = recent.reduce((o, h) => ({ ...o, [new Date(h.ts).getUTCFullYear()]: (o[new Date(h.ts).getUTCFullYear()] || 0) + 1 }), {});
+  const older = Object.entries(years).map(([year, total]) => ({ year: Number(year), count: total - (byYear[year] || 0) })).filter(y => y.count > 0).sort((a, b) => b.year - a.year);
+  return (
+    <>
+      {!recent.length && <EmptyState icon="calendar" title="No PPRC matches yet." />}
+      <ul className="history" data-testid="pprc-recent">{recent.map((h, i) => <MatchRow key={`${h.matchId}-${h.court}-${i}`} h={h} />)}</ul>
+      {older.length > 0 && <div className="history-years"><h3>Earlier matches</h3>{older.map(y => <Year key={y.year} id={playerId} year={y.year} count={y.count} skip={shown} />)}</div>}
+    </>
+  );
+}
+
 export function PprcPlayer() {
   const { playerId } = useParams();
   const [state, setState] = useState({ loading: true, player: null, error: '' });

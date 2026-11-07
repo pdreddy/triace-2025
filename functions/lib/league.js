@@ -389,8 +389,10 @@ export function applyLinkPprc(current, payload, isAdmin = false, now = Date.now(
     assert(p && typeof p === 'object' && PPRC_PLAYER_ID.test(p.id || ''), 'Invalid PPRC player.');
     for (const key of ['overall', 'singles', 'doubles']) assert(Number.isFinite(p[key]) && p[key] >= 1 && p[key] <= 16.5, 'Invalid PPRC rating.');
     assert(Number.isInteger(p.matches) && p.matches >= 0 && p.matches <= 100000, 'Invalid PPRC match count.');
+    assert(link.public === undefined || typeof link.public === 'boolean', 'Invalid public flag.');
     record.pprcLinks ||= {};
-    record.pprcLinks[link.role] = { id: p.id, overall: Number(p.overall.toFixed(2)), singles: Number(p.singles.toFixed(2)), doubles: Number(p.doubles.toFixed(2)), matches: p.matches, verified: p.matches > PPRC_VERIFIED_AFTER, linkedAt: now };
+    const wasPublic = record.pprcLinks[link.role]?.public === true;
+    record.pprcLinks[link.role] = { public: link.public ?? wasPublic, id: p.id, overall: Number(p.overall.toFixed(2)), singles: Number(p.singles.toFixed(2)), doubles: Number(p.doubles.toFixed(2)), matches: p.matches, verified: p.matches > PPRC_VERIFIED_AFTER, linkedAt: now };
     touched.add(link.teamId);
   }
   for (const teamId of touched) {

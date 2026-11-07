@@ -5,6 +5,7 @@ import { playerName, teamName } from '../components/League';
 import { ROLE_LABELS, playerId } from '../../functions/lib/league.js';
 import { splitHistory } from '../../functions/lib/pprc.js';
 import { signed, useRatings } from './Players';
+import { PprcHistory, usePprcProfile } from './Pprc';
 
 // Rating trend as an SVG line: one point per rated match, starting from the seed rating.
 function Trend({ start, history }) {
@@ -23,6 +24,7 @@ export default function Player() {
   const { teamId, role } = useParams();
   const { data } = useTournament();
   const { teams, players } = useRatings();
+  const publicPprcId = teams.get(teamId)?.pprc?.[role]?.id || null, pprc = usePprcProfile(publicPprcId); // set only when the admin made the PPRC profile public
   if (!data) return <div className="page-loading" aria-busy="true"><span className="spinner" /> Loading player…</div>;
   const player = players.find(p => p.id === playerId(teamId, role)), team = teams.get(teamId);
   if (!player || !team) return <section className="page"><EmptyState icon="user" title="Player not found."><Link className="secondary" to="/players">All players</Link></EmptyState></section>;
@@ -48,7 +50,8 @@ export default function Player() {
       <header className="team-hero">
         <div>
           <p className="eyebrow">{ROLE_LABELS[player.role]} · <Link to={`/team/${teamId}`}>{teamName(team)}</Link></p>
-          <h1>{playerName(team, player.role)}</h1>
+          <h1>{pprc.profile?.info?.name || playerName(team, player.role)}</h1>
+          {publicPprcId && <p className="small"><Link to={`/pprc/${publicPprcId}`}>Full PPRC profile →</Link></p>}
           <p className="team-hero-utr"><b>{player.rating.toFixed(2)}</b> Triace rating <span className={`change ${change > 0.004 ? 'up' : change < -0.004 ? 'down' : ''}`}>{total ? signed(change) : ''}</span> <PprcBadge info={team.pprc?.[player.role]} /></p>
         </div>
         <span className="rating-badge" aria-label={`Ranked ${rank} of ${players.length}`}><small>Rank</small>#{rank}</span>
@@ -67,8 +70,15 @@ export default function Player() {
         <Trend start={player.start} history={player.history} />
       </section>
 
+      {publicPprcId && (
+        <section className="tier-group" data-testid="player-pprc-history">
+          <div className="tier-head"><div><h2>All matches (PPRC)</h2><span>Every club: the latest 10 first, older matches by year. Click a year to open it.</span></div></div>
+          <PprcHistory playerId={publicPprcId} state={pprc} />
+        </section>
+      )}
+
       <section className="tier-group">
-        <div className="tier-head"><div><h2>Match history</h2><span>Latest 10 first, older matches by year. Scores are from the winner’s side.</span></div></div>
+        <div className="tier-head"><div><h2>Match history</h2><span>This tournament. Latest 10 first, older matches by year. Scores are from the winner’s side.</span></div></div>
         {!player.history.length && <EmptyState icon="calendar" title="No rated matches yet." />}
         <ul className="history" data-testid="history-recent">{recent.map(item)}</ul>
         {years.length > 0 && (

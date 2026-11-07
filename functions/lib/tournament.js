@@ -136,7 +136,8 @@ export const PPRC_VERIFIED_AFTER = 5;
 export function publicPprc(team) {
   const links = team.pprcLinks;
   if (!links || !Object.keys(links).length) return null;
-  return Object.fromEntries(['captain', 'ace1', 'ace2'].filter(role => links[role]).map(role => [role, links[role].matches > PPRC_VERIFIED_AFTER ? { verified: true, rating: links[role].overall } : { verified: false }]));
+  // A player's PPRC profile id is shown only when the admin chose to make that link public (the profile carries the full name).
+  return Object.fromEntries(['captain', 'ace1', 'ace2'].filter(role => links[role]).map(role => [role, { ...(links[role].matches > PPRC_VERIFIED_AFTER ? { verified: true, rating: links[role].overall } : { verified: false }), ...(links[role].public ? { id: links[role].id } : {}) }]));
 }
 export function publicRecord(team, settings = DEFAULT_SETTINGS) {
   const pprc = publicPprc(team);

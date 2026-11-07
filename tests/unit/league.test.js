@@ -445,3 +445,18 @@ test('the demo seed keeps an existing demo\'s settings when it only fills an emp
   assert.equal(state.settings.aceNameMaskingEnabled, false, 'the demo\'s own settings survive');
   assert.equal(base.registrations && Object.keys(base.registrations).length, 0, 'the state passed in is not changed');
 });
+
+test('a PPRC link shows its profile id publicly only when the admin made it public, and keeps that choice when refreshed', () => {
+  const state = league(2), teamId = Object.keys(state.registrations)[0];
+  const player = (id, matches = 9) => ({ id, overall: 6, singles: 6, doubles: 6, matches });
+  const pubOf = s => Object.values(s.tiers).flatMap(t => Object.values(t.teams)).find(t => t.teamId === teamId).pprc;
+  const first = applyLinkPprc(state, { links: [{ teamId, role: 'ace1', player: player('p_ace_one') }, { teamId, role: 'ace2', player: player('p_ace_two', 2), public: true }] }, true).state;
+  assert.deepEqual(pubOf(first), { ace1: { verified: true, rating: 6 }, ace2: { verified: false, id: 'p_ace_two' } }, 'only the public link carries an id, verified or not');
+  assert.equal(first.registrations[teamId].pprcLinks.ace1.public, false);
+  const refreshed = applyLinkPprc(first, { links: [{ teamId, role: 'ace2', player: player('p_ace_two', 12) }] }, true).state;
+  assert.deepEqual(pubOf(refreshed).ace2, { verified: true, rating: 6, id: 'p_ace_two' }, 'a refresh without the flag keeps it public');
+  const hidden = applyLinkPprc(refreshed, { links: [{ teamId, role: 'ace2', player: player('p_ace_two', 12), public: false }] }, true).state;
+  assert.equal(pubOf(hidden).ace2.id, undefined, 'the admin can hide it again');
+  assert.throws(() => applyLinkPprc(state, { links: [{ teamId, role: 'ace1', player: player('p_x'), public: 'yes' }] }, true), /public flag/);
+  assert.ok(!JSON.stringify(publicState(first)).includes('p_ace_one'), 'a link that is not public never leaks its id');
+});

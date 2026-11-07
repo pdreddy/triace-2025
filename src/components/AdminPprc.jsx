@@ -11,7 +11,7 @@ const figures = (id, rating) => ({ id, overall: rating.overall, singles: rating.
 
 // Admin: check each registered player against the shared PPRC list, link them, refresh the figures, and export the
 // players who are not in PPRC yet so they can be created there.
-export default function AdminPprc({ teams, busy, onLink }) {
+export default function AdminPprc({ teams, busy, onLink, publicByDefault = false }) {
   const [list, setList] = useState(null), [error, setError] = useState(''), [working, setWorking] = useState(''), [note, setNote] = useState('');
   const [search, setSearch] = useState({}), [fullNames, setFullNames] = useState({});
   useEffect(() => { fetchPlayerList().then(setList).catch(e => setError(e.message)); }, []);
@@ -36,8 +36,10 @@ export default function AdminPprc({ teams, busy, onLink }) {
   const link = (row, player) => run(row.key, async () => {
     const full = await fetchPlayer(player.id);
     if (!full) throw new Error('That PPRC player no longer exists.');
-    await onLink([{ teamId: row.team.teamId, role: row.role, player: figures(player.id, full.rating) }]);
+    await onLink([{ teamId: row.team.teamId, role: row.role, player: figures(player.id, full.rating), public: publicByDefault }]);
   });
+  // Show or hide this player's PPRC profile (full name and every match) on the public pages; the figures are kept as they are.
+  const setPublic = (row, value) => run(row.key, () => onLink([{ teamId: row.team.teamId, role: row.role, player: { id: row.link.id, overall: row.link.overall, singles: row.link.singles, doubles: row.link.doubles, matches: row.link.matches }, public: value }]));
   const unlink = row => run(row.key, () => onLink([{ teamId: row.team.teamId, role: row.role, player: null }]));
   const refresh = () => run('refresh', async () => {
     const links = [];
@@ -64,7 +66,7 @@ export default function AdminPprc({ teams, busy, onLink }) {
           <button type="button" className="secondary small" disabled={!rows.length} onClick={exportPlayers}>Export for PPRC</button>
         </div>
       </div>
-      <p className="small">Link each registered player to their PPRC profile. A rating is shown publicly with a tick once they have played more than {PPRC_VERIFIED_AFTER} rated matches; until then it shows as NR. {linked.length} of {rows.length} players linked · {verified.length} verified.</p>
+      <p className="small">Link each registered player to their PPRC profile. A rating is shown publicly with a seal once they have played more than {PPRC_VERIFIED_AFTER} rated matches; until then it shows as NR. Tick Public profile to also show their full name and every match on their player page (it reveals who they are, so it starts off unless the Ace names are public). {linked.length} of {rows.length} players linked · {verified.length} verified.</p>
       {error && <p className="small warn-text">{error}</p>}
       {note && <p className="small">{note}</p>}
       {!list && !error && <p className="small">Loading the PPRC list…</p>}
@@ -82,6 +84,7 @@ export default function AdminPprc({ teams, busy, onLink }) {
                     <>
                       <b>{byId.get(r.link.id)?.name || r.link.id}</b> · {r.link.overall.toFixed(2)} · {r.link.matches} {r.link.matches === 1 ? 'match' : 'matches'}{' '}
                       <PprcBadge info={publicPprc({ pprcLinks: { [r.role]: r.link } })[r.role]} />{' '}
+                      <label className="small"><input type="checkbox" checked={r.link.public === true} disabled={busy || !!working} onChange={e => setPublic(r, e.target.checked)} aria-label={`Show ${r.name} PPRC profile publicly`} /> Public profile</label>{' '}
                       <button type="button" className="text-link" disabled={busy || !!working} onClick={() => unlink(r)}>Unlink</button>
                     </>
                   ) : (

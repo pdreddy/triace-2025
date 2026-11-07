@@ -313,7 +313,7 @@ export default function Admin() {
           </div>
 
           <SectionTitle id="pprc" num="05">PPRC players</SectionTitle>
-          <AdminPprc teams={teams} busy={busy || !connected} onLink={linkPprc} />
+          <AdminPprc teams={teams} busy={busy || !connected} onLink={linkPprc} publicByDefault={data?.settings?.aceNameMaskingEnabled === false} />
           <SectionTitle id="admins" num="06">Administrators</SectionTitle>
           <AdminUsers service={service} disabled={busy || !connected || !data?.settings} />
         </div>
