@@ -1564,3 +1564,5 @@ td > a, .fixture-team, .team-card h3 a { display: inline-flex; align-items: cent
 .badge.earned { color: var(--text, #e6edf3); }
 .verified-rating { font-size: .6em; font-weight: 800; margin-left: 4px; color: #22b8cf; }
 .squad .pprc-badge, .members .pprc-badge { margin-left: 4px; }
+.badge.season.club-ladder { color: #7fd0ff; border-color: rgba(127, 208, 255, .45); background: rgba(127, 208, 255, .1); }
+.game-ladder { background: #e3f4ff; color: #0b5d8f; }

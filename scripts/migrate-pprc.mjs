@@ -9,6 +9,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { buildMultiClub, reportText } from '../functions/lib/pprcMigrate.js';
+import { parseLadder, LADDER } from '../functions/lib/ladder.js';
+import { parseUtrFile } from '../functions/lib/pprcSync.js';
 import { nameKey } from '../functions/lib/pprc.js';
 import { renderDecisionPage } from './name-decisions-page.mjs';
 
@@ -34,7 +36,17 @@ function loadDecisions(file) {
 const [input, out, decisionsFile] = process.argv.slice(2);
 if (!input || !out) { console.error('Usage: node scripts/migrate-pprc.mjs <export.json> <out-dir> [decisions.csv | overrides.json]'); process.exit(1); }
 const data = JSON.parse(fs.readFileSync(input, 'utf8'));
-const { tree, report } = buildMultiClub(data, { overrides: decisionsFile ? loadDecisions(decisionsFile) : {} });
+// Data that is not in the KOC export lives next to the name decisions: the Ladder 2026 results and the newest UTRs.
+const extras = new URL('./migration/', import.meta.url);
+const ladderFile = new URL('ladder-2026.psv', extras), seedsFile = new URL('utr-seeds.csv', extras);
+if (fs.existsSync(ladderFile)) {
+  const ladder = parseLadder(fs.readFileSync(ladderFile, 'utf8'));
+  data[LADDER.path] = ladder.matches;
+  console.log(`Ladder 2026: ${ladder.report.counted} of ${ladder.report.read} results counted; left out: ${ladder.report.skipped.map(x => `${x.players} (${x.reason})`).join('; ') || 'none'}`);
+}
+const seeds = fs.existsSync(seedsFile) ? parseUtrFile(fs.readFileSync(seedsFile, 'utf8'), 'utr-seeds.csv').rows : [];
+const { tree, report } = buildMultiClub(data, { overrides: decisionsFile ? loadDecisions(decisionsFile) : {}, seeds });
+if (seeds.length) console.log(`UTR file: ${report.seeds.applied} players updated, ${report.seeds.created} added, ${report.seeds.ambiguous.length} ambiguous${report.seeds.ambiguous.length ? ': ' + report.seeds.ambiguous.map(a => `${a.name} (${a.candidates.join(' / ')})`).join('; ') : ''}`);
 fs.mkdirSync(out, { recursive: true });
 fs.writeFileSync(path.join(out, 'multiclub.json'), JSON.stringify(tree));
 fs.writeFileSync(path.join(out, 'report.md'), reportText(report));

@@ -2,16 +2,17 @@
 // earned ones (star player of a club, specialist, hot streak). Pure, so the browser and the tests share it.
 import { PPRC_VERIFIED_AFTER } from './tournament.js';
 
-const CLUB_NAMES = { koc: 'KOC', triace: 'Triace' };
+const CLUB_NAMES = { koc: 'KOC', triace: 'Triace', ladder: 'Ladder' };
 const clubLabel = id => CLUB_NAMES[id] || String(id).toUpperCase();
-export const seasonLabel = (club, season) => `${clubLabel(club)} S${String(season).replace(/^s/i, '')}`;
+// KOC S3, Triace S1; a year-named competition reads "Ladder 2026".
+export const seasonLabel = (club, season) => (/^y\d{4}$/i.test(String(season)) ? `${clubLabel(club)} ${String(season).slice(1)}` : `${clubLabel(club)} S${String(season).replace(/^s/i, '')}`);
 export const courtsPlayed = rating => (rating?.played?.singles || 0) + (rating?.played?.doubles || 0);
 export const isVerified = rating => courtsPlayed(rating) > PPRC_VERIFIED_AFTER;
 
 // rank: { koc: 3, triace: 12 }, the player's place among the verified players of each club (see clubRanks).
 export function clubRanks(list, id) {
   const out = {};
-  for (const club of Object.keys(CLUB_NAMES)) {
+  for (const club of ['koc', 'triace']) { // the ladder has its own table; stars are for the team clubs
     const pool = list.filter(p => (p.clubs || []).includes(club) && p.played > PPRC_VERIFIED_AFTER).sort((a, b) => b.overall - a.overall);
     const at = pool.findIndex(p => p.id === id);
     if (at >= 0) out[club] = at + 1;
@@ -25,7 +26,8 @@ export function playerBadges({ rating, info, recent = [], rank = {} }) {
   const seasons = Object.values(rating.seasons || {});
   const fromRecent = [...new Map(recent.map(h => [`${h.club}_${h.season}`, { club: h.club, season: h.season }])).values()];
   for (const x of (seasons.length ? seasons : fromRecent).sort((a, b) => `${a.club}${a.season}`.localeCompare(`${b.club}${b.season}`))) {
-    badges.push({ key: `season-${x.club}-${x.season}`, kind: 'season', club: x.club, label: seasonLabel(x.club, x.season), title: `Played in ${clubLabel(x.club)} season ${String(x.season).replace(/^s/i, '')}` });
+    const label = seasonLabel(x.club, x.season);
+    badges.push({ key: `season-${x.club}-${x.season}`, kind: 'season', club: x.club, label, ...(x.club === 'ladder' ? { icon: 'ladder' } : {}), title: `Played in ${label}` });
   }
   const clubs = Object.keys(info?.clubs || {});
   if (clubs.length > 1) badges.push({ key: 'multi', kind: 'earned', label: 'Multi-club', title: `Has played for ${clubs.map(clubLabel).join(' and ')}` });

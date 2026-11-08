@@ -134,3 +134,13 @@ A profile shows the verified seal (more than 5 rated courts, otherwise NR), the 
 Triace S1) and earned badges: club star (top 3 of verified players in KOC or Triace), top 10, doubles or singles specialist,
 5-court streak, unbeaten in singles or doubles, multi-club. Season badges come from `ratings/<id>/seasons`, written by the
 migration; until it is re-run they are taken from the latest ten matches. See `functions/lib/pprcBadges.js`.
+
+## Ladder 2026 and the UTR file (in the migration)
+Two files in `scripts/migration/` are read by `migrate-pprc.mjs` alongside the KOC export:
+- `ladder-2026.psv`: the Ladder 2026 results (singles only). Ties, walkovers, byes and results still waiting for confirmation are
+  left out of the ratings (they are listed when the migration runs). To add results, append rows in the same columns and run
+  `bash refresh-pprc.sh`.
+- `utr-seeds.csv`: name, singles, doubles. These UTRs replace the older starting ratings and add players nobody had yet. Names follow
+  `name-decisions.json`, so spelling variants join the right person.
+Because `refresh-pprc.sh` replaces `pprcMaster`, UTRs uploaded only through the admin page are overwritten by the next refresh:
+keep lasting UTRs in `utr-seeds.csv`. Every player in the ladder gets a "Ladder 2026" badge with a ladder icon on their profile.

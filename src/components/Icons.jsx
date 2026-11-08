@@ -1,4 +1,5 @@
 const paths = {
+  ladder: <><path d="M7 3v18M17 3v18" /><path d="M7 7h10M7 12h10M7 17h10" /></>,
   rules: <><path d="M5 4.5A2.5 2.5 0 0 1 7.5 2H19v17H7.5A2.5 2.5 0 0 0 5 21.5z" /><path d="M5 21.5A2.5 2.5 0 0 1 7.5 19H19v3H7.5" /><path d="M9 7h6M9 11h4" /></>,
   register: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5" /><path d="M19 8v6M16 11h6" /></>,
   trophy: <><path d="M7 3h10v5a5 5 0 0 1-10 0z" /><path d="M7 5H3.5v1.5A3.5 3.5 0 0 0 7 10M17 5h3.5v1.5A3.5 3.5 0 0 1 17 10" /><path d="M12 13v4M8 21h8M9.5 17h5" /></>,

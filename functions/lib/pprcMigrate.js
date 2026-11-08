@@ -15,13 +15,15 @@ export const SOURCES = [
   { club: 'triace', season: 's1', path: 'TriAceDB' },
   { club: 'triace', season: 's1', path: 'TriAceDB2' },
   { club: 'triace', season: 's1', path: 'TriAceDBNEW_Play', stage: 'po' },
-  { club: 'triace', season: 's1', path: 'TriAceDBSUPER6', stage: 'po' }
+  { club: 'triace', season: 's1', path: 'TriAceDBSUPER6', stage: 'po' },
+  { club: 'ladder', season: 'y2026', path: 'ladder_2026' } // not in the KOC export: the migration script adds it from scripts/migration/ladder-2026.psv
 ];
 // A decision of this value means "not a real player": that name is left unrated and never asked about again.
 export const IGNORE = '__ignore__';
 export const CLUBS = {
   koc: { name: 'KOC', seasons: { s2: 'Season 2', s3: 'Season 3' } }, // there is no season 1 data
-  triace: { name: 'Triace', seasons: { s1: 'Season 1' } }
+  triace: { name: 'Triace', seasons: { s1: 'Season 1' } },
+  ladder: { name: 'Ladder', seasons: { y2026: 'Ladder 2026' } } // a singles ladder
 };
 
 const at = (data, path) => path.split('/').reduce((node, part) => (node == null ? node : node[part]), data);
@@ -135,13 +137,35 @@ export function deriveMaster({ master, matches, params = PPRC_PARAMS }) {
     playerList: Object.fromEntries(Object.values(master).map(p => [p.id, {
       name: p.name, overall: r(p.id).overall, singles: r(p.id).singles, doubles: r(p.id).doubles, utr: { singles: r(p.id).seed.singles, doubles: r(p.id).seed.doubles },
       played: r(p.id).played.singles + r(p.id).played.doubles,
-      clubs: Object.keys(p.clubs || {}).concat(rated.history[p.id].some(e => e.club === 'triace') ? ['triace'] : []).filter((c, i, a) => a.indexOf(c) === i)
+      clubs: [...new Set([...Object.keys(p.clubs || {}), ...rated.history[p.id].map(e => e.club)])]
     }]))
   };
 }
 
-export function buildMultiClub(data, { overrides = {}, createMissing = true, sources = SOURCES, params = PPRC_PARAMS } = {}) {
+// A file of UTRs ([{ name, singles, doubles }]) is the newest word on a player's starting rating: it replaces what the old
+// exports said for the fields it gives. A full name nobody has is added as a new player; an ambiguous name is reported and left out.
+export function applySeeds(master, rows = []) {
+  const registry = createRegistry(Object.values(master).map(p => ({ id: p.id, name: p.name, aliases: p.aliases })));
+  const out = { applied: 0, created: 0, ambiguous: [] };
+  for (const row of rows) {
+    const key = nameKey(row.name), found = resolveName(registry, row.name);
+    const seed = { ...(Number.isFinite(row.singles) ? { singles: row.singles } : {}), ...(Number.isFinite(row.doubles) ? { doubles: row.doubles } : {}) };
+    if (found.id) { master[found.id].seed = { ...master[found.id].seed, ...seed }; master[found.id].seedSource = 'utr file'; out.applied++; }
+    else if (found.how === 'ambiguous') out.ambiguous.push({ name: row.name, candidates: found.candidates.map(id => master[id].name) });
+    else if (looksLikeFullName(key)) {
+      const id = playerIdFor(key);
+      master[id] = { id, name: displayName(row.name), nameKey: key, clubs: {}, seed, seedSource: 'utr file' };
+      registry.add({ id, name: master[id].name }); out.created++;
+    }
+  }
+  return out;
+}
+
+export function buildMultiClub(data, { overrides = {}, createMissing = true, sources = SOURCES, params = PPRC_PARAMS, seeds = [] } = {}) {
   const notes = {}, master = buildMaster(data, notes);
+  // A name in the UTR file follows the same decisions as a name in a match ("Damodhara Palavali" is "Damu Palavali").
+  const decided = new Map(Object.entries(overrides).filter(([, v]) => typeof v === 'string' && v !== IGNORE).map(([k, v]) => [nameKey(k), v]));
+  const seedReport = applySeeds(master, seeds.map(row => ({ ...row, name: decided.get(nameKey(row.name)) || row.name })));
   // An override is an existing player id, a full name (an existing person, or a new one), or { name, singles?, doubles? }.
   // Key it by the name as written, or "<team>::<name>" to settle that name only for one team (e.g. "Team A4::Vinod").
   const idForDecision = value => {
@@ -159,7 +183,7 @@ export function buildMultiClub(data, { overrides = {}, createMissing = true, sou
     if (team) scopedOverrides[`${nameKey(team)}::${nameKey(name)}`] = idForDecision(value); else resolvedOverrides[raw] = idForDecision(value);
   }
   const registry = createRegistry(Object.values(master).map(p => ({ id: p.id, name: p.name, aliases: p.aliases })), resolvedOverrides);
-  const report = { sources: [], names: { how: {}, unresolved: {}, ambiguous: {}, similar: {}, provisional: [] }, decisions: [], courts: { total: 0, rated: 0, skipped: {} }, seasons: {} };
+  const report = { seeds: seedReport, sources: [], names: { how: {}, unresolved: {}, ambiguous: {}, similar: {}, provisional: [] }, decisions: [], courts: { total: 0, rated: 0, skipped: {} }, seasons: {} };
   const tree = { clubs: {} };
   for (const [club, def] of Object.entries(CLUBS)) tree.clubs[club] = { meta: { name: def.name }, seasons: Object.fromEntries(Object.entries(def.seasons).map(([s, label]) => [s, { meta: { label }, matches: {} }])) };
 
@@ -251,6 +275,7 @@ export function buildMultiClub(data, { overrides = {}, createMissing = true, sou
   for (const m of ratedMatches) for (const c of m.courts) {
     const complete = ['home', 'away'].every(sideName => c.names[sideName].length && c.names[sideName].every((_, k) => c.ids[sideName][k]));
     c.home = complete ? c.ids.home : undefined; c.away = complete ? c.ids.away : undefined; delete c.ids;
+    if (complete) for (const id of [...c.home, ...c.away]) if (master[id]) master[id].clubs[m.club] = true; // who played in which club
   }
 
   // Team rosters for the current KOC season (passwords and other private fields are never copied).

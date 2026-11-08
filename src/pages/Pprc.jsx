@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { EmptyState, Stat, VerifiedSeal } from '../components/UI';
+import { Icon } from '../components/Icons';
 import { clubRanks, isVerified, playerBadges, courtsPlayed } from '../../functions/lib/pprcBadges.js';
 import { fetchPlayer, fetchPlayerList, fetchYear } from '../services/pprc';
 
 const signed = v => (Math.abs(v) < 0.005 ? '0.00' : `${v > 0 ? '+' : '−'}${Math.abs(v).toFixed(2)}`);
 const pair = (a, b) => `${Number.isFinite(a) ? a.toFixed(2) : '—'} / ${Number.isFinite(b) ? b.toFixed(2) : '—'}`;
-const clubName = id => ({ koc: 'KOC', triace: 'Triace' }[id] || id);
+const clubName = id => ({ koc: 'KOC', triace: 'Triace', ladder: 'Ladder' }[id] || id);
 
 // One played court: which game it was (club, season, league or playoffs), the date, the result and the people.
 function MatchRow({ h }) {
@@ -102,7 +103,7 @@ export function PprcPlayer() {
           <h1>{info.name}{verified && <span className="verified-name" title={`PPRC verified: ${courtsPlayed(rating)} rated courts (more than 5)`}><VerifiedSeal /> <b className="verified-rating">{rating.overall.toFixed(2)}</b> <span className="sr-only">PPRC verified</span></span>}</h1>
           <ul className="badge-row" aria-label="Badges" data-testid="pprc-badges">
             <li className={`badge ${verified ? 'verified' : 'nr'}`} title={verified ? 'More than 5 rated courts' : 'Not rated yet: 5 or fewer rated courts'}>{verified ? <><VerifiedSeal /> Verified</> : 'NR · not rated yet'}</li>
-            {badges.map(b => <li key={b.key} className={`badge ${b.kind}${b.club ? ` club-${b.club}` : ''}`} title={b.title}>{b.label}</li>)}
+            {badges.map(b => <li key={b.key} className={`badge ${b.kind}${b.club ? ` club-${b.club}` : ''}`} title={b.title}>{b.icon && <Icon name={b.icon} size={14} />}{b.label}</li>)}
           </ul>
           <p className="team-hero-utr"><b>{rating.overall.toFixed(2)}</b> PPRC rating <span className="muted">· singles {rating.singles.toFixed(2)} · doubles {rating.doubles.toFixed(2)}</span></p>
           <p className="small muted">UTR (starting point) singles {rating.seed.singles.toFixed(2)} · doubles {rating.seed.doubles.toFixed(2)}{rating.reliability ? ` · reliability singles ${Math.round(rating.reliability.singles * 100)}% · doubles ${Math.round(rating.reliability.doubles * 100)}%` : ''}</p>
@@ -141,7 +142,7 @@ export function PprcDirectory() {
         <>
           <div className="toolbar">
             <input type="search" aria-label="Search players" placeholder="Search players" value={query} onChange={e => setQuery(e.target.value)} />
-            <select aria-label="Club" value={club} onChange={e => setClub(e.target.value)}><option value="all">All clubs</option><option value="koc">KOC</option><option value="triace">Triace</option></select>
+            <select aria-label="Club" value={club} onChange={e => setClub(e.target.value)}><option value="all">All clubs</option><option value="koc">KOC</option><option value="triace">Triace</option><option value="ladder">Ladder</option></select>
           </div>
           <p className="small">{rows.length} of {state.list.length} PPRC players. Right: PPRC singles / doubles, then UTR singles / doubles.</p>
           <ul className="history" data-testid="pprc-list">
