@@ -168,7 +168,7 @@ test('admin links registered players to PPRC; the tier list shows PPRC with a ti
   const visitor = await (await browser.newContext()).newPage();
   await visitor.goto('/tiers');
   await expect(card(visitor).getByLabel(/PPRC .*verified/)).toHaveCount(1);
-  await expect(card(visitor).getByLabel(/PPRC .*verified/)).toContainText('PPRC 5.');
+  await expect(card(visitor).getByLabel(/PPRC .*verified/)).toContainText(/PPRC S \d+\.\d\d · D \d+\.\d\d/);
   await expect(card(visitor).locator('.pprc-badge.ok svg.verified-seal')).toHaveCount(1);
   await expect(card(visitor).getByLabel('PPRC not rated')).toHaveCount(2);
   await expect(card(visitor)).not.toContainText('p_dinkar');

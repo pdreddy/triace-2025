@@ -75,7 +75,7 @@ export function VerifiedSeal() {
 // PPRC next to a UTR: the rating with the verified seal once the player has more than 5 rated matches, otherwise NR (not rated).
 export function PprcBadge({ info }) {
   const badge = info?.verified
-    ? <span className="pprc-badge ok" title={`PPRC verified (more than 5 rated matches). Singles ${info.singles?.toFixed(2) ?? '—'}, doubles ${info.doubles?.toFixed(2) ?? '—'}`} aria-label={`PPRC ${info.rating.toFixed(2)}, verified`}>PPRC {info.rating.toFixed(2)} <VerifiedSeal /></span>
+    ? <span className="pprc-badge ok" title={`PPRC verified (more than 5 rated matches). Singles ${info.singles?.toFixed(2) ?? '—'}, doubles ${info.doubles?.toFixed(2) ?? '—'}`} aria-label={`PPRC singles ${info.singles?.toFixed(2) ?? 'not rated'}, doubles ${info.doubles?.toFixed(2) ?? 'not rated'}, verified`}>PPRC S {info.singles?.toFixed(2) ?? '—'} · D {info.doubles?.toFixed(2) ?? '—'} <VerifiedSeal /></span>
     : <span className="pprc-badge nr" title="Not rated: fewer than 6 PPRC matches" aria-label="PPRC not rated">PPRC NR</span>;
   return info?.id ? <Link className="pprc-link" to={`/pprc/${info.id}`} title="Open this player’s PPRC profile and match history">{badge}</Link> : badge;
 }

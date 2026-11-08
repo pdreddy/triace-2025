@@ -52,12 +52,12 @@ test('winning games against an equal player raises the rating, losing them lower
   assert.equal(six.a.doubles, 6, 'the doubles rating is untouched by singles');
 });
 
-test('a bigger share of games moves the rating more, and a win is never rated below the opponents', () => {
+test('a bigger share of games moves the rating more, and winning never lowers a rating', () => {
   const close = computePprc({ players: seeds, matches: weekly(4, () => court(['a'], ['b'], 'home', 8, 7)) }).ratings.a.singles;
   const wide = computePprc({ players: seeds, matches: weekly(4, () => court(['a'], ['b'], 'home', 8, 0)) }).ratings.a.singles;
   assert.ok(wide > close, '8-0 says more than 8-7');
   const tight = computePprc({ players: { top: { singles: 12 }, low: { singles: 3 } }, matches: [match('m', 1, [court(['top'], ['low'], 'home', 8, 7)])] }).ratings;
-  assert.ok(tight.top.singles < 12 && tight.top.singles > 3 && tight.low.singles > 3, 'a narrow win over a much weaker player does not impress, but is still not a loss');
+  assert.ok(tight.top.singles >= 12 && tight.low.singles <= 3, 'a win never lowers a rating and a loss never raises one, however narrow the win or weak the opponent');
 });
 
 test('an upset moves ratings more than an expected result', () => {

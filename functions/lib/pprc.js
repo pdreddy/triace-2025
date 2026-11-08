@@ -135,7 +135,9 @@ export function computePprc({ players, matches, params = PPRC_PARAMS, asOf }) {
           for (const id of mine) {
             const partner = mine.find(x => x !== id);
             const raw = type === 'doubles' && partner ? 2 * team - rating[partner][type] : team; // the pair's level, split between the two
-            out.push({ id, type, seq: c.seq, ts: c.ts, side, perf: clamp(raw, team - 2 * params.span, team + 2 * params.span), base: gamesWeight(c) * (0.5 + 0.5 * oppReliability) });
+            // A win never rates below the player's own rating and a loss never above it, so winning cannot lower a rating (UTR can).
+            const own = rating[id][type], perf = clamp(raw, team - 2 * params.span, team + 2 * params.span), won = c.court.winner === side;
+            out.push({ id, type, seq: c.seq, ts: c.ts, side, perf: won ? Math.max(perf, own) : Math.min(perf, own), base: gamesWeight(c) * (0.5 + 0.5 * oppReliability) });
           }
         }
       }
@@ -174,13 +176,15 @@ export function computePprc({ players, matches, params = PPRC_PARAMS, asOf }) {
         const now = ratingAt(id, list, e.type, e.seq, e.ts);
         const sg = e.type === 'singles' ? now : ratingAt(id, list, 'singles', e.seq, e.ts), db = e.type === 'doubles' ? now : ratingAt(id, list, 'doubles', e.seq, e.ts);
         played[id][e.type]++; record[id][e.type][won ? 'wins' : 'losses']++;
+        // The same rule as in the solve, for what is shown: a win never lowers the rating and a loss never raises it.
+        const shown = won ? Math.max(now.rating, last[e.type]) : Math.min(now.rating, last[e.type]), before = last[e.type];
+        last[e.type] = shown;
         history[id].push({
           matchId: c.match.id, club: c.match.club, season: c.match.season, stage: c.match.stage || null, ts: c.ts, court: c.court.label || null, type: e.type, won,
           partner: c.sides[e.side].find(x => x !== id) || null, opponents: c.sides[other], games: gamesLabel(c.games[e.side], c.games[other]), score: c.court.score || null,
-          change: round(now.rating - last[e.type], 3), after: round(now.rating, 3),
-          overall: round((sg.rating * (sg.weight + params.seedWeight) + db.rating * (db.weight + params.seedWeight)) / (sg.weight + db.weight + 2 * params.seedWeight))
+          change: round(shown - before, 3), after: round(shown, 3),
+          overall: round((last.singles * (sg.weight + params.seedWeight) + last.doubles * (db.weight + params.seedWeight)) / (sg.weight + db.weight + 2 * params.seedWeight))
         });
-        last[e.type] = now.rating;
       }
     }
   }

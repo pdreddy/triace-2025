@@ -15,7 +15,7 @@ export function makeResolver(list = []) {
   const named = (name, id) => {
     if (!registry.byId.has(id)) return { name, id: null };
     const p = byId.get(id);
-    return { name: p.name, id, ...(Number.isFinite(p.overall) && p.played > 5 ? { rating: p.overall, verified: true } : {}) }; // verified: more than 5 rated courts
+    return { name: p.name, id, ...(Number.isFinite(p.overall) && p.played > 5 ? { rating: p.overall, singles: p.singles, doubles: p.doubles, verified: true } : {}) }; // verified: more than 5 rated courts
   };
   return function resolve(rawName, teamId) {
     const raw = String(rawName || '').trim();

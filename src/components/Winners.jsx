@@ -44,7 +44,8 @@ export function Medal({ size = 34 }) {
 export function PlayerName({ name, teamId }) {
   const resolve = useNameResolver(), who = resolve(name, teamId);
   const link = who.id ? <Link className="player-name" to={`/pprc/${who.id}`}>{who.name}</Link> : <>{who.name}</>;
-  return who.verified ? <>{link} <span className="pprc-badge ok" title={`PPRC verified rating ${who.rating.toFixed(2)}`} aria-label={`PPRC ${who.rating.toFixed(2)}, verified`}>{who.rating.toFixed(2)} <VerifiedSeal /></span></> : link;
+  const two = n => (Number.isFinite(n) ? n.toFixed(2) : '—');
+  return who.verified ? <>{link} <span className="pprc-badge ok" title="PPRC verified: singles and doubles rating" aria-label={`PPRC singles ${two(who.singles)}, doubles ${two(who.doubles)}, verified`}>S {two(who.singles)} · D {two(who.doubles)} <VerifiedSeal /></span></> : link;
 }
 
 // A squad written as "A · B · C" (or "A / B / C"), one name per line so full names stay readable.

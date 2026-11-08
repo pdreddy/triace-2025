@@ -36,7 +36,7 @@ test('spelling variants of one person resolve to one player', () => {
 });
 
 test('a verified player (more than 5 rated courts) carries the PPRC rating, others do not', () => {
-  const resolve = makeResolver([{ id: 'p_hari_mothukuri', name: 'Hari Mothukuri', overall: 6.11, played: 29 }, { id: 'p_prashanth_gourineni', name: 'Prashanth Gourineni', overall: 5.5, played: 4 }]);
-  assert.deepEqual(resolve('Hari', 'a5'), { name: 'Hari Mothukuri', id: 'p_hari_mothukuri', rating: 6.11, verified: true });
+  const resolve = makeResolver([{ id: 'p_hari_mothukuri', name: 'Hari Mothukuri', overall: 6.11, singles: 5.9, doubles: 6.3, played: 29 }, { id: 'p_prashanth_gourineni', name: 'Prashanth Gourineni', overall: 5.5, played: 4 }]);
+  assert.deepEqual(resolve('Hari', 'a5'), { name: 'Hari Mothukuri', id: 'p_hari_mothukuri', rating: 6.11, singles: 5.9, doubles: 6.3, verified: true });
   assert.deepEqual(resolve('Prashanth', 'zz'), { name: 'Prashanth Gourineni', id: 'p_prashanth_gourineni' });
 });
