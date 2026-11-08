@@ -40,7 +40,7 @@ test('the ladder is rated with the UTR file as the starting point, under one nam
   assert.equal(report.decisions.length, 0);
   const names = Object.values(tree.pprcMaster.players).map(p => p.name);
   assert.ok(names.includes('Sridhar Kuppuswamy') && !names.includes('Sridhar Kuppusamy'), 'the ladder spelling joins the KOC player');
-  assert.ok(names.includes('Damu Palavali') && !names.includes('Damodhara Palavali'));
+  assert.ok(names.includes('Damodhara Reddy Palavali') && !names.includes('Damodhara Palavali') && !names.includes('Damu Palavali'), 'Damu, Damodhara and Damodhara Reddy Palavali are one player');
   const id = Object.entries(tree.pprcMaster.players).find(([, p]) => p.name === 'Prashanth Gourineni')[0];
   const rating = tree.pprcMaster.ratings[id];
   assert.deepEqual(rating.seasons.ladder_y2026, { club: 'ladder', season: 'y2026', courts: 5, wins: 5, losses: 0 });
