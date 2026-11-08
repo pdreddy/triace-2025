@@ -41,7 +41,7 @@ export default function Rankings() {
                 {rows.map(p => (
                   <tr key={p.id} className={p.rank <= 3 ? `podium p${p.rank}` : ''}>
                     <td className="rank-cell">{p.rank}</td>
-                    <td><Link to={`/pprc/${p.id}`}><b>{p.name}</b></Link>{p.verified && <span className="verified-name" title="PPRC verified"><VerifiedSeal /></span>}</td>
+                    <td><Link to={`/pprc/${p.id}`}><b>{p.name}</b></Link>{p.verified && <span className="verified-name" title="PPRC verified"><VerifiedSeal /></span>}<small className="rank-sub">S {two(p.singles)} · D {two(p.doubles)} · {p.played} courts</small></td>
                     <td className="num strong">{two(p.value)}</td><td className="num">{two(p.singles)}</td><td className="num">{two(p.doubles)}</td><td className="num">{p.played}</td>
                     <td>{(p.clubs || []).map(c => <span key={c} className={`pill game-${c}`}>{CLUBS[c] || c}</span>)}</td>
                   </tr>

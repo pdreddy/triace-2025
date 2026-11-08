@@ -1587,4 +1587,13 @@ td > a, .fixture-team, .team-card h3 a { display: inline-flex; align-items: cent
 .reliability i { display: block; height: 100%; background: #22b8cf; }
 .form-row { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 0 0 14px; }
 .form-row .trend { color: #22b8cf; }
-@media (max-width: 700px) { .rating-panel { grid-template-columns: 1fr; } .rating-value { font-size: 32px; } }
+@media (max-width: 700px) { .rating-panel { grid-template-columns: 1fr 1fr; } .rating-card.overall { grid-column: 1 / -1; } .rating-value { font-size: 32px; } }
+
+/* Phones: the Sort box was capped at 44% of its already small field; the PPRC list and rankings fit the screen */
+.partner-filters .field select { max-width: none; }
+.rankings-table .rank-sub { display: none; }
+@media (max-width: 700px) {
+  [data-testid="pprc-list"] li > em, [data-testid="pprc-list"] li > small { grid-column: 2 / -1; }
+  .rankings-table th:nth-child(n+4), .rankings-table td:nth-child(n+4) { display: none; }
+  .rankings-table .rank-sub { display: block; color: var(--muted); font-size: 12px; }
+}
