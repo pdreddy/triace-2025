@@ -29,8 +29,8 @@ test('before the PPRC list loads, decided names still read in the full spelling 
 });
 
 test('spelling variants of one person resolve to one player', () => {
-  const resolve = makeResolver([{ id: 'p_damodhara_reddy_palavali', name: 'Damodhara Reddy Palavali' }, { id: 'p_sridhar_kuppuswamy', name: 'Sridhar Kuppuswamy' }, { id: 'p_rajasekhar_chintha', name: 'Rajasekhar Chintha' }]);
-  for (const raw of ['Damu', 'Palvali', 'Damdodhara Plavali', 'damu palavali', 'Damodhara Palavali']) assert.equal(resolve(raw, 'a4').id, 'p_damodhara_reddy_palavali', raw);
+  const resolve = makeResolver([{ id: 'p_damodhara_palavali', name: 'Damodhara Palavali' }, { id: 'p_sridhar_kuppuswamy', name: 'Sridhar Kuppuswamy' }, { id: 'p_rajasekhar_chintha', name: 'Rajasekhar Chintha' }]);
+  for (const raw of ['Damu', 'Palvali', 'Damdodhara Plavali', 'damu palavali', 'Damodhara Palavali', 'Damodhara Reddy Palavali']) assert.equal(resolve(raw, 'a4').id, 'p_damodhara_palavali', raw);
   for (const raw of ['Sridhar', 'Sridhar.', 'SRIDHAR']) assert.equal(resolve(raw, 'b7').id, 'p_sridhar_kuppuswamy', raw);
   for (const raw of ['RajC', 'Raj C', 'raj chinta']) assert.equal(resolve(raw, 'a4').id, 'p_rajasekhar_chintha', raw);
 });

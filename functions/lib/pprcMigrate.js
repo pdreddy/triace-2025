@@ -163,7 +163,7 @@ export function applySeeds(master, rows = []) {
 
 export function buildMultiClub(data, { overrides = {}, createMissing = true, sources = SOURCES, params = PPRC_PARAMS, seeds = [] } = {}) {
   const notes = {}, master = buildMaster(data, notes);
-  // A name in the UTR file follows the same decisions as a name in a match ("Damu" and "Damodhara Palavali" are "Damodhara Reddy Palavali").
+  // A name in the UTR file follows the same decisions as a name in a match ("Damu" and "Damodhara Reddy Palavali" are "Damodhara Palavali").
   const decided = new Map(Object.entries(overrides).filter(([, v]) => typeof v === 'string' && v !== IGNORE).map(([k, v]) => [nameKey(k), v]));
   const seedReport = applySeeds(master, seeds.map(row => ({ ...row, name: decided.get(nameKey(row.name)) || row.name })));
   // An override is an existing player id, a full name (an existing person, or a new one), or { name, singles?, doubles? }.
