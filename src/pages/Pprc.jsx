@@ -164,7 +164,7 @@ export function PprcDirectory() {
       {!state.loading && !state.error && (
         <>
           <div className="toolbar">
-            <input type="search" aria-label="Search players" placeholder="Search players" value={query} onChange={e => setQuery(e.target.value)} />
+            <label className="search"><Icon name="search" size={16} /><input type="search" aria-label="Search players" placeholder="Search players…" value={query} onChange={e => setQuery(e.target.value)} /></label>
             <select aria-label="Club" value={club} onChange={e => setClub(e.target.value)}><option value="all">All clubs</option><option value="koc">KOC</option><option value="triace">Triace</option><option value="ladder">Ladder</option></select>
           </div>
           <p className="small">{rows.length} of {state.list.length} PPRC players. Right: PPRC singles / doubles, then UTR singles / doubles.</p>

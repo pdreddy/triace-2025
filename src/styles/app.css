@@ -986,6 +986,9 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
   .register-grid { flex: 1; min-height: 0; display: flex; flex-direction: column-reverse; gap: 10px; }
   .register-grid form { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   .register-grid fieldset { flex: 1; min-height: 0; gap: 0; }
+  .register-screen > .early-card { flex: none; gap: 4px; margin: 0 0 8px; padding: 8px 12px; }
+  .register-screen > .early-card h2, .register-screen > .early-card .early-steps, .register-screen > .early-card .early-note, .register-screen > .early-card .early-why { display: none; }
+  .register-screen > .early-card p { font-size: 13px; }
   .step-panel { display: none; }
   .step-panel.on { display: block; flex: 1; min-height: 0; overflow-y: auto; }
   .card-head h2 { font-size: 22px; }

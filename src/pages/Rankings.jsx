@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { EmptyState, VerifiedSeal } from '../components/UI';
+import { Icon } from '../components/Icons';
 import { fetchPlayerList } from '../services/pprc';
 import { METRICS, rankPlayers } from '../../functions/lib/rankings.js';
 
@@ -24,7 +25,7 @@ export default function Rankings() {
         {Object.entries(METRICS).map(([id, label]) => <button key={id} type="button" className={metric === id ? 'active' : ''} aria-pressed={metric === id} onClick={() => setMetric(id)}>{label}</button>)}
       </nav>
       <div className="toolbar">
-        <input type="search" aria-label="Search players" placeholder="Search players" value={query} onChange={e => setQuery(e.target.value)} />
+        <label className="search"><Icon name="search" size={16} /><input type="search" aria-label="Search players" placeholder="Search players…" value={query} onChange={e => setQuery(e.target.value)} /></label>
         <select aria-label="Club" value={club} onChange={e => setClub(e.target.value)}>{Object.entries(CLUBS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select>
         <label className="checkbox"><input type="checkbox" checked={verifiedOnly} onChange={e => setVerifiedOnly(e.target.checked)} /><span>Verified players only</span></label>
       </div>
