@@ -174,7 +174,6 @@ export function computePprc({ players, matches, params = PPRC_PARAMS, asOf }) {
       for (const e of list) {
         const c = byCourt.get(e.seq), other = e.side === 'home' ? 'away' : 'home', won = c.court.winner === e.side;
         const now = ratingAt(id, list, e.type, e.seq, e.ts);
-        const sg = e.type === 'singles' ? now : ratingAt(id, list, 'singles', e.seq, e.ts), db = e.type === 'doubles' ? now : ratingAt(id, list, 'doubles', e.seq, e.ts);
         played[id][e.type]++; record[id][e.type][won ? 'wins' : 'losses']++;
         // The same rule as in the solve, for what is shown: a win never lowers the rating and a loss never raises it.
         const shown = won ? Math.max(now.rating, last[e.type]) : Math.min(now.rating, last[e.type]), before = last[e.type];
@@ -183,7 +182,7 @@ export function computePprc({ players, matches, params = PPRC_PARAMS, asOf }) {
           matchId: c.match.id, club: c.match.club, season: c.match.season, stage: c.match.stage || null, ts: c.ts, court: c.court.label || null, type: e.type, won,
           partner: c.sides[e.side].find(x => x !== id) || null, opponents: c.sides[other], games: gamesLabel(c.games[e.side], c.games[other]), score: c.court.score || null,
           change: round(shown - before, 3), after: round(shown, 3),
-          overall: round((last.singles * (sg.weight + params.seedWeight) + last.doubles * (db.weight + params.seedWeight)) / (sg.weight + db.weight + 2 * params.seedWeight))
+          overall: round((last.singles + last.doubles) / 2)
         });
       }
     }
@@ -205,7 +204,7 @@ export function computePprc({ players, matches, params = PPRC_PARAMS, asOf }) {
       const ws = evidence[id].singles, wd = evidence[id].doubles, k = params.seedWeight;
       out[id] = {
         singles: round(rating[id].singles), doubles: round(rating[id].doubles),
-        overall: round((rating[id].singles * (ws + k) + rating[id].doubles * (wd + k)) / (ws + wd + 2 * k)), // each discipline counts by the evidence behind it
+        overall: round((rating[id].singles + rating[id].doubles) / 2), // the plain average of the two ratings shown
         seed: { singles: round(seed[id].singles), doubles: round(seed[id].doubles) },
         reliability: { singles: round(ws / (ws + k)), doubles: round(wd / (wd + k)) },
         played: played[id], wins: record[id].singles.wins + record[id].doubles.wins, losses: record[id].singles.losses + record[id].doubles.losses,

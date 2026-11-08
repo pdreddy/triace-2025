@@ -1566,3 +1566,22 @@ td > a, .fixture-team, .team-card h3 a { display: inline-flex; align-items: cent
 .squad .pprc-badge, .members .pprc-badge { margin-left: 4px; }
 .badge.season.club-ladder { color: #7fd0ff; border-color: rgba(127, 208, 255, .45); background: rgba(127, 208, 255, .1); }
 .game-ladder { background: #e3f4ff; color: #0b5d8f; }
+
+/* Rankings */
+.rankings-table .rank-cell { font-weight: 800; }
+.rankings-table tr.podium.p1 .rank-cell { color: #f6c93b; }
+.rankings-table tr.podium.p2 .rank-cell { color: #c3cfdb; }
+.rankings-table tr.podium.p3 .rank-cell { color: #d99058; }
+.rankings-table .pill { margin-right: 4px; }
+
+/* PPRC profile: rating panel and form */
+.rating-panel { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 14px 0; }
+.rating-card { display: flex; flex-direction: column; gap: 4px; padding: 16px 18px; border: 1px solid var(--line-2); border-radius: 16px; background: rgba(255, 255, 255, .03); }
+.rating-card.overall { border-color: rgba(34, 184, 207, .45); }
+.rating-label { font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.rating-value { font-size: 40px; line-height: 1.05; }
+.reliability { display: block; height: 6px; border-radius: 99px; background: rgba(255, 255, 255, .1); overflow: hidden; margin-top: 4px; }
+.reliability i { display: block; height: 100%; background: #22b8cf; }
+.form-row { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 0 0 14px; }
+.form-row .trend { color: #22b8cf; }
+@media (max-width: 700px) { .rating-panel { grid-template-columns: 1fr; } .rating-value { font-size: 32px; } }

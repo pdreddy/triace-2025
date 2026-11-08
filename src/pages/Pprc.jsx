@@ -3,6 +3,8 @@ import { Link, useParams } from 'react-router-dom';
 import { EmptyState, Stat, VerifiedSeal } from '../components/UI';
 import { Icon } from '../components/Icons';
 import { clubRanks, isVerified, playerBadges, courtsPlayed } from '../../functions/lib/pprcBadges.js';
+import { rankPlayers } from '../../functions/lib/rankings.js';
+import { formOf, trendOf, sparkPoints } from '../../functions/lib/pprcProfile.js';
 import { fetchPlayer, fetchPlayerList, fetchYear } from '../services/pprc';
 
 const signed = v => (Math.abs(v) < 0.005 ? '0.00' : `${v > 0 ? '+' : '−'}${Math.abs(v).toFixed(2)}`);
@@ -81,8 +83,8 @@ export function PprcHistory({ playerId, state }) {
 
 export function PprcPlayer() {
   const { playerId } = useParams();
-  const [state, setState] = useState({ loading: true, player: null, error: '' }), [ranks, setRanks] = useState({});
-  useEffect(() => { fetchPlayerList().then(list => setRanks(clubRanks(list, playerId))).catch(() => setRanks({})); }, [playerId]);
+  const [state, setState] = useState({ loading: true, player: null, error: '' }), [ranks, setRanks] = useState({}), [overallRank, setOverallRank] = useState(null);
+  useEffect(() => { fetchPlayerList().then(list => { setRanks(clubRanks(list, playerId)); const all = rankPlayers(list); setOverallRank({ place: all.find(p => p.id === playerId)?.rank ?? null, of: all.length }); }).catch(() => { setRanks({}); setOverallRank(null); }); }, [playerId]);
   useEffect(() => { fetchPlayer(playerId).then(player => setState({ loading: false, player, error: '' })).catch(e => setState({ loading: false, player: null, error: e.message })); }, [playerId]);
   if (state.loading) return <div className="page-loading" aria-busy="true"><span className="spinner" /> Loading player…</div>;
   if (state.error) return <section className="page"><EmptyState icon="user" title="Could not load this player.">{state.error}</EmptyState></section>;
@@ -105,18 +107,39 @@ export function PprcPlayer() {
             <li className={`badge ${verified ? 'verified' : 'nr'}`} title={verified ? 'More than 5 rated courts' : 'Not rated yet: 5 or fewer rated courts'}>{verified ? <><VerifiedSeal /> Verified</> : 'NR · not rated yet'}</li>
             {badges.map(b => <li key={b.key} className={`badge ${b.kind}${b.club ? ` club-${b.club}` : ''}`} title={b.title}>{b.icon && <Icon name={b.icon} size={14} />}{b.label}</li>)}
           </ul>
-          <p className="team-hero-utr"><b>{rating.overall.toFixed(2)}</b> PPRC rating <span className="muted">· singles {rating.singles.toFixed(2)} · doubles {rating.doubles.toFixed(2)}</span></p>
-          <p className="small muted">UTR (starting point) singles {rating.seed.singles.toFixed(2)} · doubles {rating.seed.doubles.toFixed(2)}{rating.reliability ? ` · reliability singles ${Math.round(rating.reliability.singles * 100)}% · doubles ${Math.round(rating.reliability.doubles * 100)}%` : ''}</p>
           {info.needsFullName && <p className="small warn-text">Only a first name is known so far.</p>}
         </div>
       </header>
+      <div className="rating-panel" data-testid="pprc-ratings">
+        {['singles', 'doubles'].map(type => (
+          <div key={type} className="rating-card">
+            <span className="rating-label">{type === 'singles' ? 'Singles' : 'Doubles'}</span>
+            <b className="rating-value">{rating[type].toFixed(2)}</b>
+            <small className="muted">UTR {rating.seed[type].toFixed(2)} · {signed(rating[type] - rating.seed[type])} since</small>
+            <small>{rating.record[type].wins}–{rating.record[type].losses} · {rating.played[type]} {rating.played[type] === 1 ? 'court' : 'courts'}</small>
+            <span className="reliability" role="img" aria-label={`${Math.round((rating.reliability?.[type] || 0) * 100)}% reliable`}><i style={{ width: `${Math.round((rating.reliability?.[type] || 0) * 100)}%` }} /></span>
+            <small className="muted">{Math.round((rating.reliability?.[type] || 0) * 100)}% reliable</small>
+          </div>
+        ))}
+        <div className="rating-card overall">
+          <span className="rating-label">Overall</span>
+          <b className="rating-value">{rating.overall.toFixed(2)}</b>
+          <small className="muted">average of singles and doubles</small>
+          {overallRank?.place ? <small>Rank <b>#{overallRank.place}</b> of {overallRank.of} verified</small> : <small className="muted">{verified ? 'Ranking loading…' : 'Not ranked yet: needs more than 5 courts'}</small>}
+          {Object.entries(ranks).map(([club, place]) => <small key={club}>{clubName(club)} <b>#{place}</b></small>)}
+        </div>
+      </div>
+      {recent.length > 0 && (
+        <div className="form-row" data-testid="pprc-form">
+          <span className="rating-label">Recent form</span>
+          <span className="form">{formOf(recent).map((r, i) => <i key={i} className={r === 'W' ? 'win' : 'loss'}>{r}</i>)}</span>
+          {trendOf(recent).length > 1 && <svg className="trend" viewBox="0 0 160 40" width="160" height="40" role="img" aria-label="Overall rating over the latest courts"><polyline fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" points={sparkPoints(trendOf(recent))} /></svg>}
+          <span className="small muted">overall, latest {trendOf(recent).length} courts</span>
+        </div>
+      )}
       <div className="stat-row">
         <Stat value={`${rating.wins}–${rating.losses}`} label="Win–loss" tone="accent" />
         <Stat value={total ? `${Math.round((rating.wins / total) * 100)}%` : '—'} label="Win rate" />
-        <Stat value={`${rating.record.singles.wins}–${rating.record.singles.losses}`} label="Singles" />
-        <Stat value={`${rating.record.doubles.wins}–${rating.record.doubles.losses}`} label="Doubles" />
-        <Stat value={pair(rating.seed.singles, rating.seed.doubles)} label="UTR singles / doubles" />
-        <Stat value={pair(rating.singles, rating.doubles)} label="PPRC singles / doubles" />
       </div>
       <section className="tier-group">
         <div className="tier-head"><div><h2>All matches</h2><span>Latest 10 first{games.length ? ` (${games.join(', ')})` : ''}. Older matches are grouped by year; click a year to open it.</span></div></div>

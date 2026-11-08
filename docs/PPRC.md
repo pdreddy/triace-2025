@@ -27,7 +27,8 @@ One function, `computePprc({ players, matches })`, rates every court from every 
   level, winning 92% of the games is 2.0 above (the share is limited to 8%..92%, so one 8-0 cannot say more than that).
   A win is never rated below the opponents' level. Tiebreak points are not games; a match tiebreak counts as one.
 - **Doubles** performances are worked out from the pair's level and split between the partners, so a strong partner does
-  not inflate your rating. Singles and doubles are rated **separately**; `overall` blends them by the evidence behind each.
+  not inflate your rating. Singles and doubles are rated **separately**; `overall` is the plain average of the two. A win never lowers a rating and a loss never raises one.
+The leaderboard is at `/rankings` (overall, singles or doubles; club filter; verified players only by default).
 - **The rating is a weighted average of performances.** Recent courts count more (half as much every 150 days), courts with
   more games count more (up to 16), and courts against opponents whose own rating is still uncertain count less.
 - **The seed (UTR) is the starting point** and counts like 24 games of evidence, so a new player stays near it and moves

@@ -23,6 +23,7 @@ const CaptainLogin = lazy(() => import('./pages/CaptainLogin'));
 const Partners = lazy(() => import('./pages/Partners'));
 const Status = lazy(() => import('./pages/Status'));
 const Pprc = lazy(() => import('./pages/Pprc'));
+const Rankings = lazy(() => import('./pages/Rankings'));
 const PprcPlayer = lazy(() => import('./pages/Pprc').then(m => ({ default: m.PprcPlayer })));
 
 const FRIENDLY_ERROR = 'We can’t reach the tournament right now. Please check your connection and try again shortly.';
@@ -72,6 +73,7 @@ function Layout() {
             <NavLink to="/league"><Icon name="calendar" /><span>League</span></NavLink>
             <NavLink to="/players"><Icon name="users" /><span>Players</span></NavLink>
             <NavLink to="/partners" aria-label="Find a partner"><Icon name="partner" /><span className="tab-long">Find a partner</span><span className="tab-short">Partner</span></NavLink>
+            <NavLink to="/rankings"><Icon name="ladder" /><span>Rankings</span></NavLink>
             <NavLink to="/champions"><Icon name="trophy" /><span>Champions</span></NavLink>
             <NavLink className="admin-tab" to={user?.admin ? '/admin' : '/admin/login'}><Icon name="shield" /><span>Admin</span></NavLink>
           </nav>
@@ -112,6 +114,7 @@ function Layout() {
             <Route path="/status" element={<Status />} />
             <Route path="/captain" element={<CaptainLogin />} />
             <Route path="/champions" element={<Champions />} />
+            <Route path="/rankings" element={<Rankings />} />
             <Route path="/pprc" element={<Pprc />} />
             <Route path="/pprc/:playerId" element={<PprcPlayer />} />
             <Route path="/history" element={<History />} />
