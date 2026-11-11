@@ -166,6 +166,15 @@ export function buildMultiClub(data, { overrides = {}, createMissing = true, sou
   // A name in the UTR file follows the same decisions as a name in a match ("Damu" and "Damodhara Reddy Palavali" are "Damodhara Palavali").
   const decided = new Map(Object.entries(overrides).filter(([, v]) => typeof v === 'string' && v !== IGNORE).map(([k, v]) => [nameKey(k), v]));
   const seedReport = applySeeds(master, seeds.map(row => ({ ...row, name: decided.get(nameKey(row.name)) || row.name })));
+  // "X is Y" also retires an entry spelled X that came from a roster or the graded list (not only X inside matches), so the person is listed once.
+  for (const [raw, value] of Object.entries(overrides)) {
+    if (typeof value !== 'string' || value === IGNORE || raw.includes('::')) continue;
+    const from = playerIdFor(raw), to = playerIdFor(value);
+    if (from === to || !master[from] || !master[to]) continue;
+    master[to].clubs = { ...master[from].clubs, ...master[to].clubs };
+    master[to].aliases = [...new Set([...(master[to].aliases || []), master[from].name])];
+    delete master[from];
+  }
   // An override is an existing player id, a full name (an existing person, or a new one), or { name, singles?, doubles? }.
   // Key it by the name as written, or "<team>::<name>" to settle that name only for one team (e.g. "Team A4::Vinod").
   const idForDecision = value => {

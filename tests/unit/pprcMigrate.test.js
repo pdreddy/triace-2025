@@ -173,3 +173,13 @@ test('a match that is also listed as a playoff keeps one copy and becomes a play
   assert.equal(matches[0].stage, 'po');
   assert.equal(report.sources.find(s => s.path === 'TriAceDBSUPER6').duplicate, 1);
 });
+
+test('a name decision also retires a roster entry spelled the old way, so the person is listed once', () => {
+  const data = { koc_users_grades: [{ name: 'Damodhara Palavali', s: 3.58, d: 4.26 }], koc_s3: { teams: { t1: { id: 't1', name: 'Team One', players: [{ name: 'Damu Palavali' }, { name: 'Asha Rao' }] } } } };
+  const without = buildMultiClub(data).tree.pprcMaster.players;
+  assert.ok(Object.values(without).some(p => p.name === 'Damu Palavali'), 'without a decision the roster spelling is its own player');
+  const { tree } = buildMultiClub(data, { overrides: { 'Damu Palavali': 'Damodhara Palavali' } });
+  const names = Object.values(tree.pprcMaster.players).map(p => p.name);
+  assert.ok(names.includes('Damodhara Palavali') && !names.includes('Damu Palavali'));
+  assert.ok(Object.values(tree.pprcMaster.playerList).every(p => p.name !== 'Damu Palavali'));
+});
