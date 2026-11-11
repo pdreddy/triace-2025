@@ -231,12 +231,28 @@ export function splitHistory(entries, count = 10) {
 }
 
 // Players whose name starts with what was typed, each typed word matching the start of a different part of the name
-// ("viv red" finds "Vivekvardhan Reddy Mereddy"). Most experienced first; at most `limit`.
+// ("viv red" finds "Vivekvardhan Reddy Mereddy"). A word of five letters or more may also be one letter off a name part
+// ("sudrshan" and "sudharshan" find "Sudarshan"), because names are spelled many ways; shorter words stay exact.
+// Exact matches come first, then the most experienced players; at most `limit`.
+const withinOne = (a, b) => {
+  if (Math.abs(a.length - b.length) > 1) return false;
+  let i = 0; while (i < a.length && i < b.length && a[i] === b[i]) i++;
+  if (a.length === b.length) return a.slice(i + 1) === b.slice(i + 1) || a.slice(i) === b.slice(i);
+  const [short, long] = a.length < b.length ? [a, b] : [b, a];
+  return short.slice(i) === long.slice(i + 1);
+};
 export function matchPlayers(list, query, limit = 5) {
   const words = nameKey(query).split(' ').filter(Boolean);
   if (!words.length || words.join('').length < 2) return [];
+  const exact = (word, part) => part.startsWith(word);
+  const close = (word, part) => word.length >= 5 && (withinOne(word, part) || withinOne(word, part.slice(0, word.length)) || withinOne(word, part.slice(0, word.length + 1)));
+  const rank = p => {
+    const parts = nameKey(p.name).split(' ');
+    if (words.every(w => parts.some(part => exact(w, part)))) return 0;
+    return words.every(w => parts.some(part => exact(w, part) || close(w, part))) ? 1 : 2;
+  };
   return (list || [])
-    .filter(p => { const parts = nameKey(p.name).split(' '); return words.every(w => parts.some(part => part.startsWith(w))); })
-    .sort((a, b) => (b.played || 0) - (a.played || 0) || String(a.name).localeCompare(b.name))
-    .slice(0, limit);
+    .map(p => ({ p, r: rank(p) })).filter(x => x.r < 2)
+    .sort((a, b) => a.r - b.r || (b.p.played || 0) - (a.p.played || 0) || String(a.p.name).localeCompare(b.p.name))
+    .slice(0, limit).map(x => x.p);
 }

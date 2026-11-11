@@ -167,3 +167,17 @@ test('typing part of a name finds players, most experienced first', () => {
   assert.equal(matchPlayers(list, 'vi', 2).length, 2);
   assert.deepEqual(matchPlayers(undefined, 'viv'), []);
 });
+
+test('lookup forgives one typo or a spelling variant in a word of five letters or more', () => {
+  const list = [{ id: 'a', name: 'Sudarshan Paliwal', played: 4 }, { id: 'b', name: 'Satish Reddy Orugunta', played: 2 }, { id: 'c', name: 'Ravi Kumar', played: 9 }, { id: 'd', name: 'Rajasekhar Chintha', played: 3 }];
+  for (const typed of ['sudrshan', 'sudharshan', 'sudarshan', 'sudar']) assert.deepEqual(matchPlayers(list, typed).map(p => p.id), ['a'], typed);
+  for (const typed of ['sathish', 'satish', 'sathish reddy']) assert.deepEqual(matchPlayers(list, typed).map(p => p.id), ['b'], typed);
+  assert.deepEqual(matchPlayers(list, 'rajasekar').map(p => p.id), ['d'], 'rajasekar (one letter off)');
+  assert.deepEqual(matchPlayers(list, 'raj').map(p => p.id), ['d'], 'short words stay exact: raj is not ravi');
+  assert.deepEqual(matchPlayers(list, 'rovi'), [], 'four letters, no guessing');
+});
+
+test('exact starts of a name come before spelling guesses', () => {
+  const list = [{ id: 'x', name: 'Sudharshan Rao', played: 1 }, { id: 'y', name: 'Sudarshan Paliwal', played: 50 }];
+  assert.deepEqual(matchPlayers(list, 'sudharshan').map(p => p.id), ['x', 'y']);
+});
