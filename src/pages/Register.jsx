@@ -106,6 +106,11 @@ export default function Register() {
     data && settings && !active.length && 'No tier is open for registration. An admin must activate a tier.',
     !user?.uid && 'Signing you in… (anonymous sign-in must be enabled in Firebase Authentication)'
   ].filter(Boolean);
+  // Suggestions from the shared PPRC list. The captain's name field holds only a first name, so the captain is looked up by first and last name together.
+  const lookup = key => (
+    <PprcLookup query={key === 'captain' ? `${players.captain.name} ${players.captain.lastName}` : players[key].name} linked={players[key].pprc} onUnlink={() => change(key, 'pprc', null)}
+      onPick={found => setPlayers(old => ({ ...old, [key]: { ...old[key], pprc: found, name: key === 'captain' ? found.name.split(' ')[0] : found.name, ...(key === 'captain' ? { lastName: found.name.split(' ').slice(1).join(' ') } : {}), ...(found.singles ? { singles: found.singles.toFixed(2), doubles: found.doubles ? found.doubles.toFixed(2) : '' } : {}) } }))} />
+  );
   const filled = key => !!players[key].name.trim() && !!players[key].singles && (key !== 'captain' || !!players.captain.lastName.trim());
   const stepDone = [true, filled('captain') && !!whatsappPhone.trim(), filled('ace1') && !!players.ace1.phone.trim(), filled('ace2') && !!players.ace2.phone.trim(), consent];
   const utrLimits = { min: (settings?.minPlayerUtr || 1) / 100, max: (settings?.maxPlayerUtr || 1650) / 100 };
@@ -182,8 +187,9 @@ export default function Register() {
               <section key={p.key} className={`step-panel card${step === i + 1 ? ' on' : ''}`}>
                 <div className="card-head"><h2><span className="player-num">0{i + 1}</span>{p.title}</h2><span className="pill">{p.note}</span></div>
                 <Field id={`${p.key}-name`} label={p.label} value={players[p.key].name} onChange={e => { change(p.key, 'name', e.target.value); if (players[p.key].pprc) change(p.key, 'pprc', null); }} required maxLength={p.max} autoComplete={p.autoComplete} placeholder={p.placeholder} />
-                <PprcLookup query={players[p.key].name} linked={players[p.key].pprc} onUnlink={() => change(p.key, 'pprc', null)} onPick={found => setPlayers(old => ({ ...old, [p.key]: { ...old[p.key], pprc: found, name: p.key === 'captain' ? found.name.split(' ')[0] : found.name, ...(found.singles ? { singles: found.singles.toFixed(2), doubles: found.doubles ? found.doubles.toFixed(2) : '' } : {}) } }))} />
+                {p.key !== 'captain' && lookup(p.key)}
                 {p.key === 'captain' && <Field id="captain-lastname" label="Captain last name (private)" value={players.captain.lastName} onChange={e => change('captain', 'lastName', e.target.value)} required maxLength={40} autoComplete="family-name" placeholder="Last name" hint="Never shown publicly. It is used to create your team login." />}
+                {p.key === 'captain' && lookup('captain')}
                 {p.key === 'captain' && <Field id="captain-whatsapp" label="Captain WhatsApp number (private)" type="tel" inputMode="tel" autoComplete="tel" placeholder="+15551234567" hint="Include country code. This is visible to the team owner and admin, never on public pages." value={whatsappPhone} onChange={e => setWhatsappPhone(e.target.value)} required maxLength={25} />}
                 {p.key !== 'captain' && <Field id={`${p.key}-whatsapp`} label={`${p.title} WhatsApp number (private)`} type="tel" inputMode="tel" autoComplete="off" placeholder="+15551234567" hint="Include country code. This is visible to the team owner and admin, never on public pages." value={players[p.key].phone} onChange={e => change(p.key, 'phone', e.target.value)} required maxLength={25} />}
                 <div className="ratings">
