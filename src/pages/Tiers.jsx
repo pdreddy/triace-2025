@@ -18,9 +18,9 @@ function Standings({ teams, ranks }) {
               <td className="rank-cell">{ranks.get(t.teamId)}</td>
               <td><b>{t.captainFirstName}</b></td>
               <td className="muted">{t.ace1Name || 'Ace 1 (masked)'} · {t.ace2Name || 'Ace 2 (masked)'}</td>
-              <td className="num">{formatUtr(t.captainUtr)}<br /><PprcBadge info={t.pprc?.captain} /><br /><small className="utr-detail">S/D {utrPair(t.utrs?.captain)}<br />PPRC {pprcPair(t.pprc?.captain)}</small></td>
-              <td className="num">{formatUtr(t.ace1Utr)}<br /><PprcBadge info={t.pprc?.ace1} /><br /><small className="utr-detail">S/D {utrPair(t.utrs?.ace1)}<br />PPRC {pprcPair(t.pprc?.ace1)}</small></td>
-              <td className="num">{formatUtr(t.ace2Utr)}<br /><PprcBadge info={t.pprc?.ace2} /><br /><small className="utr-detail">S/D {utrPair(t.utrs?.ace2)}<br />PPRC {pprcPair(t.pprc?.ace2)}</small></td>
+              <td className="num">{formatUtr(t.captainUtr)} <PprcBadge info={t.pprc?.captain} /><small className="utr-detail">S/D {utrPair(t.utrs?.captain)} · PPRC {pprcPair(t.pprc?.captain)}</small></td>
+              <td className="num">{formatUtr(t.ace1Utr)} <PprcBadge info={t.pprc?.ace1} /><small className="utr-detail">S/D {utrPair(t.utrs?.ace1)} · PPRC {pprcPair(t.pprc?.ace1)}</small></td>
+              <td className="num">{formatUtr(t.ace2Utr)} <PprcBadge info={t.pprc?.ace2} /><small className="utr-detail">S/D {utrPair(t.utrs?.ace2)} · PPRC {pprcPair(t.pprc?.ace2)}</small></td>
               <td className="num strong">{formatUtr(t.combinedUtr)}</td>
             </tr>
           ))}

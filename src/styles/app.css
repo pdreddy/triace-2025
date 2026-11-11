@@ -980,7 +980,7 @@ input[type=checkbox], input[type=radio] { flex: none; width: 18px; height: 18px;
   .button.small { min-height: 40px; padding: 4px 14px; font-size: 15px; }
 
   /* register: one step per screen */
-  .screen-register main { overflow: hidden; }
+  .screen-register main { overflow-x: hidden; overflow-y: auto; } /* the success page (the captain's new login) is longer than a phone screen */
   .register-screen { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   .register-screen > .page-head, .step-rail { display: none; }
   .register-grid { flex: 1; min-height: 0; display: flex; flex-direction: column-reverse; gap: 10px; }
@@ -1599,4 +1599,20 @@ td > a, .fixture-team, .team-card h3 a { display: inline-flex; align-items: cent
   [data-testid="pprc-list"] li > em, [data-testid="pprc-list"] li > small { grid-column: 2 / -1; }
   .rankings-table th:nth-child(n+4), .rankings-table td:nth-child(n+4) { display: none; }
   .rankings-table .rank-sub { display: block; color: var(--muted); font-size: 12px; }
+}
+
+/* Tier table: the S/D detail is one small line under the rating, so a team row is not four lines tall */
+.standings .num .utr-detail { display: block; margin-top: 2px; font-family: var(--body, inherit); font-size: 10.5px; font-weight: 600; letter-spacing: 0; white-space: nowrap; }
+.standings td { padding-block: 9px; }
+
+/* iPhone autofill (saved usernames and passwords) paints a light background; keep the text readable on it */
+.field input:-webkit-autofill, .field input:-webkit-autofill:hover, .field input:-webkit-autofill:focus { -webkit-text-fill-color: #fff; caret-color: #fff; box-shadow: 0 0 0 1000px #091827 inset; border: 1px solid #3d6283; transition: background-color 9999s ease-out; }
+
+/* Phones, registration complete: the team login comes first and the page is compact, so it is seen without scrolling */
+@media (max-width: 700px) {
+  .success-screen { gap: 8px; margin-top: 0; }
+  .success-icon { width: 48px; height: 48px; box-shadow: 0 0 0 6px #d9f24b22; }
+  .success-icon svg { width: 24px; height: 24px; }
+  .success-screen > .success-icon, .success-screen > .eyebrow, .success-screen > h1, .success-screen > p:not(.early-bird) { order: -2; }
+  .success-screen > .credential-card, .success-screen > .saved-check { order: -1; }
 }
