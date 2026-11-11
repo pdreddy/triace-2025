@@ -15,7 +15,16 @@
     "test": "node --test tests/unit/*.test.js",
     "test:browser": "playwright test",
     "test:rules": "firebase emulators:exec --project demo-traice-2 --only auth,database,functions \"node --test --test-concurrency=1 tests/firebase/functions.test.js tests/firebase/security.test.js\"",
-    "check": "npm test && npm run build && npm run test:browser"
+    "check": "npm test && npm run build && npm run check:pwa && npm run test:browser && npm run test:pwa",
+    "test:all": "npm test && npm run build && npm run check:pwa && npm run test:browser && npm run test:pwa",
+    "demo:register": "node scripts/demo-register-teams.mjs",
+    "check:pwa": "node scripts/check-pwa.mjs",
+    "test:pwa": "playwright test -c playwright.pwa.config.js",
+    "preflight": "node scripts/preflight.mjs",
+    "backup": "node scripts/backup.cjs",
+    "rules:generate": "node scripts/generate-rules.mjs",
+    "rules:check": "node scripts/generate-rules.mjs --check",
+    "rules:deploy": "node scripts/deploy-rules.mjs"
   },
   "dependencies": {
     "firebase": "^13.1.0",
@@ -32,6 +41,6 @@
     "vite": "^8.3.5"
   },
   "engines": {
-    "node": ">=22.12.0 <25"
+    "node": ">=24.12.0 <25"
   }
 }

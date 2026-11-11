@@ -1,6 +1,6 @@
 # Run Traice in IntelliJ IDEA
 
-1. Install Node.js **22 LTS** (22.12 or newer) and restart IntelliJ if necessary. Node 24 also works for the web/local demo; Firebase Functions targets Node 22.
+1. Install Node.js **24 LTS** (24.12 or newer) and restart IntelliJ if necessary. Firebase Functions targets Node 22.
 2. Extract this project and choose **File → Open** in IntelliJ. Select the folder containing `package.json`. Open the Terminal tab in that folder.
 3. Verify `node --version` and `npm --version`. In Settings → Languages & Frameworks → Node.js (or JavaScript Runtime), select your Node interpreter if your IntelliJ edition provides JavaScript support. The Terminal method also works without IDE JavaScript support. This is an npm app, not a Java/Maven project.
 4. Run:

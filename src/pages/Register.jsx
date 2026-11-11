@@ -1,9 +1,14 @@
+import { registrationWindow } from '../config/calendar.js';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTournament } from '../hooks/useTournament';
 import { useRulesAccess } from '../hooks/useRulesAccess';
 import { Field, Message, UtrMeter, tierTone } from '../components/UI';
+import PprcLookup from '../components/PprcLookup';
 import { Icon } from '../components/Icons';
+import { EarlyBirdCard } from '../components/EarlyBird';
+import { useEarlyBird } from '../hooks/useEarlyBird';
+import LoginCard from '../components/LoginCard';
 import { assignSelectedTier, assignTier, orderedTiers, parseUtr, formatUtr, validateRegistration, playerUtr, UTR_GAP_LIMIT, DEFAULT_TIERS } from '../../functions/lib/tournament.js';
 
 const PLAYERS = [
@@ -12,7 +17,7 @@ const PLAYERS = [
   { key: 'ace2', title: 'Ace 2', note: 'Full name private', label: 'Ace 2 full name', placeholder: 'Full name', max: 80, autoComplete: 'off' }
 ];
 const STEPS = ['Tier', 'Captain', 'Ace 1', 'Ace 2', 'Confirm'];
-const emptyPlayers = () => Object.fromEntries(PLAYERS.map(p => [p.key, { name: '', phone: '', singles: '', doubles: '' }]));
+const emptyPlayers = () => Object.fromEntries(PLAYERS.map(p => [p.key, { name: '', lastName: '', phone: '', singles: '', doubles: '', pprc: null }]));
 // Counted rating for the live preview, using the same gap rule as the server (playerUtr).
 function rating(player, gap = UTR_GAP_LIMIT) {
   try {
@@ -33,6 +38,8 @@ function TierOption({ value, tone, title, detail, eligibility, art, selected, di
 }
 
 function Success({ result, config, onAgain }) {
+  const [saved, setSaved] = useState(!result.login);   // must confirm the login is saved before leaving
+  const { bird } = useEarlyBird();
   const listed = result.listedTiers?.length > 1 ? 'GOAT and Rising' : config[result.assignedTier]?.name || result.assignedTier;
   return (
     <section className="page success-screen" role="status">
@@ -40,22 +47,26 @@ function Success({ result, config, onAgain }) {
       <p className="eyebrow">Registration complete</p>
       <h1>You’re in the <em>draw.</em></h1>
       <p>Team registered successfully! Listed in {listed}, combined UTR {formatUtr(result.combinedUtr)}.</p>
+      {result.waitlisted?.length > 0 && (
+        <div className="early-bird late waitlist-note" role="status">
+          <span className="pill">Waitlist</span>
+          <span><strong>{result.waitlisted.length > 1 && result.waitlisted.length === (result.listedTiers || []).length ? 'Both tiers are full, so you are on the waitlist.' : 'This tier is full, so you are on the waitlist.'}</strong> {result.waitlisted.map(w => `${config[w.tierId]?.name || w.tierId}: #${w.position}`).join(' · ')}. Your registration is saved. If a place opens you move up automatically and the tournament admin will message you on WhatsApp. Keep your login safe.</span>
+        </div>
+      )}
+      {(bird.phase === 'open' || bird.phase === 'late') && <p className={`early-bird ${bird.phase}`}><span className="pill">{bird.phase === 'open' ? 'Early bird' : 'After early bird'}</span><span>{bird.phase === 'open' ? 'You registered during the early-bird period.' : bird.detail}</span></p>}
       <dl className="success-facts">
         <div><dt>Combined UTR</dt><dd>{formatUtr(result.combinedUtr)}</dd></div>
         <div><dt>Registration ID</dt><dd className="mono">{result.teamId}</dd></div>
       </dl>
-      {result.captainCode && (
-        <div className="captain-code">
-          <p className="eyebrow">Your captain code</p>
-          <output className="mono" aria-label="Captain code">{result.captainCode}</output>
-          <p className="small">Save it now; it isn’t shown again. Use it to manage your team from another phone or browser (team page → “Captain of this team on a new device?”).</p>
-          <button type="button" className="secondary small" onClick={() => navigator.clipboard?.writeText(result.captainCode)}>Copy code</button>
-        </div>
+      {result.loginPending && (
+        <div className="early-bird late" role="status"><span className="pill">Login pending</span><span><strong>Your team is registered.</strong> We couldn’t create your captain login automatically. The tournament admin will send it to you; keep your Registration ID below.</span></div>
       )}
+      {result.login && <LoginCard login={result.login} teamLabel={`${result.captainName || 'your'}’s team`} />}
+      {result.login && <label className="checkbox saved-check"><input type="checkbox" checked={saved} onChange={e => setSaved(e.target.checked)} /><span>I’ve saved my username and password</span></label>}
       <div className="success-actions">
-        <Link className="button" to={`/team/${result.teamId}`}>Open my team <Icon name="arrow" size={18} /></Link>
-        <Link className="secondary" to="/tiers">View the lineup</Link>
-        <button type="button" className="secondary" onClick={onAgain}>Register another team</button>
+        <Link className="button" aria-disabled={!saved} tabIndex={saved ? undefined : -1} to={`/team/${result.teamId}`}>Open my team <Icon name="arrow" size={18} /></Link>
+        <Link className="secondary" to="/tiers" aria-disabled={!saved} tabIndex={saved ? undefined : -1}>View the lineup</Link>
+        <button type="button" className="secondary" disabled={!saved} onClick={onAgain}>Register another team</button>
       </div>
     </section>
   );
@@ -67,7 +78,7 @@ export default function Register() {
   const [players, setPlayers] = useState(emptyPlayers), [whatsappPhone, setWhatsappPhone] = useState(''), [selectedTier, setSelectedTier] = useState('higher'), [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [success, setSuccess] = useState(null), [step, setStep] = useState(0);
   const id = useRef(crypto.randomUUID()), form = useRef(null);
-  const settings = data?.settings, config = settings ? data?.tierConfig || {} : DEFAULT_TIERS, active = orderedTiers(config, true), gap = data?.leagueRules?.utrGapLimit ?? UTR_GAP_LIMIT;
+  const settings = data?.settings, window0 = registrationWindow(settings, data?.calendar), config = settings ? data?.tierConfig || {} : DEFAULT_TIERS, active = orderedTiers(config, true), gap = data?.leagueRules?.utrGapLimit ?? UTR_GAP_LIMIT;
 
   let combined = 0, complete = true;
   for (const value of Object.values(players)) {
@@ -91,11 +102,16 @@ export default function Register() {
     !connected && 'Connecting to the tournament server…',
     connected && !data && (loadError ? `Tournament data could not be loaded: ${loadError}` : 'Loading tournament settings…'),
     data && !settings && (loadError ? `Registration setup is unavailable: ${loadError}` : 'Opening tournament registration…'),
-    settings && !settings.registrationEnabled && 'Registration is closed.',
+    settings && !window0.open && window0.reason,
     data && settings && !active.length && 'No tier is open for registration. An admin must activate a tier.',
     !user?.uid && 'Signing you in… (anonymous sign-in must be enabled in Firebase Authentication)'
   ].filter(Boolean);
-  const filled = key => !!players[key].name.trim() && !!players[key].singles;
+  // Suggestions from the shared PPRC list. The captain's name field holds only a first name, so the captain is looked up by first and last name together.
+  const lookup = key => (
+    <PprcLookup query={key === 'captain' ? `${players.captain.name} ${players.captain.lastName}` : players[key].name} linked={players[key].pprc} onUnlink={() => change(key, 'pprc', null)}
+      onPick={found => setPlayers(old => ({ ...old, [key]: { ...old[key], pprc: found, name: key === 'captain' ? found.name.split(' ')[0] : found.name, ...(key === 'captain' ? { lastName: found.name.split(' ').slice(1).join(' ') } : {}), ...(found.singles ? { singles: found.singles.toFixed(2), doubles: found.doubles ? found.doubles.toFixed(2) : '' } : {}) } }))} />
+  );
+  const filled = key => !!players[key].name.trim() && !!players[key].singles && (key !== 'captain' || !!players.captain.lastName.trim());
   const stepDone = [true, filled('captain') && !!whatsappPhone.trim(), filled('ace1') && !!players.ace1.phone.trim(), filled('ace2') && !!players.ace2.phone.trim(), consent];
   const utrLimits = { min: (settings?.minPlayerUtr || 1) / 100, max: (settings?.maxPlayerUtr || 1650) / 100 };
 
@@ -113,10 +129,12 @@ export default function Register() {
     setError(''); setSuccess(null);
     try {
       const payload = { teamId: id.current, whatsappPhone, ace1Phone: players.ace1.phone, ace2Phone: players.ace2.phone, selectedTier, consent, rulesAccepted: accepted };
-      for (const [key, value] of Object.entries(players)) payload[key] = { [key === 'captain' ? 'firstName' : 'fullName']: value.name.trim(), singlesUtr: parseUtr(value.singles), doublesUtr: value.doubles.trim() ? parseUtr(value.doubles) : null };
+      const links = Object.fromEntries(Object.entries(players).filter(([, value]) => value.pprc).map(([key, value]) => [key, value.pprc.id]));
+      if (Object.keys(links).length) payload.pprcIds = links;
+      for (const [key, value] of Object.entries(players)) payload[key] = { [key === 'captain' ? 'firstName' : 'fullName']: value.name.trim(), ...(key === 'captain' ? { lastName: value.lastName.trim() } : {}), singlesUtr: parseUtr(value.singles), doublesUtr: value.doubles.trim() ? parseUtr(value.doubles) : null };
       validateRegistration(payload, settings, config, gap);
       setBusy(true);
-      setSuccess(await service.register(payload));
+      setSuccess({ ...(await service.register(payload)), captainName: payload.captain.firstName });
       setPlayers(emptyPlayers()); setWhatsappPhone(''); setConsent(false); setStep(0); id.current = crypto.randomUUID();
     } catch (e) { setError(e.message); } finally { setBusy(false); }
   }
@@ -132,7 +150,10 @@ export default function Register() {
         <p className="eyebrow">Three players. One team.</p>
         <h1>Build your <em>trio.</em></h1>
         <p>Pick your tier, add your three players, and see where your team lands as you type.</p>
+        <p className="small">Don’t have three players yet? <Link to="/partners">Find a partner</Link>.</p>
       </header>
+
+      <EarlyBirdCard />
 
       <ol className="step-rail" aria-label="Registration steps">
         {STEPS.map((label, i) => {
@@ -165,7 +186,10 @@ export default function Register() {
             {PLAYERS.map((p, i) => (
               <section key={p.key} className={`step-panel card${step === i + 1 ? ' on' : ''}`}>
                 <div className="card-head"><h2><span className="player-num">0{i + 1}</span>{p.title}</h2><span className="pill">{p.note}</span></div>
-                <Field id={`${p.key}-name`} label={p.label} value={players[p.key].name} onChange={e => change(p.key, 'name', e.target.value)} required maxLength={p.max} autoComplete={p.autoComplete} placeholder={p.placeholder} />
+                <Field id={`${p.key}-name`} label={p.label} value={players[p.key].name} onChange={e => { change(p.key, 'name', e.target.value); if (players[p.key].pprc) change(p.key, 'pprc', null); }} required maxLength={p.max} autoComplete={p.autoComplete} placeholder={p.placeholder} />
+                {p.key !== 'captain' && lookup(p.key)}
+                {p.key === 'captain' && <Field id="captain-lastname" label="Captain last name (private)" value={players.captain.lastName} onChange={e => change('captain', 'lastName', e.target.value)} required maxLength={40} autoComplete="family-name" placeholder="Last name" hint="Never shown publicly. It is used to create your team login." />}
+                {p.key === 'captain' && lookup('captain')}
                 {p.key === 'captain' && <Field id="captain-whatsapp" label="Captain WhatsApp number (private)" type="tel" inputMode="tel" autoComplete="tel" placeholder="+15551234567" hint="Include country code. This is visible to the team owner and admin, never on public pages." value={whatsappPhone} onChange={e => setWhatsappPhone(e.target.value)} required maxLength={25} />}
                 {p.key !== 'captain' && <Field id={`${p.key}-whatsapp`} label={`${p.title} WhatsApp number (private)`} type="tel" inputMode="tel" autoComplete="off" placeholder="+15551234567" hint="Include country code. This is visible to the team owner and admin, never on public pages." value={players[p.key].phone} onChange={e => change(p.key, 'phone', e.target.value)} required maxLength={25} />}
                 <div className="ratings">
@@ -183,7 +207,7 @@ export default function Register() {
                 <span>I have permission to register these players and publish the captain’s first name and all three UTR values. All three WhatsApp numbers stay private to the team owner and admin. Ace names are public only when the admin turns masking off.</span>
               </label>
               <Message error>{error}</Message>
-              <button className="button block" disabled={busy || !settings?.registrationEnabled || !connected || !user?.uid || !active.length}>{busy ? 'Saving registration…' : 'Register team ↗'}</button>
+              <button className="button block" disabled={busy || !settings?.registrationEnabled || !window0.open || !connected || !user?.uid || !active.length}>{busy ? 'Saving registration…' : 'Register team ↗'}</button>
             </div>
 
             <div className="step-nav">

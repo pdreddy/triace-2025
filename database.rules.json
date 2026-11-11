@@ -2,6 +2,12 @@
   "rules": {
     ".read": false,
     ".write": false,
+    "pprcMaster": {
+      ".read": true
+    },
+    "pprcClubs": {
+      ".read": true
+    },
     "traice2_0": {
       ".read": "auth != null && auth.token.admin === true",
       "settings": {
@@ -40,6 +46,28 @@
         ".read": true
       },
       "schedules": {
+        ".read": true
+      },
+      "earlyBird": {
+        ".read": true
+      },
+      "calendar": {
+        ".read": true
+      },
+      "partnerPosts": {
+        ".read": true
+      },
+      "partnerPrivate": {
+        "$postId": {
+          ".read": "auth != null && (data.child('ownerUid').val() === auth.uid || auth.token.admin === true)"
+        }
+      },
+      "partnerByOwner": {
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid"
+        }
+      },
+      "season1": {
         ".read": true
       }
     }

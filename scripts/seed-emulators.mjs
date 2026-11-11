@@ -10,7 +10,7 @@ const app = initializeApp({ projectId: 'demo-traice-2', databaseURL: 'https://de
 const auth = getAuth(app), email = 'reddi2026@traice.local';
 let user; try { user = await auth.getUserByEmail(email); await auth.updateUser(user.uid, { password }); } catch (error) { if (error.code !== 'auth/user-not-found') throw error; user = await auth.createUser({ email, password }); }
 await auth.setCustomUserClaims(user.uid, { ...(user.customClaims || {}), admin: true });
-const node = getDatabase(app).ref('traice2_0');
+const node = getDatabase(app).ref(process.env.TRAICE_DB_ROOT || 'traice2_0');
 if (!(await node.get()).exists()) await node.set(initialState());
 console.log('Demo emulator admin and tournament are initialized. Existing registrations were preserved.');
 process.exit(0);
