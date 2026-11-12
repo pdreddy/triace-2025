@@ -1623,6 +1623,8 @@ td > a, .fixture-team, .team-card h3 a { display: inline-flex; align-items: cent
    ========================================================================= */
 :root { --teal: #2ec4b6; --teal-2: #7fe6dc; }
 .topbar-inner > .all-formats { flex: none; white-space: nowrap; }
+.topbar-inner > .all-formats svg { display: none; }
+.topbar-inner > .all-formats span { display: inline; }
 .all-formats.active { color: var(--teal-2); border-color: var(--teal); }
 .brand.pprc span { letter-spacing: .04em; }
 .brand.pprc b { background: var(--teal); }
@@ -1773,4 +1775,17 @@ a.format-card:hover, a.format-card:focus-visible { transform: translateY(-3px); 
   .format-card { padding: 18px; } .format-card h2 { font-size: 28px; }
   .ladder-head { align-items: flex-start; }
 }
+/* All Formats shares the header with the tabs: between phone and desktop the tabs drop their icons so none is clipped,
+   and on the narrowest phones the tab bar gives its side padding to the tabs so each stays a 32px tap target. */
+@media (min-width: 761px) and (max-width: 1240px) {
+  .tabs a svg, .nav-locked svg { display: none; }
+  .tabs a, .nav-locked { padding: 6px 5px; font-size: 13px; letter-spacing: 0; }
+  .tabs .admin-tab { display: none; }                       /* the shield chip beside Sign out does this job here */
+  .admin-chip { display: inline-flex; }
+  .topbar-inner > .all-formats svg { display: block; }       /* icon only (still labelled "All Formats") */
+  .topbar-inner > .all-formats span { display: none; }
+}
+@media (min-width: 761px) and (max-width: 819px) { .brand:not(.pprc) span, .brand:not(.pprc) b { display: none; } }   /* logo only */
+@media (min-width: 1241px) { .tabs { gap: 2px; } .tabs a, .nav-locked { gap: 5px; padding: 6px 8px; font-size: 15px; letter-spacing: .04em; } }
+@media (max-width: 360px) { .tabs { padding-left: 1px; padding-right: 1px; } .tabs a, .nav-locked { min-width: 32px; } }
 @media (prefers-reduced-motion: reduce) { .format-card, .lcard { animation: none; } .format-card, .ladder-row { transition: none; } }

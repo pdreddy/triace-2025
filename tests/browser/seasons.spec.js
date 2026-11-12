@@ -27,7 +27,7 @@ test('Champions tab shows Season 1 winners and runners-up for both tiers with fu
   await expect(goat.getByText('Yogesh')).toBeVisible();
   await expect(goat.locator('.runner-up')).toContainText('Team A2');
   await expect(rising.getByRole('heading', { name: 'Team A5' })).toBeVisible();
-  await expect(rising.getByText('Hari Mothkuri')).toBeVisible();
+  await expect(rising.getByText('Hari Mothukuri')).toBeVisible();
   await expect(rising.locator('.runner-up')).toContainText('Team B5');
   await expect(page.locator('.champ-season', { hasText: 'Season 1' }).locator('.winner-card')).toHaveCount(2);
 });
@@ -107,7 +107,7 @@ test('early bird: shown on every page, editable by the admin without a rebuild',
   await adminLogin(page);
   await savePlan(page, { opens: localDay(-1), ends: localDay(3), fee: 25 });          // open now: 4 days left
   const visitor = await (await browser.newContext()).newPage();
-  for (const route of ['/', '/tiers', '/league', '/champions', '/history', '/captain']) {
+  for (const route of ['/triace', '/tiers', '/league', '/champions', '/history', '/captain']) {
     await visitor.goto(route);
     const bar = visitor.locator('.early-bar');
     await expect(bar, `${route} shows the early-bird bar`).toBeVisible();

@@ -77,7 +77,7 @@ function Layout() {
           {triace
             ? <Link to="/triace" className="brand" aria-label="Traice 2.0 home"><img src="/traice-tennis.webp" alt="" /><span>traice</span><b>2.0</b></Link>
             : <Link to="/home" className="brand pprc" aria-label="PPRC Player Home"><span>PPRC</span>{module === 'ladder' && <b>Ladder</b>}</Link>}
-          {module !== 'home' && <NavLink className="chip-button all-formats" to="/home">All Formats</NavLink>}
+          {module !== 'home' && <NavLink className="chip-button all-formats" to="/home" aria-label="All Formats"><Icon name="grid" size={16} /><span>All Formats</span></NavLink>}
           {triace && <nav aria-label="Main navigation" className="tabs">
             <NavLink to="/triace" end><Icon name="rules" /><span>Rules</span></NavLink>
             {accepted
