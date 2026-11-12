@@ -6,7 +6,7 @@ const SIZES = [[320, 568], [360, 640], [375, 667], [390, 844], [414, 896], [430,
 for (const [width, height] of SIZES) {
   test(`all rule cards fit without scrolling at ${width}x${height}`, async ({ page }) => {
     await page.setViewportSize({ width, height });
-    await page.goto('/');
+    await page.goto('/triace');
     await expect(page.locator('.rule-card')).toHaveCount(10);
     await expect.poll(() => page.locator('.rule-card-body').first().evaluate(el => el.dataset.fit)).toBeTruthy();   // fitted
     const count = 10;
@@ -23,7 +23,7 @@ for (const [width, height] of SIZES) {
 
 test('cards refit when the window is resized', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto('/');
+  await page.goto('/triace');
   await expect(page.locator('.rule-card')).toHaveCount(10);
   await page.setViewportSize({ width: 375, height: 667 });
   await expect.poll(() => page.locator('.rule-card-body').first().evaluate(el => el.scrollHeight - el.clientHeight)).toBeLessThanOrEqual(1);

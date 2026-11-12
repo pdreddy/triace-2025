@@ -20,7 +20,7 @@ const sounds = page => page.evaluate(() => window.__audio.oscillators + window._
 
 test('flash cards play a slice and ball bounces when they change, and the sound can be muted', async ({ page }) => {
   await page.addInitScript(FAKE_AUDIO);
-  await page.goto('/');
+  await page.goto('/triace');
   await expect(page.locator('.rule-card')).toHaveCount(10);
   await expect.poll(() => sounds(page)).toBeGreaterThan(0);          // welcome sound on the first card
   const before = await sounds(page);
@@ -40,7 +40,7 @@ test('flash cards play a slice and ball bounces when they change, and the sound 
 
 test('flash cards still work when the browser has no audio', async ({ page }) => {
   await page.addInitScript(() => { delete window.AudioContext; delete window.webkitAudioContext; });
-  await page.goto('/');
+  await page.goto('/triace');
   await expect(page.locator('.rule-card')).toHaveCount(10);
   await page.getByRole('button', { name: 'Next rule card' }).click();
   await expect(page.locator('.rule-card.active')).toContainText('Team composition');

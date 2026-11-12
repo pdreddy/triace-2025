@@ -121,7 +121,7 @@ test('early bird: shown on every page, editable by the admin without a rebuild',
   await expect(card.locator('.early-steps li.current')).toHaveCount(1);
   await visitor.screenshot({ path: 'test-results/early-bird-register.png' });
   // the rules card shows it too
-  await visitor.goto('/');
+  await visitor.goto('/triace');
   await expect(visitor.locator('.rule-card.hero .early-bird')).toContainText('+$25');
 
   await savePlan(page, { opens: localDay(-10), ends: localDay(-2), fee: 25 });        // ended: the late fee applies now
@@ -131,11 +131,11 @@ test('early bird: shown on every page, editable by the admin without a rebuild',
   await expect(visitor.locator('.early-bar')).toHaveCount(0);                          // the top bar is only for open / coming up
 
   await savePlan(page, { opens: localDay(5), ends: localDay(9), fee: 10 });            // coming up
-  await visitor.goto('/');
+  await visitor.goto('/triace');
   await expect(visitor.locator('.early-bar')).toContainText('Opens in 5 days');
 
   await savePlan(page, { enabled: false, opens: localDay(5), ends: localDay(9), fee: 10 });   // off: nothing anywhere
-  await visitor.goto('/');
+  await visitor.goto('/triace');
   await expect(visitor.locator('.early-bar')).toHaveCount(0);
   await expect(visitor.locator('.rule-card.hero .early-bird')).toHaveCount(0);
   await visitor.goto('/register');

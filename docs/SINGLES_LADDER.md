@@ -1,6 +1,6 @@
 # Player Home and Singles Ladder
 
-Player Home is `/home`; `/triace` opens the existing TRIACE rules and all prior TRIACE routes remain available. Successful captain and admin sign-in opens Player Home. All Formats stays in the main navigation. PO and KOC are visibly Coming Soon.
+The root `/` redirects to Player Home at `/home` for all visitors; `/triace` opens the existing TRIACE rules and all prior TRIACE routes remain available. Successful captain and admin sign-in opens Player Home. All Formats stays in the main navigation. PO and KOC are visibly Coming Soon.
 
 ## Architecture and identity
 

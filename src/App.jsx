@@ -29,7 +29,7 @@ const Rankings = lazy(() => import('./pages/Rankings'));
 const PprcPlayer = lazy(() => import('./pages/Pprc').then(m => ({ default: m.PprcPlayer })));
 
 const FRIENDLY_ERROR = 'We can’t reach the tournament right now. Please check your connection and try again shortly.';
-const SCREENS = { '/home': 'home', '/triace': 'rules', '/ladder': 'ladder', '/': 'rules', '/register': 'register', '/tiers': 'tiers', '/league': 'league', '/players': 'players', '/champions': 'champions', '/partners': 'partners', '/admin/login': 'login', '/captain': 'login', '/admin': 'admin' };
+const SCREENS = { '/home': 'home', '/triace': 'rules', '/ladder': 'ladder', '/': 'home', '/register': 'register', '/tiers': 'tiers', '/league': 'league', '/players': 'players', '/champions': 'champions', '/partners': 'partners', '/admin/login': 'login', '/captain': 'login', '/admin': 'admin' };
 
 function StatusPill({ mode, connected, online }) {
   const state = !online ? 'offline' : connected ? 'live' : 'connecting';
@@ -107,7 +107,7 @@ function Layout() {
         )}
         <Suspense fallback={<div className="page-loading" aria-busy="true"><span className="spinner" /> Loading…</div>}>
           <Routes>
-            <Route path="/" element={user && !user.anonymous ? <Navigate to="/home" replace /> : <Rules />} />
+            <Route path="/" element={<Navigate to="/home" replace />} />
             <Route path="/home" element={<Home />} />
             <Route path="/triace" element={<Rules />} />
             <Route path="/ladder" element={<SinglesLadder />} />

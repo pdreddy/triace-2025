@@ -70,7 +70,7 @@ export { expect };
 // named "rules cards must all be read and agreed"). Saves several seconds in every test that needs to register.
 export async function acceptRulesFast(page) {
   await page.addInitScript(() => { try { sessionStorage.setItem('traice-rules-accepted-v1', 'yes'); } catch { /* storage blocked */ } });
-  await page.goto('/');
+  await page.goto('/triace');
   await expect(page.getByRole('link', { name: 'Register team ↗' })).toBeVisible();
 }
 

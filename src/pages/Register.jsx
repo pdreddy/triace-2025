@@ -201,7 +201,7 @@ export default function Register() {
 
             <div className={`step-panel card${step === 4 ? ' on' : ''}`}>
               <div className="card-head"><h2>Confirm &amp; register</h2></div>
-              <p className="confirmed"><Icon name="check" size={16} /> Tournament rules accepted in this session. <Link to="/">Review rules</Link></p>
+              <p className="confirmed"><Icon name="check" size={16} /> Tournament rules accepted in this session. <Link to="/triace">Review rules</Link></p>
               <label className="checkbox">
                 <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} required />
                 <span>I have permission to register these players and publish the captain’s first name and all three UTR values. All three WhatsApp numbers stay private to the team owner and admin. Ace names are public only when the admin turns masking off.</span>

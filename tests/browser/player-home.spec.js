@@ -1,6 +1,7 @@
 import { test, expect } from './fixtures.js';
 test('formats navigation and TRIACE routes remain available', async ({ page }) => {
-  await page.goto('/home');
+  await page.goto('/');
+  await expect(page).toHaveURL(/\/home$/);
   await expect(page.getByRole('heading', { name: 'Player Home' })).toBeVisible();
   await expect(page.getByText('Coming Soon', { exact: true })).toHaveCount(2);
   await page.getByRole('link', { name: /Active TRIACE 2.0/ }).click();
