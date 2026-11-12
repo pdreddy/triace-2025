@@ -7,7 +7,7 @@ const SHARED_PUBLIC_ROOTS = ['pprcMaster', 'pprcClubs'];
 const SEGMENT = /^[A-Za-z0-9_-]+$/; // Realtime Database keys cannot contain . $ # [ ] /
 
 // Every child node the tournament itself owns under the root. Season 1 may never be written on top of one.
-export const RESERVED_ROOT_CHILDREN = ['settings', 'tierConfig', 'configRevision', 'tiers', 'registrations', 'teamsByOwner', 'fixtures', 'leagueRules', 'season', 'seasons', 'schedules', 'archive', 'earlyBird', 'calendar', 'partnerPosts', 'partnerPrivate', 'partnerByOwner', 'withdrawn', 'demoLogins', 'demoAdmins'];
+export const RESERVED_ROOT_CHILDREN = ['settings', 'tierConfig', 'configRevision', 'tiers', 'registrations', 'teamsByOwner', 'fixtures', 'leagueRules', 'season', 'seasons', 'schedules', 'archive', 'earlyBird', 'calendar', 'partnerPosts', 'partnerPrivate', 'partnerByOwner', 'withdrawn', 'demoLogins', 'demoAdmins', 'singlesLadder', 'ladderAccounts'];
 
 export function cleanPath(value, label) {
   const path = String(value ?? '').trim().replace(/^\/+|\/+$/g, '');

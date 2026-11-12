@@ -5,11 +5,12 @@ import { getAuth } from 'firebase-admin/auth';
 import { getDatabase } from 'firebase-admin/database';
 import { randomUUID } from 'node:crypto';
 import { initialState } from '../../functions/lib/tournament.js';
-process.env.FIREBASE_AUTH_EMULATOR_HOST='127.0.0.1:9099';process.env.FIREBASE_DATABASE_EMULATOR_HOST='127.0.0.1:9000';
+process.env.FIREBASE_AUTH_EMULATOR_HOST ||= '127.0.0.1:9099'; process.env.FIREBASE_DATABASE_EMULATOR_HOST ||= '127.0.0.1:9000';
+const authURL = `http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}`, functionsURL = `http://${process.env.FIREBASE_FUNCTIONS_EMULATOR_HOST || '127.0.0.1:5001'}`;
 const app=initializeApp({projectId:'demo-traice-2',databaseURL:'https://demo-traice-2-default-rtdb.firebaseio.com'}),database=getDatabase(app),auth=getAuth(app);
 let guestToken,adminToken;
-async function token(admin=false){const email=`${randomUUID()}@example.test`,password='emulator-test-only-password';const user=await auth.createUser({email,password});if(admin)await auth.setCustomUserClaims(user.uid,{admin:true});const response=await fetch('http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=demo-local-key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password,returnSecureToken:true})});const result=await response.json();assert.ok(result.idToken);return result.idToken;}
-async function call(name,data,bearer=guestToken){const response=await fetch(`http://127.0.0.1:5001/demo-traice-2/us-central1/${name}`,{method:'POST',headers:{'Content-Type':'application/json',...(bearer?{Authorization:`Bearer ${bearer}`}:{})},body:JSON.stringify({data})});return {status:response.status,...await response.json()};}
+async function token(admin=false){const email=`${randomUUID()}@example.test`,password='emulator-test-only-password';const user=await auth.createUser({email,password});if(admin)await auth.setCustomUserClaims(user.uid,{admin:true});const response=await fetch(`${authURL}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=demo-local-key`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password,returnSecureToken:true})});const result=await response.json();assert.ok(result.idToken);return result.idToken;}
+async function call(name,data,bearer=guestToken){const response=await fetch(`${functionsURL}/demo-traice-2/us-central1/${name}`,{method:'POST',headers:{'Content-Type':'application/json',...(bearer?{Authorization:`Bearer ${bearer}`}:{})},body:JSON.stringify({data})});return {status:response.status,...await response.json()};}
 const team=()=>({teamId:randomUUID(),whatsappPhone:'+15551234567',ace1Phone:'+15551234568',ace2Phone:'+15551234569', captain:{firstName:'John',singlesUtr:600,doublesUtr:null},ace1:{fullName:'Secret Alpha',singlesUtr:600,doublesUtr:null},ace2:{fullName:'Secret Beta',singlesUtr:600,doublesUtr:null},selectedTier:'higher',consent:true,rulesAccepted:true});
 before(async()=>{guestToken=await token();adminToken=await token(true);});
 after(async()=>{await deleteApp(app);});
@@ -20,11 +21,11 @@ test('non-admin cannot mutate settings or recalculate; server rejects forged or 
 test('admin config and recalculation move public entries and synchronize private assignment',async()=>{const payload=team();await call('registerTeam',payload);const state=initialState();state.tierConfig.goat.active=false;state.tierConfig.rising.maxCombinedUtr=2000;assert.equal((await call('saveConfiguration',{settings:state.settings,tierConfig:state.tierConfig,expectedRevision:1},adminToken)).status,200);const result=await call('recalculateTiers',{},adminToken);assert.equal(result.status,200);assert.deepEqual(result.result,{reviewed:1,moved:1,unchanged:0,unassigned:0});const value=(await database.ref('traice2_0').get()).val();assert.equal(value.tiers.goat,undefined);assert.equal(value.registrations[payload.teamId].assignedTier,'rising');assert.equal(Object.keys(value.tiers.rising.teams).length,1);});
 test('registering creates a captain login; the admin can reset it; withdrawing deletes it',async()=>{
  const payload=team(),result=await call('registerTeam',payload);assert.equal(result.status,200);
- const {username,password}=result.result.login;assert.match(username,/^johnsec$/);assert.match(password,/^trijoh\d{4}$/);   // no last name sent: the fixed prefix
+ const {username,password}=result.result.login;assert.match(username,/^johnsec\d*$/);assert.match(password,/^trijoh\d{4}$/);   // no last name sent: the fixed prefix
  const email=`${username}@captain.traice.local`,user=await auth.getUserByEmail(email);assert.equal(user.uid,`cap_${payload.teamId}`);
  const value=(await database.ref('traice2_0').get()).val();assert.equal(value.registrations[payload.teamId].captainUsername,username);assert.equal(value.registrations[payload.teamId].owners[user.uid],true);
  assert.ok(!JSON.stringify(value).includes(password),'the password is never stored');assert.ok(!JSON.stringify(value.tiers).includes(username),'the username is not public');
- const signIn=pw=>fetch('http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pw,returnSecureToken:true})});
+ const signIn=pw=>fetch(`${authURL}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pw,returnSecureToken:true})});
  assert.equal((await signIn(password)).status,200);
  const repeat=await call('registerTeam',payload);assert.equal(repeat.status,200);assert.equal(repeat.result.login,undefined,'a repeated request issues no second login');
  assert.equal((await call('resetCaptainLogin',{teamId:payload.teamId})).status,403);
@@ -47,4 +48,40 @@ test('health diagnostics require no login and leave tournament data and Auth use
  assert.deepEqual(result.result, { ok: true, service: 'traice' });
  assert.deepEqual((await database.ref('traice2_0').get()).val(), before);
  assert.deepEqual((await auth.listUsers()).users.map(user => user.uid).sort(), users);
+});
+
+test('Ladder callable verifies canonical identity and protects organizer actions', async () => {
+  await database.ref('pprcMaster/players/ladder_test_p1').set({ id:'ladder_test_p1',name:'Test Player' });
+  assert.equal((await call('singlesLadderAction',{action:'enroll',playerId:'ladder_test_p1'},null)).status,401);
+  assert.equal((await call('singlesLadderAction',{action:'enroll',playerId:'ladder_test_p1'})).status,403);
+  assert.notEqual((await call('singlesLadderAction',{action:'enroll',playerId:'absent'},adminToken)).status,200);
+  const result=await call('singlesLadderAction',{action:'enroll',playerId:'ladder_test_p1',name:'Forged Name'},adminToken);
+  assert.equal(result.status,200);
+  assert.equal((await database.ref('traice2_0/singlesLadder/entries/ladder_test_p1/name').get()).val(),'Test Player');
+  assert.notEqual((await call('singlesLadderAction',{action:'link',playerId:'ladder_test_p1',uid:'missing_account'},adminToken)).status,200);
+  assert.notEqual((await call('singlesLadderAction',{action:'challenge',opponentId:'ladder_test_p1'})).status,200);
+});
+
+test('Ladder concurrent requests allow one active challenge and confirm standings atomically', async () => {
+  const playerUid=(await auth.verifyIdToken(guestToken)).uid, organizerUid=(await auth.verifyIdToken(adminToken)).uid;
+  const action=(data,bearer=adminToken)=>call('singlesLadderAction',data,bearer);
+  for (const [playerId, uid] of [['ladder_flow_one',organizerUid],['ladder_flow_two',playerUid]]) {
+    await database.ref(`pprcMaster/players/${playerId}`).set({id:playerId,name:playerId});
+    assert.equal((await action({action:'enroll',playerId})).status,200);
+    assert.equal((await action({action:'link',playerId,uid})).status,200);
+  }
+  assert.equal((await action({action:'open'})).status,200);
+  const requests=await Promise.all([action({action:'challenge',opponentId:'ladder_flow_one'},guestToken),action({action:'challenge',opponentId:'ladder_flow_one'},guestToken)]);
+  assert.equal(requests.filter(r=>r.status===200).length,1);
+  const challengeId=requests.find(r=>r.status===200).result.id;
+  assert.equal((await action({action:'respond',challengeId,accept:true})).status,200);
+  assert.equal((await action({action:'submit',challengeId,winnerId:'ladder_flow_two',score:'6-4 6-3'},guestToken)).status,200);
+  assert.notEqual((await action({action:'confirm',challengeId},guestToken)).status,200);
+  assert.equal((await action({action:'confirm',challengeId})).status,200);
+  assert.notEqual((await action({action:'confirm',challengeId})).status,200);
+  const ladder=(await database.ref('traice2_0/singlesLadder').get()).val();
+  assert.equal(ladder.entries.ladder_flow_two.rank,1);
+  assert.equal(ladder.entries.ladder_flow_two.points,5);
+  assert.equal(ladder.entries.ladder_flow_one.points,1);
+  assert.equal(ladder.challenges[challengeId].status,'confirmed');
 });

@@ -8,7 +8,7 @@ export default function Login() {
   const { service, user } = useTournament(), navigate = useNavigate();
   const [username, setUsername] = useState(''), [password, setPassword] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState('');
 
-  useEffect(() => { if (user?.admin) navigate('/admin', { replace: true }); }, [user?.admin, navigate]);
+  useEffect(() => { if (user?.admin) navigate('/home', { replace: true }); }, [user?.admin, navigate]);
 
   async function submit(event) {
     event.preventDefault();

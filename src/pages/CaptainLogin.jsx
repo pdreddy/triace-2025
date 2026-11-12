@@ -13,7 +13,7 @@ export default function CaptainLogin() {
   async function submit(event) {
     event.preventDefault();
     setBusy(true); setError('');
-    try { await service.captainLogin(username.trim(), password); navigate('/league'); }
+    try { await service.captainLogin(username.trim(), password); navigate('/home'); }
     catch (e) { setError(e.message); setBusy(false); }
   }
   if (user?.captain) {

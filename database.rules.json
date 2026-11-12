@@ -67,6 +67,14 @@
           ".read": "auth != null && auth.uid === $uid"
         }
       },
+      "singlesLadder": {
+        ".read": true
+      },
+      "ladderAccounts": {
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid"
+        }
+      },
       "season1": {
         ".read": true
       }

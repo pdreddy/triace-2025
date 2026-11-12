@@ -10,3 +10,14 @@ beforeEach(async()=>{await env.clearDatabase();await env.withSecurityRulesDisabl
 test('public may read only safe tier data and form configuration',async()=>{const db=env.unauthenticatedContext().database();for(const key of ['settings','tierConfig','tiers','configRevision'])await assertSucceeds(get(ref(db,`traice2_0/${key}`)));for(const key of ['traice2_0','traice2_0/registrations'])await assertFails(get(ref(db,key)));});
 test('anonymous and admin clients cannot bypass callable validation through direct writes',async()=>{for(const context of [env.unauthenticatedContext(),env.authenticatedContext('guest'),env.authenticatedContext('admin',{admin:true})]){const db=context.database();for(const key of ['settings','tierConfig','registrations/fake','tiers/goat/teams/fake'])await assertFails(set(ref(db,`traice2_0/${key}`),{}));}});
 test('only admin claims allow private reads',async()=>{const admin=env.authenticatedContext('owner',{admin:true}).database(),guest=env.authenticatedContext('guest').database();await assertSucceeds(get(ref(admin,'traice2_0/registrations')));await assertFails(get(ref(guest,'traice2_0/registrations')));});
+test('ladder standings readable; identities isolated; no client writes including admin', async()=>{
+  await env.withSecurityRulesDisabled(async c => { await set(ref(c.database(),'traice2_0/ladderAccounts'),{alice:'p1',bob:'p2'}); });
+  const publicDb=env.unauthenticatedContext().database(), alice=env.authenticatedContext('alice').database();
+  await assertSucceeds(get(ref(publicDb,'traice2_0/singlesLadder')));
+  await assertFails(get(ref(publicDb,'traice2_0/ladderAccounts/alice')));
+  await assertSucceeds(get(ref(alice,'traice2_0/ladderAccounts/alice')));
+  await assertFails(get(ref(alice,'traice2_0/ladderAccounts/bob')));
+  for(const context of [env.unauthenticatedContext(), env.authenticatedContext('alice'), env.authenticatedContext('admin',{admin:true})]) {
+    for(const path of ['singlesLadder/entries/p1/rank','singlesLadder/challenges/fake','ladderAccounts/alice']) await assertFails(set(ref(context.database(),`traice2_0/${path}`),'forged'));
+  }
+});

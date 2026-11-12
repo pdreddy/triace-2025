@@ -1,3 +1,4 @@
+import { applySinglesLadder } from './lib/singlesLadder.js';
 import { initializeApp } from 'firebase-admin/app';
 import { getDatabase } from 'firebase-admin/database';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
@@ -17,7 +18,11 @@ import { usernameAttempt, newPassword, loginNames, captainUid, loginEmail } from
 import { runRegistration } from './lib/registerFlow.js';
 import { resolveDbPaths } from './lib/paths.js';
 import { validateLegacySeason } from './lib/legacy.js';
-initializeApp();
+// The CLI otherwise chooses the legacy project-ID namespace, while the web emulator config
+// and seed scripts use the default-rtdb namespace. Keep local callables in that same database.
+const demoProject = process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT;
+if (process.env.FUNCTIONS_EMULATOR === 'true' && demoProject?.startsWith('demo-')) initializeApp({ projectId: demoProject, databaseURL: `https://${demoProject}-default-rtdb.firebaseio.com` });
+else initializeApp();
 // TRAICE_DB_ROOT / TRAICE_DB_SEASON1_PATH come from functions/.env (see functions/.env.example).
 const paths = resolveDbPaths({ root: process.env.TRAICE_DB_ROOT, season1: process.env.TRAICE_DB_SEASON1_PATH });
 const options = { region: 'us-central1', maxInstances: 10, timeoutSeconds: 60 };
@@ -256,4 +261,25 @@ export const backupNow = onCall(options, async request => {
     console.error('Backup failed', { name: error.name, code: error.code, message: error.message });
     throw new HttpsError('internal', 'The backup could not be saved. Check that Cloud Storage is set up for this project (Firebase Console → Storage → Get started).');
   }
+});
+
+// Singles Ladder uses the same Firebase app, current admin check and atomic tournament mutation.
+export const singlesLadderAction = onCall(options, async request => {
+  requireAuth(request);
+  if (request.auth.token.firebase?.sign_in_provider === 'anonymous') throw new HttpsError('permission-denied', 'Sign in with your player account.');
+  const admin = await currentAdmin(request), payload = { ...request.data };
+  if (['enroll', 'link'].includes(payload.action)) {
+    if (!admin) throw new HttpsError('permission-denied', 'Organizer access required.');
+    if (typeof payload.playerId !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(payload.playerId)) throw new HttpsError('invalid-argument', 'Invalid player ID.');
+    const player = (await getDatabase().ref(`pprcMaster/players/${payload.playerId}`).get()).val();
+    if (!player || player.mergedInto || player.retired) throw new HttpsError('failed-precondition', 'Choose a current canonical PPRC player.');
+    payload.name = player.name || player.displayName || payload.playerId;
+    if (payload.action === 'link') {
+      if (typeof payload.uid !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(payload.uid)) throw new HttpsError('invalid-argument', 'Invalid account UID.');
+      const account = await getAuth().getUser(payload.uid).catch(() => null);
+      if (!account || account.disabled || !account.providerData.length) throw new HttpsError('failed-precondition', 'Choose an existing enabled sign-in account.');
+    }
+  }
+  const id = newId(), now = Date.now();
+  return mutate(state => applySinglesLadder(state, payload, { uid: request.auth.uid, admin }, now, id));
 });

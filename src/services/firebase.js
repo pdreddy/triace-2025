@@ -38,6 +38,9 @@ export function createFirebaseService() {
   let stopped = false, anonymousPromise;
   const withError = fn => async (...args) => { try { return await fn(...args); } catch (error) { throw new Error(errorMessage(error)); } };
   return {
+    subscribeLadder(callback, onError) { return onValue(ref(database, `${ROOT}/singlesLadder`), snapshot => callback(snapshot.val()), onError); },
+    subscribeLadderIdentity(uid, callback, onError) { return onValue(ref(database, `${ROOT}/ladderAccounts/${uid}`), snapshot => callback(snapshot.val()), onError); },
+    ladderAction: withError(async payload => (await httpsCallable(functions, 'singlesLadderAction')(payload)).data),
     mode: env.VITE_USE_EMULATORS === 'true' ? 'Firebase Emulators' : 'Firebase',
     info: { projectId: config.projectId, authDomain: config.authDomain, databaseURL: config.databaseURL, root: paths.root, season1Path: paths.season1, emulators: env.VITE_USE_EMULATORS === 'true' },
     subscribePublic(callback, onError) {

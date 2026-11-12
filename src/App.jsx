@@ -8,6 +8,8 @@ import { Icon } from './components/Icons';
 import { EarlyBirdBar } from './components/EarlyBird';
 import { diagnose } from './services/diagnose.js';
 
+const Home = lazy(() => import('./pages/Home'));
+const SinglesLadder = lazy(() => import('./pages/SinglesLadder'));
 const Rules = lazy(() => import('./pages/Rules'));
 const Register = lazy(() => import('./pages/Register'));
 const Tiers = lazy(() => import('./pages/Tiers'));
@@ -27,7 +29,7 @@ const Rankings = lazy(() => import('./pages/Rankings'));
 const PprcPlayer = lazy(() => import('./pages/Pprc').then(m => ({ default: m.PprcPlayer })));
 
 const FRIENDLY_ERROR = 'We can’t reach the tournament right now. Please check your connection and try again shortly.';
-const SCREENS = { '/': 'rules', '/register': 'register', '/tiers': 'tiers', '/league': 'league', '/players': 'players', '/champions': 'champions', '/partners': 'partners', '/admin/login': 'login', '/captain': 'login', '/admin': 'admin' };
+const SCREENS = { '/home': 'home', '/triace': 'rules', '/ladder': 'ladder', '/': 'rules', '/register': 'register', '/tiers': 'tiers', '/league': 'league', '/players': 'players', '/champions': 'champions', '/partners': 'partners', '/admin/login': 'login', '/captain': 'login', '/admin': 'admin' };
 
 function StatusPill({ mode, connected, online }) {
   const state = !online ? 'offline' : connected ? 'live' : 'connecting';
@@ -41,7 +43,7 @@ function NotFound() {
       <Icon name="ball" size={56} />
       <h1>Out of <em>bounds.</em></h1>
       <p>That page isn’t on the court. Head back to the rules to get started.</p>
-      <Link className="button" to="/">Back to rules <Icon name="arrow" size={18} /></Link>
+      <Link className="button" to="/triace">Back to rules <Icon name="arrow" size={18} /></Link>
     </section>
   );
 }
@@ -64,8 +66,10 @@ function Layout() {
       <header className="topbar">
         <div className="topbar-inner">
           <Link to="/" className="brand" aria-label="Traice 2.0 home"><img src="/traice-tennis.webp" alt="" /><span>traice</span><b>2.0</b></Link>
+          <NavLink className="chip-button all-formats" to="/home">All Formats</NavLink>
           <nav aria-label="Main navigation" className="tabs">
-            <NavLink to="/" end><Icon name="rules" /><span>Rules</span></NavLink>
+            <NavLink to="/ladder">Singles Ladder</NavLink>
+            <NavLink to="/triace" end><Icon name="rules" /><span>Rules</span></NavLink>
             {accepted
               ? <NavLink to="/register"><Icon name="register" /><span>Register</span></NavLink>
               : <span className="nav-locked" aria-disabled="true" title="Read and agree to all rules first"><Icon name="lock" /><span>Register</span></span>}
@@ -103,8 +107,11 @@ function Layout() {
         )}
         <Suspense fallback={<div className="page-loading" aria-busy="true"><span className="spinner" /> Loading…</div>}>
           <Routes>
-            <Route path="/" element={<Rules />} />
-            <Route path="/register" element={accepted ? <Register /> : <Navigate to="/" replace />} />
+            <Route path="/" element={user && !user.anonymous ? <Navigate to="/home" replace /> : <Rules />} />
+            <Route path="/home" element={<Home />} />
+            <Route path="/triace" element={<Rules />} />
+            <Route path="/ladder" element={<SinglesLadder />} />
+            <Route path="/register" element={accepted ? <Register /> : <Navigate to="/triace" replace />} />
             <Route path="/tiers" element={<Tiers />} />
             <Route path="/league" element={<League />} />
             <Route path="/team/:teamId" element={<Team />} />
