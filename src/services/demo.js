@@ -17,6 +17,10 @@ export function createDemoService() {
     async runChecks(report) { report({ id: 'demo', label: 'Demo mode', status: 'ok', detail: 'This is the local demo: there is no Firebase to check. Open this page on the live site.' }); },
     subscribeConnection(callback) { callback(true); return () => {}; },
     subscribeAuth(callback, error) { authListeners.add(callback); refreshAuth().catch(error); return () => authListeners.delete(callback); },
+    // Singles Ladder on the local demo server (same engine as the Cloud Function). ladderDemo exists only here.
+    subscribeLadder: (path, callback, error = () => {}) => poll(`ladder?path=${encodeURIComponent(path)}`, callback, error),
+    ladderAction: payload => request('ladder-action', payload),
+    ladderDemo: { seed: () => request('ladder-demo-seed', {}), async loginAs(playerId) { await request('ladder-demo-login', { playerId }); await refreshAuth(); } },
     subscribePrivate: (callback, error) => poll('registrations', callback, error),
     getMyRegistration: teamId => request(`my-registration?teamId=${encodeURIComponent(teamId)}`),
     subscribeMyTeams: (uid, callback) => poll('my-teams', callback, () => callback({})),

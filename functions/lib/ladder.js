@@ -49,3 +49,18 @@ export function parseLadder(text) {
   });
   return { matches, report };
 }
+
+// Everyone who appears in the Ladder 2026 results table, once each, with the rating printed after their name
+// ("Raj Chava [5.3022]" is the ladder site's own rating, not a UTR). Used to set up a Singles Ladder season from the
+// real roster; a person's identity is still decided by the PPRC name index, never by this spelling alone.
+export function ladderRoster(text) {
+  const rows = String(text ?? '').split(/\r?\n/).filter(l => l.trim()), cols = rows[0].split('|').map(c => c.trim()), seen = new Map();
+  for (const line of rows.slice(1)) {
+    const cells = line.split('|');
+    for (const col of ['Home', 'Away']) {
+      const raw = (cells[cols.indexOf(col)] ?? '').trim(), name = stripRating(raw), rating = Number(raw.match(/\[([\d.]+)\]\s*$/)?.[1]);
+      if (name && !seen.has(nameKey(name))) seen.set(nameKey(name), { name, key: nameKey(name), rating: Number.isFinite(rating) ? rating : null });
+    }
+  }
+  return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
+}

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState } from 'react';
-import { BrowserRouter, Link, Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter, Link, Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import { TournamentProvider, useTournament } from './hooks/useTournament';
 import { RulesAccessProvider, useRulesAccess } from './hooks/useRulesAccess';
 import { usePwa } from './hooks/usePwa';
@@ -7,9 +7,17 @@ import { Message } from './components/UI';
 import { Icon } from './components/Icons';
 import { EarlyBirdBar } from './components/EarlyBird';
 import { diagnose } from './services/diagnose.js';
+import { MODULES, moduleForPath } from './features/modules.js';
+import { LadderProvider } from './features/ladder/LadderContext';
 
-const Home = lazy(() => import('./pages/Home'));
-const SinglesLadder = lazy(() => import('./pages/SinglesLadder'));
+const PlayerHome = lazy(() => import('./features/home/PlayerHome'));
+const ComingSoon = lazy(() => import('./features/home/PlayerHome').then(m => ({ default: m.ComingSoon })));
+const LadderLayout = lazy(() => import('./features/ladder/LadderLayout'));
+const LadderStandings = lazy(() => import('./features/ladder/Standings'));
+const LadderMatches = lazy(() => import('./features/ladder/Matches'));
+const LadderActivity = lazy(() => import('./features/ladder/Activity'));
+const LadderRules = lazy(() => import('./features/ladder/RulesPage'));
+const LadderOrganizer = lazy(() => import('./features/ladder/Organizer'));
 const Rules = lazy(() => import('./pages/Rules'));
 const Register = lazy(() => import('./pages/Register'));
 const Tiers = lazy(() => import('./pages/Tiers'));
@@ -29,7 +37,7 @@ const Rankings = lazy(() => import('./pages/Rankings'));
 const PprcPlayer = lazy(() => import('./pages/Pprc').then(m => ({ default: m.PprcPlayer })));
 
 const FRIENDLY_ERROR = 'We can’t reach the tournament right now. Please check your connection and try again shortly.';
-const SCREENS = { '/home': 'home', '/triace': 'rules', '/ladder': 'ladder', '/': 'home', '/register': 'register', '/tiers': 'tiers', '/league': 'league', '/players': 'players', '/champions': 'champions', '/partners': 'partners', '/admin/login': 'login', '/captain': 'login', '/admin': 'admin' };
+const SCREENS = { '/home': 'home', '/triace': 'rules', '/': 'home', '/register': 'register', '/tiers': 'tiers', '/league': 'league', '/players': 'players', '/champions': 'champions', '/partners': 'partners', '/admin/login': 'login', '/captain': 'login', '/admin': 'admin' };
 
 function StatusPill({ mode, connected, online }) {
   const state = !online ? 'offline' : connected ? 'live' : 'connecting';
@@ -52,7 +60,7 @@ function Layout() {
   const { service, connected, error, user, savedAt } = useTournament();
   const { accepted } = useRulesAccess();
   const { canInstall, install, online, updated } = usePwa();
-  const path = useLocation().pathname, screen = SCREENS[path] || (path.startsWith('/team/') ? 'team' : path.startsWith('/player/') ? 'player' : path.startsWith('/history') ? 'history' : 'other');
+  const path = useLocation().pathname, module = moduleForPath(path), triace = module === 'triace', screen = SCREENS[path] || (module !== 'triace' ? module : (path.startsWith('/team/') ? 'team' : path.startsWith('/player/') ? 'player' : path.startsWith('/history') ? 'history' : 'other'));
   const [logoutError, setLogoutError] = useState(''), [loggingOut, setLoggingOut] = useState(false);
 
   async function logout() {
@@ -65,10 +73,12 @@ function Layout() {
     <div className={`app screen-${screen}`}>
       <header className="topbar">
         <div className="topbar-inner">
-          <Link to="/" className="brand" aria-label="Traice 2.0 home"><img src="/traice-tennis.webp" alt="" /><span>traice</span><b>2.0</b></Link>
-          <NavLink className="chip-button all-formats" to="/home">All Formats</NavLink>
-          <nav aria-label="Main navigation" className="tabs">
-            <NavLink to="/ladder">Singles Ladder</NavLink>
+          {/* Each format keeps its own brand and tabs inside the shared PPRC header; All Formats is always one tap away. */}
+          {triace
+            ? <Link to="/triace" className="brand" aria-label="Traice 2.0 home"><img src="/traice-tennis.webp" alt="" /><span>traice</span><b>2.0</b></Link>
+            : <Link to="/home" className="brand pprc" aria-label="PPRC Player Home"><span>PPRC</span>{module === 'ladder' && <b>Ladder</b>}</Link>}
+          {module !== 'home' && <NavLink className="chip-button all-formats" to="/home">All Formats</NavLink>}
+          {triace && <nav aria-label="Main navigation" className="tabs">
             <NavLink to="/triace" end><Icon name="rules" /><span>Rules</span></NavLink>
             {accepted
               ? <NavLink to="/register"><Icon name="register" /><span>Register</span></NavLink>
@@ -80,18 +90,25 @@ function Layout() {
             <NavLink to="/rankings"><Icon name="ladder" /><span>Rankings</span></NavLink>
             <NavLink to="/champions"><Icon name="trophy" /><span>Champions</span></NavLink>
             <NavLink className="admin-tab" to={user?.admin ? '/admin' : '/admin/login'}><Icon name="shield" /><span>Admin</span></NavLink>
-          </nav>
+          </nav>}
+          {module === 'ladder' && <nav aria-label="Ladder navigation" className="tabs">
+            <NavLink to="/ladder" end><Icon name="ladder" /><span>Ladder</span></NavLink>
+            <NavLink to="/ladder/matches"><Icon name="ball" /><span>Matches</span></NavLink>
+            <NavLink to="/ladder/activity"><Icon name="bolt" /><span>Activity</span></NavLink>
+            <NavLink to="/ladder/rules"><Icon name="rules" /><span>Rules</span></NavLink>
+            {user?.admin && <NavLink to="/ladder/organizer"><Icon name="shield" /><span>Organizer</span></NavLink>}
+          </nav>}
           <div className="topbar-actions">
             <StatusPill mode={service.mode} connected={connected} online={online} />
-            <NavLink className="chip-button admin-chip" to={user?.admin ? '/admin' : '/admin/login'} aria-label="Admin"><Icon name="shield" size={16} /></NavLink>
-            {!user?.admin && <NavLink className="chip-button" to="/captain" aria-label={user?.captain ? 'My team' : 'Captain sign in'}><Icon name="user" size={16} /><span>{user?.captain ? 'My team' : 'Captain'}</span></NavLink>}
+            {triace && <NavLink className="chip-button admin-chip" to={user?.admin ? '/admin' : '/admin/login'} aria-label="Admin"><Icon name="shield" size={16} /></NavLink>}
+            {!user?.admin && (triace || !user?.captain) && <NavLink className="chip-button" to="/captain" aria-label={triace ? (user?.captain ? 'My team' : 'Captain sign in') : 'Sign in'}><Icon name="user" size={16} /><span>{triace ? (user?.captain ? 'My team' : 'Captain') : 'Sign in'}</span></NavLink>}
             {canInstall && <button type="button" className="chip-button" aria-label="Install app" onClick={install}><Icon name="download" size={16} /><span>Install app</span></button>}
             {(user?.admin || user?.captain) && <button type="button" className="chip-button" aria-label="Sign out" disabled={loggingOut} onClick={logout}><Icon name="logout" size={16} /><span>{loggingOut ? 'Signing out…' : 'Sign out'}</span></button>}
           </div>
         </div>
       </header>
 
-      <EarlyBirdBar />
+      {triace && <EarlyBirdBar />}
       <main>
         {!online && <p className="banner offline" role="status"><Icon name="wifiOff" size={16} /> You’re offline. Saved pages still work; reconnect before registering.</p>}
         {savedAt && <p className="banner offline" role="status"><Icon name="wifiOff" size={16} /> Showing data saved {new Date(savedAt).toLocaleString()}. It refreshes as soon as a connection is available.</p>}
@@ -108,9 +125,19 @@ function Layout() {
         <Suspense fallback={<div className="page-loading" aria-busy="true"><span className="spinner" /> Loading…</div>}>
           <Routes>
             <Route path="/" element={<Navigate to="/home" replace />} />
-            <Route path="/home" element={<Home />} />
+            {/* Player Home and the Ladder share the ladder's data provider; TRIACE pages never load ladder data. */}
+            <Route element={<LadderProvider><Outlet /></LadderProvider>}>
+              <Route path="/home" element={<PlayerHome />} />
+              <Route path="/ladder" element={<LadderLayout />}>
+                <Route index element={<LadderStandings />} />
+                <Route path="matches" element={<LadderMatches />} />
+                <Route path="activity" element={<LadderActivity />} />
+                <Route path="rules" element={<LadderRules />} />
+                <Route path="organizer" element={<LadderOrganizer />} />
+              </Route>
+            </Route>
+            {MODULES.filter(m => m.status === 'soon').map(m => <Route key={m.id} path={m.path} element={<ComingSoon name={m.name} />} />)}
             <Route path="/triace" element={<Rules />} />
-            <Route path="/ladder" element={<SinglesLadder />} />
             <Route path="/register" element={accepted ? <Register /> : <Navigate to="/triace" replace />} />
             <Route path="/tiers" element={<Tiers />} />
             <Route path="/league" element={<League />} />

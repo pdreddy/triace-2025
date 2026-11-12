@@ -1,4 +1,4 @@
-import { applySinglesLadder } from './lib/singlesLadder.js';
+import { applyLadder, isKey as isLadderKey } from './lib/singlesLadder/engine.js';
 import { initializeApp } from 'firebase-admin/app';
 import { getDatabase } from 'firebase-admin/database';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
@@ -40,10 +40,10 @@ async function requireAdmin(request) {
 }
 // `operation(state, { now })`: the time (and any random id the caller made beforehand) is fixed once per request, so every
 // retry of the transaction computes exactly the same result from the same inputs.
-async function mutate(operation) {
+async function mutate(operation, path = paths.root) {
   let outcome, updateError, attempts = 0, rootBytes = 0;
   const startedAt = Date.now(), ctx = { now: startedAt };
-  const root = getDatabase().ref(paths.root);
+  const root = getDatabase().ref(path);
   let listener;
   try {
     // Keep a value listener alive so the transaction starts with authoritative
@@ -263,23 +263,42 @@ export const backupNow = onCall(options, async request => {
   }
 });
 
-// Singles Ladder uses the same Firebase app, current admin check and atomic tournament mutation.
-export const singlesLadderAction = onCall(options, async request => {
+// ---------- Singles Ladder ----------
+// One callable for every ladder change. It reuses the same sign-in, the same current-admin check and the same atomic
+// transaction as the tournament, but the transaction covers only the `ladder` node, so ladder play and TRIACE never
+// contend. The policy is functions/lib/singlesLadder/engine.js; the browser supplies no names, UTRs, roles or time.
+const LADDER_PATH = `${paths.root}/ladder`;
+const ladderMutate = (payload, actor, id) => mutate((state, { now }) => { const out = applyLadder(state, payload, actor, { now, id }); return { state: JSON.parse(JSON.stringify(out.state)), result: out.result }; }, LADDER_PATH);
+const pprcUtr = player => (Number.isFinite(player?.seed?.singles) && player.seed.singles >= 0 && player.seed.singles <= 16.5 ? player.seed.singles : null);
+export const ladderAction = onCall(options, async request => {
   requireAuth(request);
   if (request.auth.token.firebase?.sign_in_provider === 'anonymous') throw new HttpsError('permission-denied', 'Sign in with your player account.');
-  const admin = await currentAdmin(request), payload = { ...request.data };
-  if (['enroll', 'link'].includes(payload.action)) {
-    if (!admin) throw new HttpsError('permission-denied', 'Organizer access required.');
-    if (typeof payload.playerId !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(payload.playerId)) throw new HttpsError('invalid-argument', 'Invalid player ID.');
-    const player = (await getDatabase().ref(`pprcMaster/players/${payload.playerId}`).get()).val();
-    if (!player || player.mergedInto || player.retired) throw new HttpsError('failed-precondition', 'Choose a current canonical PPRC player.');
-    payload.name = player.name || player.displayName || payload.playerId;
-    if (payload.action === 'link') {
-      if (typeof payload.uid !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(payload.uid)) throw new HttpsError('invalid-argument', 'Invalid account UID.');
+  const admin = await currentAdmin(request), data = request.data;
+  const payload = data && typeof data === 'object' && !Array.isArray(data) ? { ...data } : {};
+  // Facts the server looks up itself, for organizers only: the canonical PPRC player, and the sign-in account being linked.
+  if (['enroll', 'syncPlayers', 'link'].includes(payload.action)) {
+    if (!admin) throw new HttpsError('permission-denied', 'Organizer access is required.');
+    const db = getDatabase();
+    if (payload.action === 'enroll') {
+      if (!isLadderKey(payload.playerId)) throw new HttpsError('invalid-argument', 'Choose a player.');
+      const player = (await db.ref(`pprcMaster/players/${payload.playerId}`).get()).val();
+      if (!player?.name || player.mergedInto || player.retired) throw new HttpsError('failed-precondition', 'Choose a current player from the PPRC list.');
+      payload.name = player.name; payload.utr = pprcUtr(player);
+    } else if (payload.action === 'syncPlayers') {
+      if (!isLadderKey(payload.seasonId)) throw new HttpsError('invalid-argument', 'Choose a season.');
+      const ids = Object.keys((await db.ref(`${LADDER_PATH}/public/${payload.seasonId}/players`).get()).val() || {});
+      const records = await Promise.all(ids.map(async id => (await db.ref(`pprcMaster/players/${id}`).get()).val()));
+      payload.players = Object.fromEntries(ids.map((id, i) => [id, records[i] ? { name: records[i].name, utr: pprcUtr(records[i]) } : null]).filter(([, value]) => value));
+    } else {
+      if (!isLadderKey(payload.uid)) throw new HttpsError('invalid-argument', 'Choose a sign-in account.');
       const account = await getAuth().getUser(payload.uid).catch(() => null);
-      if (!account || account.disabled || !account.providerData.length) throw new HttpsError('failed-precondition', 'Choose an existing enabled sign-in account.');
+      if (!account || account.disabled || !account.providerData.length) throw new HttpsError('failed-precondition', 'Choose an existing, enabled sign-in account.');
     }
   }
-  const id = newId(), now = Date.now();
-  return mutate(state => applySinglesLadder(state, payload, { uid: request.auth.uid, admin }, now, id));
+  return ladderMutate(payload, { uid: request.auth.uid, admin }, newId());
+});
+// Hourly: unanswered challenges and inactivity, for every running season, exactly as the season's rules say.
+export const ladderSweep = onSchedule({ schedule: 'every 60 minutes', region: 'us-central1', timeoutSeconds: 120, maxInstances: 1 }, async () => {
+  const seasons = (await getDatabase().ref(`${LADDER_PATH}/index/seasons`).get()).val() || {};
+  for (const [seasonId, season] of Object.entries(seasons)) if (season.status === 'active') await ladderMutate({ action: 'sweep', seasonId }, { uid: 'system', system: true }, newId());
 });

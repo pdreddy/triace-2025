@@ -67,12 +67,31 @@
           ".read": "auth != null && auth.uid === $uid"
         }
       },
-      "singlesLadder": {
-        ".read": true
-      },
-      "ladderAccounts": {
-        "$uid": {
-          ".read": "auth != null && auth.uid === $uid"
+      "ladder": {
+        "index": {
+          ".read": true
+        },
+        "public": {
+          ".read": true
+        },
+        "accounts": {
+          "$uid": {
+            ".read": "auth != null && auth.uid === $uid"
+          }
+        },
+        "private": {
+          "$seasonId": {
+            "requests": {
+              "$playerId": {
+                ".read": "auth != null && data.parent().parent().parent().parent().child('accounts').child(auth.uid).val() === $playerId"
+              }
+            },
+            "notifications": {
+              "$playerId": {
+                ".read": "auth != null && data.parent().parent().parent().parent().child('accounts').child(auth.uid).val() === $playerId"
+              }
+            }
+          }
         }
       },
       "season1": {

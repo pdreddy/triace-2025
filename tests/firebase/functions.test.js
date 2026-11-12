@@ -50,38 +50,75 @@ test('health diagnostics require no login and leave tournament data and Auth use
  assert.deepEqual((await auth.listUsers()).users.map(user => user.uid).sort(), users);
 });
 
-test('Ladder callable verifies canonical identity and protects organizer actions', async () => {
-  await database.ref('pprcMaster/players/ladder_test_p1').set({ id:'ladder_test_p1',name:'Test Player' });
-  assert.equal((await call('singlesLadderAction',{action:'enroll',playerId:'ladder_test_p1'},null)).status,401);
-  assert.equal((await call('singlesLadderAction',{action:'enroll',playerId:'ladder_test_p1'})).status,403);
-  assert.notEqual((await call('singlesLadderAction',{action:'enroll',playerId:'absent'},adminToken)).status,200);
-  const result=await call('singlesLadderAction',{action:'enroll',playerId:'ladder_test_p1',name:'Forged Name'},adminToken);
-  assert.equal(result.status,200);
-  assert.equal((await database.ref('traice2_0/singlesLadder/entries/ladder_test_p1/name').get()).val(),'Test Player');
-  assert.notEqual((await call('singlesLadderAction',{action:'link',playerId:'ladder_test_p1',uid:'missing_account'},adminToken)).status,200);
-  assert.notEqual((await call('singlesLadderAction',{action:'challenge',opponentId:'ladder_test_p1'})).status,200);
-});
-
-test('Ladder concurrent requests allow one active challenge and confirm standings atomically', async () => {
-  const playerUid=(await auth.verifyIdToken(guestToken)).uid, organizerUid=(await auth.verifyIdToken(adminToken)).uid;
-  const action=(data,bearer=adminToken)=>call('singlesLadderAction',data,bearer);
-  for (const [playerId, uid] of [['ladder_flow_one',organizerUid],['ladder_flow_two',playerUid]]) {
-    await database.ref(`pprcMaster/players/${playerId}`).set({id:playerId,name:playerId});
-    assert.equal((await action({action:'enroll',playerId})).status,200);
-    assert.equal((await action({action:'link',playerId,uid})).status,200);
+// ---------- Singles Ladder ----------
+const ladder = (data, bearer = adminToken) => call('ladderAction', data, bearer);
+const ladderNode = async path => (await database.ref(`traice2_0/ladder/${path}`).get()).val();
+async function ladderSeason(players) {
+  assert.equal((await ladder({ action: 'createSeason', seasonId: 's1', name: 'Emulator season' })).status, 200);
+  for (const [playerId, uid, utr] of players) {
+    await database.ref(`pprcMaster/players/${playerId}`).set({ name: `Name ${playerId}`, seed: { singles: utr, doubles: utr } });
+    assert.equal((await ladder({ action: 'enroll', seasonId: 's1', playerId })).status, 200);
+    if (uid) assert.equal((await ladder({ action: 'link', uid, playerId })).status, 200);
   }
-  assert.equal((await action({action:'open'})).status,200);
-  const requests=await Promise.all([action({action:'challenge',opponentId:'ladder_flow_one'},guestToken),action({action:'challenge',opponentId:'ladder_flow_one'},guestToken)]);
-  assert.equal(requests.filter(r=>r.status===200).length,1);
-  const challengeId=requests.find(r=>r.status===200).result.id;
-  assert.equal((await action({action:'respond',challengeId,accept:true})).status,200);
-  assert.equal((await action({action:'submit',challengeId,winnerId:'ladder_flow_two',score:'6-4 6-3'},guestToken)).status,200);
-  assert.notEqual((await action({action:'confirm',challengeId},guestToken)).status,200);
-  assert.equal((await action({action:'confirm',challengeId})).status,200);
-  assert.notEqual((await action({action:'confirm',challengeId})).status,200);
-  const ladder=(await database.ref('traice2_0/singlesLadder').get()).val();
-  assert.equal(ladder.entries.ladder_flow_two.rank,1);
-  assert.equal(ladder.entries.ladder_flow_two.points,5);
-  assert.equal(ladder.entries.ladder_flow_one.points,1);
-  assert.equal(ladder.challenges[challengeId].status,'confirmed');
+}
+test('Ladder: organizer actions need the current admin; names and UTRs come from the PPRC list, never the request', async () => {
+  await database.ref('pprcMaster/players/ladder_p1').set({ name: 'Real Name', seed: { singles: 6.4, doubles: 6 } });
+  assert.equal((await ladder({ action: 'createSeason', seasonId: 's1', name: 'Forged' }, null)).status, 401);
+  assert.notEqual((await ladder({ action: 'createSeason', seasonId: 's1', name: 'Forged' }, guestToken)).status, 200);
+  assert.equal(await ladderNode('index'), null);
+  assert.equal((await ladder({ action: 'createSeason', seasonId: 's1', name: 'Emulator season' })).status, 200);
+  assert.equal((await ladder({ action: 'enroll', seasonId: 's1', playerId: 'ladder_p1' }, guestToken)).status, 403);
+  assert.notEqual((await ladder({ action: 'enroll', seasonId: 's1', playerId: 'not_in_pprc' })).status, 200);
+  assert.equal((await ladder({ action: 'enroll', seasonId: 's1', playerId: 'ladder_p1', name: 'Forged Name', utr: 16, rank: 1, points: 99 })).status, 200);
+  assert.deepEqual(await ladderNode('public/s1/players/ladder_p1'), { name: 'Real Name', utr: 6.4, rank: 1, points: 0, streak: 0, wins: 0, losses: 0, eligible: true, joinedAt: (await ladderNode('public/s1/players/ladder_p1/joinedAt')) });
+  assert.notEqual((await ladder({ action: 'link', uid: 'missing_account', playerId: 'ladder_p1' })).status, 200);
+  assert.equal((await ladder({ action: 'link', uid: 'x', playerId: 'ladder_p1' }, guestToken)).status, 403);
+  // Rules: only organizers, validated on the server, versioned and audited; the stored rules are never replaced by defaults.
+  const rules = await ladderNode('public/s1/rules');
+  assert.equal(rules.version, 1);
+  const values = structuredClone(rules.values); values.points.win = 7;
+  assert.notEqual((await ladder({ action: 'saveRules', seasonId: 's1', values, baseVersion: 1, reason: 'forged' }, guestToken)).status, 200);
+  const invalid = structuredClone(values); invalid.points.loss = 9;
+  assert.notEqual((await ladder({ action: 'saveRules', seasonId: 's1', values: invalid, baseVersion: 1, reason: 'invalid combination' })).status, 200);
+  assert.equal((await ladder({ action: 'saveRules', seasonId: 's1', values, baseVersion: 1, reason: 'committee vote' })).status, 200);
+  assert.deepEqual([(await ladderNode('public/s1/rules')).version, (await ladderNode('public/s1/rules/values/points/win')), (await ladderNode('public/s1/rulesHistory/v1/values/points/win'))], [2, 7, 3]);
+  const audit = Object.values(await ladderNode('audit')).filter(a => a.action === 'saveRules');
+  assert.equal(audit.length, 1);
+  assert.deepEqual([audit[0].reason, audit[0].before.points_win, audit[0].after.points_win, audit[0].actor.uid], ['committee vote', 3, 7, (await auth.verifyIdToken(adminToken)).uid]);
+});
+test('Ladder: concurrent challenges create exactly one; ownership is the linked sign-in; scores are confirmed once', async () => {
+  const playerUid = (await auth.verifyIdToken(guestToken)).uid, organizerUid = (await auth.verifyIdToken(adminToken)).uid, strangerToken = await token();
+  await ladderSeason([['ladder_one', organizerUid, 7], ['ladder_two', playerUid, 6.5], ['ladder_three', null, 6]]);
+  // Not active yet, then an unlinked account, then an anonymous-style stranger.
+  assert.notEqual((await ladder({ action: 'challenge', seasonId: 's1', opponentId: 'ladder_one' }, guestToken)).status, 200);
+  assert.equal((await ladder({ action: 'setStatus', seasonId: 's1', status: 'active', reason: 'open the season' })).status, 200);
+  assert.notEqual((await ladder({ action: 'challenge', seasonId: 's1', opponentId: 'ladder_one' }, strangerToken)).status, 200);
+  // Five simultaneous requests, to two different opponents: the transaction lets exactly one through.
+  const burst = await Promise.all([1, 2, 3, 4, 5].map(i => ladder({ action: 'challenge', seasonId: 's1', opponentId: i % 2 ? 'ladder_one' : 'ladder_three', playerId: 'ladder_one', challengerId: 'ladder_one' }, guestToken)));
+  assert.equal(burst.filter(r => r.status === 200).length, 1);
+  const challenges = await ladderNode('public/s1/challenges');
+  assert.equal(Object.keys(challenges).length, 1);
+  const [challengeId, challenge] = Object.entries(challenges)[0];
+  assert.equal(challenge.challengerId, 'ladder_two');                       // the sign-in decides who is challenging
+  assert.deepEqual([challenge.rules.version, challenge.rules.values.points.win], [1, 3]);
+  if (challenge.opponentId !== 'ladder_one') return;                        // the other opponent won the race: nothing more to play here
+  // A retried request (same opId) is applied once.
+  const accept = { action: 'respond', seasonId: 's1', challengeId, accept: true, opId: 'retry-accept-1' };
+  assert.equal((await ladder(accept)).status, 200);
+  const retried = await ladder(accept);
+  assert.deepEqual([retried.status, retried.result.duplicate], [200, true]);
+  assert.notEqual((await ladder({ action: 'submit', seasonId: 's1', challengeId, winnerId: 'ladder_two', score: '6-4 6-3' }, strangerToken)).status, 200);
+  assert.equal((await ladder({ action: 'submit', seasonId: 's1', challengeId, winnerId: 'ladder_two', score: '6-4 6-3' }, guestToken)).status, 200);
+  assert.notEqual((await ladder({ action: 'confirm', seasonId: 's1', challengeId }, guestToken)).status, 200);   // not your own report
+  const confirms = await Promise.all([1, 2, 3].map(() => ladder({ action: 'confirm', seasonId: 's1', challengeId })));
+  assert.equal(confirms.filter(r => r.status === 200).length, 1);
+  const season = await ladderNode('public/s1');
+  assert.deepEqual([season.players.ladder_two.rank, season.players.ladder_two.points, season.players.ladder_one.rank, season.players.ladder_one.points], [1, 4, 2, 1]);
+  assert.equal(season.challenges[challengeId].status, 'completed');
+  assert.equal(Object.keys(season.points).length, 3);
+  // Frozen: players are stopped on the server.
+  assert.equal((await ladder({ action: 'setStatus', seasonId: 's1', status: 'frozen', reason: 'final review' })).status, 200);
+  assert.notEqual((await ladder({ action: 'challenge', seasonId: 's1', opponentId: 'ladder_three' }, guestToken)).status, 200);
+  // TRIACE data is untouched by ladder transactions.
+  assert.deepEqual((await database.ref('traice2_0/settings').get()).val(), initialState().settings);
 });

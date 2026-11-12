@@ -1,63 +1,199 @@
-# Player Home and Singles Ladder
+# PPRC Player Home and Singles Ladder
 
-The root `/` redirects to Player Home at `/home` for all visitors; `/triace` opens the existing TRIACE rules and all prior TRIACE routes remain available. Successful captain and admin sign-in opens Player Home. All Formats stays in the main navigation. PO and KOC are visibly Coming Soon.
+One app, several formats. `/home` is Player Home; TRIACE 2.0 and the Singles Ladder are active; PO and KOC are reserved
+(`/po`, `/koc` show Coming Soon). The Ladder runs on the existing React + Firebase architecture: the reference under
+`reference/ladder/` (a FastAPI stub) was used for behaviour only and is not installed or run.
 
-## Architecture and identity
+## Routes
 
-This implementation adapts the policy in `reference/ladder/backend/app/rules.py` to the existing React/Firebase architecture. It does not install or run the reference Python application, whose API endpoints are largely placeholders. No frontend design files were supplied under the reference directory.
+| URL | What it is |
+| --- | --- |
+| `/` → `/home` | Player Home: a card per format. Captain and admin sign-in land here. |
+| `/triace` and every earlier TRIACE URL (`/register`, `/tiers`, `/league`, `/team/:id`, `/players`, `/partners`, `/rankings`, `/champions`, `/history`, `/pprc`, `/captain`, `/admin`, `/admin/login`, `/status`) | TRIACE, unchanged, with its own brand and tabs |
+| `/ladder` | Standings, your card, your next move |
+| `/ladder/matches` | Your active challenges, your history, latest results |
+| `/ladder/activity` | Points breakdown, notifications, exemption requests |
+| `/ladder/rules` | Rules, written from the season's configuration |
+| `/ladder/organizer` | Organizer dashboard (admins only; enforced on the server) |
+| `/po`, `/koc` | Reserved, Coming Soon |
 
-UI: `src/pages/Home.jsx`, `src/pages/SinglesLadder.jsx`. Subscription/action state: `src/hooks/useSinglesLadder.js`. Firebase transport: existing `src/services/firebase.js`. Server business policy: `functions/lib/singlesLadder.js`. Callable entry point: `singlesLadderAction` in `functions/index.js`.
+"All Formats" is in the header of every TRIACE and Ladder page. Netlify (`netlify.toml`) and Firebase Hosting
+(`firebase.json`) already rewrite every path to `index.html`, so direct URLs and refreshes work.
 
-The configured tournament root contains `singlesLadder/{status,rules,entries,challenges,audit}` and private `ladderAccounts/{firebaseUid}: canonicalPprcPlayerId`. Enrollment resolves names from existing `pprcMaster/players`; clients cannot choose authoritative names or ranks. Organizers verify account ownership outside the app and explicitly link an existing enabled Firebase sign-in account. A captain's ability to edit multiple team members does not grant those members' Ladder identities. Links are one account per player and are never inferred by spelling. Players can copy their own UID from the dashboard. Existing captain usernames/passwords and admin detection are reused; no account creation or password copying occurs in Ladder.
+## Where the code is
 
-Public Ladder data contains names, canonical IDs, results, standings and audit entries. Account UIDs stay in the separate private mapping. Do not enter private medical/contact information in organizer decision reasons: audit reasons are public. Direct writes to both nodes are denied even for admin clients. The callable checks the current Firebase admin account through existing `currentAdmin`, rejects anonymous sign-ins and runs mutations in the existing root transaction. IDs and request time are fixed before transaction retries. Confirmed results cannot be applied again. No production data has been read or changed by this implementation.
-
-## Policy and assumptions
-
-- One current season is supported at the configured root. Start in draft, enroll canonical players, link verified accounts, then open. Closed seasons are immutable; export the JSON with audit history before any future season migration. Multi-season archival is future work.
-- Initial ranks follow organizer enrollment order. Organizers may adjust rank or approve up to 90-day exemptions with a reason while no match is active. Rank changes shift intervening players to preserve unique contiguous positions.
-- Top three players may challenge within three ranks in either direction. Others challenge up three ranks; two consecutive wins unlock any higher rank. Both players must be available and not exempt. Rematches require 14 days, measured from completion (creation for an unfinished challenge).
-- Players have 48 hours to respond. Overdue pending challenges can explicitly be expired by a participant or organizer; no background job or automatic punishment is assumed. First decline is free; each subsequent decline costs two points and drops one position when possible. Declines are season cumulative.
-- Challenge creation snapshots rules and initial ranks. The match deadline is the end of the current Chicago Sunday, including DST. A challenge near Sunday may have a response window beyond its play deadline; organizer-approved extensions handle this case. Extensions require a participant request and organizer approval, at most 14 days beyond the original deadline.
-- Scores are best of three, entered from the challenger's side, including an optional deciding match tiebreak such as `6-4 3-6 10-8`. The selected winner must agree with the score. The submitting player cannot confirm their own result. Disputes freeze points until an organizer selects a winner and records a reason. Walkovers and retirements require organizer cancellation/rank decisions; they are not recorded as played scores.
-- Confirmation awards three winner points, one challenge/defense bonus and one upset bonus if the winner started below the opponent; late submission loses bonuses. Loser receives one point. Only an upward challenger victory moves the winner into the opponent's rank, shifting intervening players down. A defending winner keeps position. Two-week inactivity is displayed, with no automatic demotion assumed.
-- Results remain independent of historical PPRC rating imports. This change does not feed unreviewed live Ladder results into the master rating calculation.
-
-## Local testing
-
-Navigation only, without Firebase:
-
-```sh
-npm run demo
-# Open the URL Vite prints, then /home, /triace and /ladder.
+```
+src/features/modules.js            the list of formats (add a format: one entry + its routes)
+src/features/home/                 Player Home, Coming Soon
+src/features/triace/summary.js     what the Home card shows about a captain's team (TRIACE pages stay in src/pages)
+src/features/ladder/               LadderContext (data access), selectors (pure), pages, organizer, rules settings
+src/services/firebase.js|demo.js   subscribeLadder(path) and ladderAction(payload): the only two ladder calls
+functions/lib/singlesLadder/
+  config.js                        every business rule: type, limits, INITIAL default, help text, validation, Rules-page text
+  time.js                          deadlines in the season timezone (DST-safe); storage is UTC
+  engine.js                        applyLadder(state, payload, actor, ctx): all policy, pure, transaction-safe
+functions/index.js                 ladderAction (callable) and ladderSweep (hourly)
+scripts/ladder-setup.mjs           create a draft season from the real Ladder 2026 roster (dry run by default)
+scripts/ladder-dev-fixtures.mjs    DEVELOPMENT ONLY roster for the local demo, emulators and tests
 ```
 
-Demo mode previews navigation; match operations require Firebase emulators. The dashboard explicitly reports this limitation in demo mode.
+Components call `useLadder()`/`act()`; they never touch database paths. The UI and the backend import the same
+`config.js`, so a rule value exists in exactly one place. TRIACE pages were not moved: relocating them would have
+changed dozens of files for no behaviour change.
 
-Full local Ladder, using the existing emulator configuration and a `demo-` project only:
+## Firebase schema (new, additive)
 
-```sh
-# Terminal 1 (requires Java and installed functions dependencies)
-npm run emulators
+Everything is under `<root>/ladder` (`<root>` is `VITE_DB_ROOT` / `TRAICE_DB_ROOT`, default `traice2_0`).
 
-# Terminal 2
-TRAICE_ADMIN_PASSWORD=local-testing-password npm run seed:emulators
-node scripts/seed-ladder-emulators.mjs
-npm run dev:emulators
+```
+ladder/
+  index/      current, seasons/<seasonId> { name, status: draft|active|frozen|closed, createdAt, activatedAt, closedAt }   public
+  public/<seasonId>/                                                                                                    public
+    rules            { schema, version, values, updatedAt }          the season's current configuration
+    rulesHistory/v<N> { ...rules, actor, reason }                    every version ever saved
+    players/<pprcPlayerId>   { name, utr, rank, points, streak, wins, losses, eligible, joinedAt, lastActiveAt, exemptFrom, exemptUntil, ... }
+    challenges/<id>  { challengerId, opponentId, status, createdAt, respondBy, acceptedAt, deadline, extensionUntil,
+                       ranks {challenger, opponent}, rules { version, values }   <- the snapshot used to judge it
+                       result { winnerId, score, kind, submittedBy, submittedAt }, outcome { late, extended, moved, bonuses, points, ranksBefore, ranksAfter } }
+    points/<id>      { playerId, amount, type, at, challengeId, rulesVersion, note }   the points ledger
+    penalties/<id>   { type: decline|inactivity, playerId, positions, status: pending|applied|waived, rulesVersion, policy {...} }
+  private/<seasonId>/
+    requests/<playerId>/<id>        exemption / extension requests with the player's reason    that player + admins
+    notifications/<playerId>/<id>                                                               that player + admins
+  accounts/<firebaseUid> = pprcPlayerId     identity links                                      that account + admins
+  audit/<id>  { at (UTC ms), seasonId, action, actor { role, uid, playerId }, reason, target, before, after, rankChanges }   admins only
+  ops/<opId>  request ids already applied (pruned after 7 days)                                 nobody
 ```
 
-Open the Vite URL at `/captain`. Sign in as `ladder4` with password `ladder1234`; challenge `Demo Player 2`. In a separate browser profile sign in as `ladder2`, accept, then submit or confirm a result. Switch back to the other player to confirm; check standings and the audit export. Admin login is `reddi2026` with the password you selected above; Player Home links to TRIACE administration and the Ladder dashboard reveals organizer controls. The Ladder seed refuses to replace an existing local ladder, preserves other tournament state and hardcodes loopback emulators and `demo-traice-2`. Newly created player passwords are local fixtures only.
+Timestamps are UTC milliseconds. Player ids are the existing `pprcMaster/players` ids, so a person is the same person
+in TRIACE, the PPRC ratings and the Ladder. Nothing existing is renamed, moved or rewritten.
 
-Checks:
+### Migration plan (non-disruptive)
+
+1. Deploy the Cloud Functions (`ladderAction`, `ladderSweep`) and the merged database rules. No existing node changes;
+   `ladder` simply does not exist until an organizer creates a season, and the UI says "No ladder season yet".
+2. Create the season: either in `/ladder/organizer`, or from the real roster:
+   `node scripts/ladder-setup.mjs --database-url <url>` (read-only plan), then add `--write`. It matches the 62 players
+   of `scripts/migration/ladder-2026.psv` through `pprcMaster/nameIndex`, seeds by PPRC singles UTR, lists anyone it
+   could not match, writes only under `<root>/ladder`, and leaves the season a draft.
+3. Review Rules settings, link each player's sign-in, then Open season.
+4. Rollback is deleting nothing: unpublish the routes or leave the season in draft. TRIACE data is never touched (the
+   ladder transaction is scoped to the `ladder` node).
+
+An earlier commit on this branch used `<root>/singlesLadder` and `<root>/ladderAccounts`. I could not check whether
+that version was ever deployed. If either node exists in your database, this version ignores it and does not modify
+it, and the generated rules no longer make it readable; tell me and I will add an import step.
+
+## Identity
+
+Sign-in is the existing Firebase Email/Password accounts (captain logins and admin accounts); the Ladder creates no
+accounts. An organizer links one sign-in to one PPRC player (`ladder/accounts/<uid>`), after confirming with the person;
+the player reads their account ID on `/ladder` to pass on. A matching name never grants anything, and a captain's
+ability to edit a TRIACE team does not make them that team's players on the Ladder. Every player action is checked
+against this link inside the transaction.
+
+**Gap to know about:** TRIACE has logins for captains only. Ladder players who are not captains have no sign-in yet.
+Creating player logins (who issues them, how they are delivered) is a decision for you; until then such players can be
+enrolled and ranked, and an organizer records their results from the dashboard.
+
+## Rules configuration and versioning
+
+`config.js` defines 13 groups (challenge range, top players, win streak, rematches, responding, deadline, position
+changes, late results, extensions, points, declines, inactivity, no-shows). `DEFAULT_RULES` are the initial defaults
+and are only used when a season is created; an existing season's rules are never replaced by them.
+
+- **Typed and validated**: every field has a type and limits; unknown or missing fields are refused; contradictory
+  combinations are refused (for example a streak that unlocks no more than the normal range, a loss worth more than a
+  win, a position drop triggered by a decline that is still free, an inactivity period shorter than the response window).
+- **Organizers only**, checked on the server; the settings screen shows help for each rule, validates as you type with
+  the same function, and previews the before/after table and the Rules-page sentences that will change. A reason is required.
+- **Versioned and audited**: each save is `version + 1`, kept in `rulesHistory`, and audited with actor, UTC time,
+  reason and before/after values. Two organizers editing at once: the second is refused and asked to reload.
+- **Snapshots**: every challenge stores the rules version and values in force when it was sent, and is judged by that
+  snapshot until it ends. Completed results keep it. Each ledger line and each penalty records the rules version (a
+  penalty also stores the policy values used). A rule change applies to new challenges only; nothing already recorded
+  is ever recalculated.
+- **Not configurable**: authentication, organizer authorization, ownership checks, audit logging and data-integrity
+  checks. They are code, not settings.
+
+### Defaults that needed a decision (all changeable in Rules settings unless noted)
+
+| Question | Default chosen |
+| --- | --- |
+| "One active challenge": sent, received, or both? | Both count (`challenge.activeLimit` = 1) |
+| When is the deadline set? | On acceptance: the next Sunday 23:59 season time, even if that is tomorrow (`deadline.minDays` = 0) |
+| What makes a result late? | The time the score was first reported, not when it was confirmed (fixed) |
+| Unanswered challenge | Lapses with no penalty (`response.onExpire` = void; can count as a decline or a walkover) |
+| "Swap" | The two players exchange positions (`swap.mode`; alternative: winner takes the place, others shift down) |
+| Lower-ranked player beats a downward challenge | Keeps position, earns defense + upset bonus (`swap.lowerDefenderWin`) |
+| Upset bonus | By positions when the challenge was sent; the swap uses positions at confirmation (fixed) |
+| Rematch cooldown | Also after a declined or lapsed challenge (`rematch.afterUnplayed`) |
+| Decline and inactivity position drops ("can trigger") | Raised for an organizer to apply or waive (`*.review`; can be automatic). The 2-point deduction is immediate |
+| After a decline drop | The decline count starts again (`decline.resetAfterDrop`) |
+| Inactivity clock | From the last completed match, joining, season opening, the end of an exemption, or the last inactivity decision |
+| No-show | Reported by the player who was there; an organizer decides (`noShow.requireOrganizer`). 0 points; walkover win 3, no bonuses, positions can change |
+| Walkover wins | Count towards a win streak (fixed) |
+| Frozen season | Players and automatic rules stop; organizers can still settle disputes and adjust. Closed is permanent |
+| Voiding a result | Reverses its points with new ledger lines; positions are moved back only by an explicit organizer adjustment (fixed) |
+
+## Security and authorization
+
+- **Database rules** (`database.rules.template.json` → `npm run rules:generate`): `ladder/index` and `ladder/public`
+  are world-readable; `accounts/<uid>` only by that account; `private/<season>/requests|notifications/<playerId>` only
+  by the account linked to that player; `audit`, all `private` and `accounts` by admins. There is no `.write` rule
+  anywhere: no client, admin included, can write ladder data. Merge these into the shared project's rules as
+  described in the README; never add a rule for `clubs/koc`.
+- **`ladderAction` callable**: requires a non-anonymous sign-in; resolves the admin role from the live account record
+  (the existing `currentAdmin`); looks up names and UTRs itself in `pprcMaster` (the request cannot supply them);
+  verifies a linked account exists and is enabled; then runs `applyLadder` in one transaction on `<root>/ladder`.
+  The engine checks the organizer role for every organizer action and the identity link for every player action.
+- **Atomic and retry-safe**: one transaction per action, so concurrent challenges, confirmations and position changes
+  are applied one after another against the latest state; the time and ids are fixed per request so a retried
+  transaction computes the same result; each request carries an `opId` and a repeated one is answered without being
+  applied twice; a result can only be confirmed once.
+- **Audit**: every action writes an entry; position changes are listed as `from → to` per player. Players' own request
+  reasons are private and never copied into the audit log or public data. Organizer reasons are visible to admins only.
+
+## Organizer guide
+
+Season: create (initial defaults or a copy of another season's rules), open, freeze, unfreeze, close; "Run time-based
+checks now" (also runs hourly). Players: enroll from the PPRC list, seed positions from UTR (before the first
+challenge), refresh names/UTRs from PPRC, move position, adjust points, eligibility, record activity, grant an
+exemption, link/unlink a sign-in. Matches: decide a result (played, walkover, no-show), extend a deadline, cancel,
+void. Requests: approve/deny exemptions and extensions, apply/waive penalties. Rules settings. Audit. Export
+(standings, players, matches, points as CSV; UTC times; no private reasons or account ids).
+
+## Local development
 
 ```sh
-npm test
-npm run build
-npm run rules:check
-npx playwright test tests/browser/player-home.spec.js
-npm run test:rules
+npm run demo            # no Firebase. Sign in at /admin/login, open /ladder/organizer, "Create demo season",
+                        # then "Sign in as Demo Player N" to act as a player.
 ```
 
-Do not run emulator tests against an emulator holding work you want to keep: existing integration tests clear test data. Start an isolated emulator when ports are occupied. Integration tests accept `FIREBASE_AUTH_EMULATOR_HOST`, `FIREBASE_DATABASE_EMULATOR_HOST` and `FIREBASE_FUNCTIONS_EMULATOR_HOST` for isolated ports. No deployment is part of local testing. New callables and database rules must eventually be reviewed and deployed together through the repository's existing deployment process before live Ladder operations can work.
+The demo server (`scripts/demo-plugin.mjs`) runs the same engine and applies the same read rules. Its players come
+from `scripts/ladder-dev-fixtures.mjs`, which nothing in `src/` or `functions/` imports: the live site has no demo
+roster and no fallback data. With no season, or when the database cannot be read, the UI says so.
 
-Verification for this change: 253 unit tests, 13 isolated Firebase callable/security tests and 2 Player Home navigation/login browser tests passed; production build and generated rules consistency passed. The full historical browser/PWA suite was not run.
+Emulators: `npm run emulators`, `npm run seed:emulators`, `node scripts/seed-ladder-emulators.mjs`, `npm run dev:emulators`.
+
+## Tests
+
+```sh
+npm test                                  # unit: tests/unit/ladder{Config,Engine,Selectors}.test.js and the rest
+npx playwright test tests/browser/ladder.spec.js tests/browser/player-home.spec.js
+npm run test:rules                        # emulators: callable authorization, concurrency, database rules
+npm run build && npm run rules:check
+```
+
+## What could not be verified from the development sandbox
+
+- **Live database**: the sandbox's network policy blocks `multiclub-890ea-default-rtdb.firebaseio.com`, so no live
+  path was read (and none written). Whether `pprcMaster/nameIndex` resolves all 62 Ladder 2026 names, and which of
+  them have a singles UTR on file, is shown by the read-only run of `scripts/ladder-setup.mjs`.
+- **Existing live ladder state**: the Ladder 2026 results in the repo are a group round-robin with playoffs, stored as
+  history under `pprcClubs/ladder`. There is no existing challenge-ladder season, ranking, points table or rules node
+  to connect to; the new season starts at 0 points, seeded by UTR.
+- **Player sign-ins** for non-captains (see Identity).
+- **Emulator suite** (`npm run test:rules`) could not run in the sandbox; run it locally or in CI before deploying.
+- **Deployment**: functions and rules are not deployed. Until they are, `/ladder` on the live site shows the
+  unavailable state.

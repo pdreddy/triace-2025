@@ -7,6 +7,8 @@ import { applyGenerateFixtures, applyGeneratePlayoffs, applySubmitResult, applyR
 import { adminEmail, validateAdminUsername, newAdminPassword, checkRemoval } from '../functions/lib/admins.js';
 import { newPassword, usernameAttempt, loginNames, captainUid, loginEmail, normalizePassword } from '../functions/lib/captainLogin.js';
 import { validateLegacySeason } from '../functions/lib/legacy.js';
+import { applyLadder } from '../functions/lib/singlesLadder/engine.js';
+import { DEMO_ROSTER, seedDemoLadder, demoUid } from './ladder-dev-fixtures.mjs';
 import { applyCreatePost, applyExpressInterest, applyClosePost, applyMarkPicked, applyReopenPost } from '../functions/lib/partners.js';
 const digest = value => createHash('sha256').update(value).digest();
 // Demo captain logins are kept in the demo state with a salted hash (never the password).
@@ -72,6 +74,13 @@ export function demoPlugin(env) {
           if (endpoint === '/my-registration') { const reg = state.registrations?.[url.searchParams.get('teamId')]; return reg && session && (session.admin || isOwner(reg, session.uid)) ? send(200, reg) : send(403, { error: 'Only this team’s captain can read it.' }); }
           if (endpoint === '/partner-mine') return send(200, session ? Object.fromEntries(Object.entries(state.partnerPrivate || {}).filter(([, secret]) => secret.ownerUid === session.uid)) : {});
           if (endpoint === '/my-teams') return send(200, session ? state.teamsByOwner?.[session.uid] || {} : {});
+          if (endpoint === '/ladder') {
+            // The same read rules as database.rules.template.json: index and public for everyone, own identity/requests/notifications, everything for organizers.
+            const parts = (url.searchParams.get('path') || '').split('/').filter(Boolean), ladder = state.ladder || {}, mine = session && ladder.accounts?.[session.uid];
+            const allowed = session?.admin || ['index', 'public'].includes(parts[0]) || (parts[0] === 'accounts' && parts.length === 2 && parts[1] === session?.uid) || (parts[0] === 'private' && ['requests', 'notifications'].includes(parts[2]) && parts.length >= 4 && mine && parts[3] === mine);
+            if (!allowed) return send(403, { error: 'You cannot read that ladder data.' });
+            return send(200, parts.reduce((node, key) => (node && typeof node === 'object' && Object.hasOwn(node, key) ? node[key] : null), ladder) ?? null);
+          }
           if (endpoint === '/registrations') return session?.admin ? send(200, state.registrations || {}) : send(403, { error: 'Administrator access is required.' });
           return send(404, { error: 'Unknown endpoint.' });
         }
@@ -118,6 +127,23 @@ export function demoPlugin(env) {
           return send(200, await mutate(current => ({ state: { ...current, season1: payload.season }, result: { path: 'demo state' } })));
         }
         const newId = () => randomBytes(10).toString('hex');
+        // Singles Ladder: the same engine the Cloud Function runs. Players come from the development roster, never from live data.
+        if (endpoint === '/ladder-action') {
+          if (!session || session.anonymous) return send(401, { error: 'Sign in with your player account.' });
+          const data = { ...payload };
+          if (admin && data.action === 'enroll') { const record = Object.hasOwn(DEMO_ROSTER, data.playerId) && DEMO_ROSTER[data.playerId]; if (!record) return send(400, { error: 'The local demo only knows its development roster: ladder_demo_1 to ladder_demo_12.' }); Object.assign(data, record); }
+          if (admin && data.action === 'syncPlayers') data.players = DEMO_ROSTER;
+          return send(200, await mutate(current => { const out = applyLadder(current.ladder, data, { uid: session.uid, admin }, { now: Date.now(), id: newId() }); return { state: { ...current, ladder: JSON.parse(JSON.stringify(out.state)) }, result: out.result }; }));
+        }
+        if (endpoint === '/ladder-demo-seed') {
+          if (!admin) return send(403, { error: 'Administrator access is required.' });
+          return send(200, await mutate(current => ({ state: { ...current, ladder: JSON.parse(JSON.stringify(seedDemoLadder(current.ladder, Date.now()))) }, result: { ok: true } })));
+        }
+        if (endpoint === '/ladder-demo-login') {
+          const uid = Object.hasOwn(DEMO_ROSTER, payload.playerId) ? demoUid(payload.playerId) : null;
+          if (!uid || state.ladder?.accounts?.[uid] !== payload.playerId) return send(400, { error: 'Seed the demo ladder first, then choose one of its players.' });
+          session = newSession(false, { uid, username: payload.playerId.replaceAll('_', '') }); return send(200, safeUser());
+        }
         if (endpoint === '/partner-post') return signedIn ? send(200, await mutate(current => applyCreatePost(current, payload, session.uid, Date.now(), newId()))) : send(401, { error: 'Open the page again, then retry.' });
         if (endpoint === '/partner-interest') return signedIn ? send(200, await mutate(current => applyExpressInterest(current, payload, session.uid, Date.now(), newId()))) : send(401, { error: 'Open the page again, then retry.' });
         if (endpoint === '/partner-picked') return signedIn ? send(200, await mutate(current => applyMarkPicked(current, payload, session.uid, admin))) : send(401, { error: 'Open the page again, then retry.' });
