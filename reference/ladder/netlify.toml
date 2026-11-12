@@ -1,0 +1,7 @@
+[build]
+  publish = "dist"
+
+[[redirects]]
+  from = "/api/*"
+  to = "https://YOUR-API-DOMAIN/:splat"
+  status = 200

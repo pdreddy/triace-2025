@@ -1,0 +1,3 @@
+"""Creates an explicit demo roster; production seeding must use an admin-only command."""
+NAMES=[('Maya Patel',6.72),('Ethan Chen',6.46),('Diego Morales',6.31),('Nate Williams',6.18),('Priya Shah',6.12),('Arjun Kumar',6.01),('Sofia Rossi',5.91),('Damodhara Palavali',5.84),('Vikram Singh',5.76),('Leah Martin',5.63),('Marcus Lee',5.52),('Aisha Rahman',5.44),('Kevin Tran',5.36),('Jordan Bell',5.25),('Anika Rao',5.13),('Tom Brooks',4.98)]
+DEFAULT_RULES={'max_upward_positions':3,'response_hours':48,'weekly_deadline_timezone':'America/Chicago','rematch_days':14,'inactivity_days':14,'decline_penalty':-2,'rank_drop_after_declines':2,'late_results_points_only':True}
