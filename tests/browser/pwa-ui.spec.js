@@ -60,7 +60,8 @@ test('signed in as admin with the install button showing, the top bar still fits
   await page.getByLabel('Username or email').fill('reddi2026');
   await page.getByLabel('Password', { exact: true }).fill('local-e2e-test-password');
   await page.getByRole('button', { name: 'Sign in ↗', exact: true }).click();
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(/\/home$/);   // sign-in lands on Player Home
+  await page.goto('/admin');
   await page.evaluate(() => window.dispatchEvent(new Event('beforeinstallprompt')));   // the browser offers to install the app
   await expect(page.getByRole('button', { name: 'Install app' })).toBeVisible();
   for (const width of [820, 900, 1024, 1100, 1180, 1280, 1366, 1440, 1536, 1600, 1700, 1920, 2560]) {

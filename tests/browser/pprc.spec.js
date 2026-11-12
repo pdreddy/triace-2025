@@ -121,7 +121,8 @@ async function login(page) {
   await page.getByLabel('Username or email').fill('reddi2026');
   await page.getByLabel('Password', { exact: true }).fill('local-e2e-test-password');
   await page.getByRole('button', { name: 'Sign in ↗', exact: true }).click();
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(/\/home$/);   // sign-in lands on Player Home
+  await page.goto('/admin');
   await expect(page.getByRole('button', { name: 'Save configuration ↗' })).toBeEnabled();
 }
 const serveMaster = (page, tree) => page.route('**/pprc-db/**', route => {

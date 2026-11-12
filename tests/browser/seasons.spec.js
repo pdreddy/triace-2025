@@ -5,6 +5,8 @@ async function adminLogin(page) {
   await page.getByLabel(/username/i).fill('reddi2026');
   await page.getByLabel(/password/i).fill('local-e2e-test-password');
   await page.getByRole('button', { name: /sign in|log in/i }).click();
+  await expect(page).toHaveURL(/\/home$/);   // sign-in lands on Player Home
+  await page.goto('/admin');
   await expect(page.locator('#admin-firebase')).toBeVisible();
 }
 // Earlier tests in the shared demo may leave registration closed; make sure it is open.

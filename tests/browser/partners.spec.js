@@ -72,7 +72,8 @@ test('partner board: a player posts, a captain replies, numbers are swapped but 
   await admin.getByLabel('Username or email').fill('reddi2026');
   await admin.getByLabel('Password', { exact: true }).fill(password);
   await admin.getByRole('button', { name: 'Sign in ↗', exact: true }).click();
-  await expect(admin).toHaveURL(/\/admin$/);
+  await expect(admin).toHaveURL(/\/home$/);   // sign-in lands on Player Home
+  await admin.goto('/admin');
   await admin.goto('/partners');
   admin.on('dialog', d => d.accept());
   await admin.locator('.partner-card', { hasText: 'Zelda' }).getByRole('button', { name: 'Remove' }).click();
@@ -114,7 +115,8 @@ test('partner board: a team with two players looks for a third, and posts are ch
   await admin.getByLabel('Username or email').fill('reddi2026');
   await admin.getByLabel('Password', { exact: true }).fill(password);
   await admin.getByRole('button', { name: 'Sign in ↗', exact: true }).click();
-  await expect(admin).toHaveURL(/\/admin$/);
+  await expect(admin).toHaveURL(/\/home$/);   // sign-in lands on Player Home
+  await admin.goto('/admin');
   await admin.goto('/partners');
   admin.on('dialog', d => d.accept());
   await admin.getByRole('tab', { name: /^Teams/ }).click();
@@ -167,7 +169,8 @@ test('partner board: a picked player is shown publicly with who picked them, the
   await admin.getByLabel('Username or email').fill('reddi2026');
   await admin.getByLabel('Password', { exact: true }).fill(password);
   await admin.getByRole('button', { name: 'Sign in ↗', exact: true }).click();
-  await expect(admin).toHaveURL(/\/admin$/);
+  await expect(admin).toHaveURL(/\/home$/);   // sign-in lands on Player Home
+  await admin.goto('/admin');
   await admin.goto('/partners');
   admin.on('dialog', d => d.accept());
   const adminCard = admin.locator('.partner-card', { hasText: 'Pickme' });

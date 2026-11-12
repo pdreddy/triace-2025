@@ -5,7 +5,8 @@ async function login(page) {
   await page.getByLabel('Username or email').fill('reddi2026');
   await page.getByLabel('Password', { exact: true }).fill('local-e2e-test-password');
   await page.getByRole('button', { name: 'Sign in ↗', exact: true }).click();
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(/\/home$/);   // sign-in lands on Player Home
+  await page.goto('/admin');
 }
 
 test('admin: an overview first, one section at a time, the choice is remembered, and it fits a phone', async ({ page }) => {

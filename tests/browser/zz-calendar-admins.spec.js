@@ -6,6 +6,8 @@ async function adminLogin(page, user = 'reddi2026', password = 'local-e2e-test-p
   await page.getByLabel(/username/i).fill(user);
   await page.getByLabel(/password/i).fill(password);
   await page.getByRole('button', { name: /sign in|log in/i }).click();
+  await expect(page).toHaveURL(/\/home$/);   // sign-in lands on Player Home
+  await page.goto('/admin');
   await expect(page.locator('#admin-firebase')).toBeVisible();
   // The admin shell can render before its first public-data poll arrives.
   const { calendar } = await (await page.request.get('/api/public')).json();
