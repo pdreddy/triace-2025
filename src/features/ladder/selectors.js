@@ -32,12 +32,12 @@ export const challengesOf = (season, playerId) => entries(season?.challenges).fi
 export function challengeOption(season, meId, targetId, now = Date.now()) {
   const v = season?.rules?.values, me = season?.players?.[meId], target = season?.players?.[targetId];
   if (!v || !me || !target || meId === targetId) return { ok: false };
-  if (!me.eligible || !target.eligible) return { ok: false };
+  if (!inChallengeRange(v, me.rank, target.rank, me.streak || 0, Object.keys(season.players).length)) return { ok: false, why: 'Outside your range' };
+  if (!me.eligible || !target.eligible) return { ok: false, why: 'Not eligible' };
   const exempt = p => p.exemptUntil > now && (p.exemptFrom || 0) <= now;
-  if (v.challenge.blockExempt && (exempt(me) || exempt(target))) return { ok: false };
-  if (!inChallengeRange(v, me.rank, target.rank, me.streak || 0, Object.keys(season.players).length)) return { ok: false };
+  if (v.challenge.blockExempt && (exempt(me) || exempt(target))) return { ok: false, why: 'Approved exemption' };
   const all = entries(season.challenges), active = id => all.filter(c => isActive(c) && involves(c, id)).length;
-  if (active(meId) >= v.challenge.activeLimit) return { ok: false };   // their own card already says what to finish first
+  if (active(meId) >= v.challenge.activeLimit) return { ok: false, why: 'Your active limit' };
   if (active(targetId) >= v.challenge.activeLimit) return { ok: false, why: 'Busy' };
   if (v.rematch.enabled) {
     const last = Math.max(0, ...all.filter(c => involves(c, meId) && involves(c, targetId) && c.completedAt && (c.status === 'completed' || (v.rematch.afterUnplayed && ['declined', 'expired'].includes(c.status)))).map(c => c.completedAt));

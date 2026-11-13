@@ -108,3 +108,16 @@ test('demo history stays on time and keeps its sample ranks on every weekday', (
     assert.ok(Object.values(s.challenges).filter(c => c.status === 'completed').every(c => !c.outcome.late));
   }
 });
+
+
+test('every blocked opponent has an explanation while allowed challenges stay actionable', () => {
+  let state = ladder();
+  assert.deepEqual(challengeOption(season(state), 'p8', 'p4', T0), { ok: false, why: 'Outside your range' });
+  state = act(state, admin, { action: 'adjust', playerId: 'p5', eligible: false, reason: 'injury recovery' });
+  assert.deepEqual(challengeOption(season(state), 'p8', 'p5', T0), { ok: false, why: 'Not eligible' });
+  state = act(state, admin, { action: 'grant', type: 'exemption', playerId: 'p6', until: T0 + DAY, reason: 'away for work' });
+  assert.deepEqual(challengeOption(season(state), 'p8', 'p6', T0), { ok: false, why: 'Approved exemption' });
+  assert.deepEqual(challengeOption(season(state), 'p8', 'p7', T0), { ok: true });
+  state = act(state, 8, { action: 'challenge', opponentId: 'p7' });
+  assert.deepEqual(challengeOption(season(state), 'p8', 'p6', T0 + 2 * DAY), { ok: false, why: 'Your active limit' });
+});

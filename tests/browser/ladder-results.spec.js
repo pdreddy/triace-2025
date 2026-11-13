@@ -1,0 +1,41 @@
+import { test, expect } from './fixtures.js';
+
+test('a confirmed win without rank changes shows a trophy and never swallows a player or replays history', async ({ page }) => {
+  await page.goto('/admin/login');
+  await page.getByLabel('Username or email').fill('reddi2026');
+  await page.getByLabel('Password', { exact: true }).fill('local-e2e-test-password');
+  await page.getByRole('button', { name: 'Sign in ↗', exact: true }).click();
+  await expect(page).toHaveURL(/\/home$/);
+  expect((await page.request.post('/api/ladder-demo-seed', { data: {} })).ok()).toBeTruthy();
+  const season = await (await page.request.get('/api/ladder?path=public%2Fdemo')).json();
+  const values = structuredClone(season.rules.values); values.swap.enabled = false; values.extension.allowSwap = false;
+  const action = async payload => {
+    const response = await page.request.post('/api/ladder-action', { data: { seasonId: 'demo', ...payload } });
+    expect(response.ok(), await response.text()).toBeTruthy();
+    return response.json();
+  };
+  const loginAs = async n => expect((await page.request.post('/api/ladder-demo-login', { data: { playerId: `ladder_demo_${n}` } })).ok()).toBeTruthy();
+  await action({ action: 'saveRules', values, baseVersion: 1, reason: 'Test points without rank changes' });
+  await loginAs(14);
+  const { challengeId } = await action({ action: 'challenge', opponentId: 'ladder_demo_13' });
+  await loginAs(13);
+  await action({ action: 'respond', challengeId, accept: true });
+  await loginAs(14);
+  await action({ action: 'submit', challengeId, winnerId: 'ladder_demo_14', score: '6-3 6-2' });
+  await loginAs(13);
+  await page.goto('/ladder/matches');
+  await expect(page.getByRole('button', { name: 'Confirm result' })).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Confirm result' }).click();
+  const result = page.getByRole('dialog', { name: 'The climb continues.' });
+  await expect(result).toBeVisible();
+  await expect(result).toContainText('Positions unchanged under this match’s rules.');
+  await expect(result).toContainText('Stays at #14');
+  await expect(result).toContainText('Stays at #13');
+  await expect(result.locator('.result-board')).toHaveCount(0);
+  await expect(result.locator('.result-trophy')).toBeVisible();
+  await result.getByRole('button', { name: 'Back to the ladder' }).click();
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Your history' })).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});

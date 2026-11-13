@@ -1,5 +1,6 @@
 // Small shared pieces for the Singles Ladder screens.
 import { useState } from 'react';
+import { Icon } from '../../components/Icons';
 import { Message } from '../../components/UI';
 import { formatInZone, zonedTime } from '../../../functions/lib/singlesLadder/time.js';
 import { REQUEST_CATEGORIES } from '../../../functions/lib/singlesLadder/config.js';
@@ -22,17 +23,20 @@ export function Select({ label, id, children, ...props }) { return <label classN
 const TONES = { pending: 'warn', accepted: 'sky', submitted: 'warn', disputed: 'danger', completed: 'good' };
 // One challenge with everything the signed-in player may do about it. The server re-checks every action.
 export function ChallengeCard({ challenge: c, compact = false }) {
-  const { season, playerId, rules, act } = useLadder(), { busy, error, run } = useAction();
+  const { season, playerId, rules, act, meta } = useLadder(), { busy, error, run } = useAction();
   const [panel, setPanel] = useState(null), [winnerId, setWinner] = useState(c.challengerId), [score, setScore] = useState(''), [until, setUntil] = useState(''), [reason, setReason] = useState(''), [category, setCategory] = useState('');
   const name = id => season.players?.[id]?.name || 'Unknown player', step = nextStep(c, playerId), mine = !!step || c.challengerId === playerId || c.opponentId === playerId;
   const send = (payload, done) => run(async () => { await act({ challengeId: c.id, ...payload }); setPanel(null); done?.(); });
   const v = c.rules?.values, due = dueAt(c), tz = rules?.deadline.timezone || 'America/Chicago';
+  const stage = { pending: 0, accepted: 1, submitted: 2, disputed: 2, completed: 3 }[c.status];
   return (
     <article className={`lcard challenge ${c.status}`} data-testid="challenge-card">
-      <header>
+      <header key={c.status} className="challenge-heading">
         <h3><span>{name(c.challengerId)}</span> <i>vs</i> <span>{name(c.opponentId)}</span></h3>
         <Chip tone={TONES[c.status]}>{STATUS_LABELS[c.status]}</Chip>
       </header>
+      {!compact && stage !== undefined && <ol className="match-progress" aria-label="Match progress">{['Sent', 'Accepted', 'Reported', 'Confirmed'].map((label, index) => <li key={label} className={index < stage ? 'done' : index === stage ? 'current' : ''} aria-current={index === stage ? 'step' : undefined}><span>{index < stage || c.status === 'completed' ? <Icon name="check" size={12} /> : index + 1}</span><small>{label}</small></li>)}</ol>}
+      {c.status === 'completed' && !compact && <div className="match-complete"><Icon name="trophy" size={21} /><span>Match confirmed <b>{name(c.result.winnerId)} wins</b></span>{c.outcome?.moved && <span className="result-climb"><Icon name="ladder" size={16} /> Positions updated</span>}</div>}
       <p className="lmeta">
         #{c.ranks.challenger} challenged #{c.ranks.opponent}
         {c.status === 'pending' && <> · answer by <When at={c.respondBy} /></>}
@@ -45,7 +49,7 @@ export function ChallengeCard({ challenge: c, compact = false }) {
         {c.outcome.late && ' · late result: no bonuses or position change'}{c.outcome.moved && ' · positions changed'}
       </p>}
       {c.status === 'disputed' && <p className="lmeta">{c.review === 'noShow' ? 'A no-show was reported. An organizer will decide.' : 'The result is disputed. An organizer will decide.'}</p>}
-      {mine && !compact && <>
+      {mine && !compact && meta.status === 'active' && <>
         <div className="lactions">
           {step === 'respond' && <><button className="button small" disabled={busy} onClick={() => send({ action: 'respond', accept: true })}>Accept</button><button className="secondary small" disabled={busy} onClick={() => setPanel(panel === 'decline' ? null : 'decline')}>Decline</button></>}
           {step === 'waiting' && c.status === 'pending' && <button className="secondary small" disabled={busy} onClick={() => send({ action: 'withdraw' })}>Withdraw challenge</button>}

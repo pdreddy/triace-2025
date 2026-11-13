@@ -1809,3 +1809,140 @@ a.format-card:hover, a.format-card:focus-visible { transform: translateY(-3px); 
 @media (min-width: 1241px) { .tabs { gap: 2px; } .tabs a, .nav-locked { gap: 5px; padding: 6px 8px; font-size: 15px; letter-spacing: .04em; } }
 @media (max-width: 360px) { .tabs { padding-left: 1px; padding-right: 1px; } .tabs a, .nav-locked { min-width: 32px; } }
 @media (prefers-reduced-motion: reduce) { .format-card, .lcard { animation: none; } .format-card, .ladder-row { transition: none; } }
+
+/* Challenge discovery and match motion. */
+.challenge-finder { position: relative; display: flex; align-items: flex-start; gap: 18px; padding: 24px; margin: 18px 0; border: 1px solid #2ec4b65c; border-radius: 20px; background: radial-gradient(ellipse at top right, #2ec4b619, transparent 70%), var(--surface); overflow: hidden; }
+.challenge-finder.ready { border-color: #d9f24b66; background: radial-gradient(ellipse at top right, #d9f24b12, transparent 70%), var(--surface); }
+.finder-symbol { flex: none; display: grid; place-items: center; width: 56px; height: 56px; border: 1px solid #2ec4b64d; border-radius: 17px; color: var(--teal-2); background: #2ec4b612; }
+.ready .finder-symbol { color: var(--lime); border-color: #d9f24b55; background: #d9f24b0d; animation: court-arrive .65s ease both; }
+.finder-body { flex: 1; min-width: 0; }
+.finder-body .eyebrow { margin: 0 0 5px; font-size: 10px; color: var(--teal-2); }
+.finder-body h2 { font-size: clamp(23px, 4vw, 30px); margin: 0 0 7px; }
+.finder-body > p:not(.eyebrow) { max-width: 660px; margin: 5px 0; color: var(--soft); font-size: 14px; line-height: 1.6; }
+.finder-facts { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+.finder-facts span { padding: 4px 9px; border-radius: 7px; background: #ffffff06; border: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.finder-facts span:first-child { color: var(--teal-2); }
+.finder-actions { flex: none; display: grid; justify-items: end; gap: 12px; padding-top: 5px; }
+.finder-actions > a:last-child { color: var(--muted); font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
+.finder-body > .finder-demo { margin-top: 14px !important; color: var(--muted) !important; font-size: 12px !important; }
+.finder-demo button { display: inline-flex; align-items: center; gap: 5px; padding: 0; border: 0; background: none; color: var(--lime); font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.standings-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ladder-list { position: relative; scroll-margin-top: 100px; }
+.ladder-row { animation: court-arrive .4s ease both; animation-delay: var(--row-delay, 0ms); }
+.ladder-row:hover { transform: none; }
+.ladder-list .ladder-row .lrank { color: var(--text); background: var(--surface-3); }
+.ladder-list .ladder-row.podium .lrank { color: var(--ink); background: var(--lime); }
+.ladder-row.challengeable { border-color: #d9f24b4a; }
+.ladder-row.challengeable:hover { border-color: var(--lime); box-shadow: 0 0 26px #d9f24b09; }
+.lgo { flex-direction: column; align-items: flex-end; gap: 5px; }
+.lgo small { max-width: 135px; color: var(--muted); }
+.lgo .challenge-unavailable { opacity: 1; color: var(--muted); border-color: var(--line); background: transparent; }
+.challenge-trigger { position: relative; overflow: hidden; }
+.challenge-trigger::after { content: ''; position: absolute; inset: -40%; background: linear-gradient(110deg, transparent 35%, #ffffff55 50%, transparent 65%); transform: translateX(-130%); pointer-events: none; }
+.challenge-trigger:hover::after { animation: challenge-sheen .65s ease; }
+.rank-value, .points-value { animation: score-pop .45s cubic-bezier(.2,.8,.2,1) both; }
+.challenge-heading { animation: court-arrive .35s ease both; }
+.challenge .lpanel { animation: court-arrive .24s ease both; }
+.challenge .lactions .button { transition: transform .2s ease, box-shadow .2s ease; }
+.challenge .lactions .button:hover { box-shadow: 0 5px 22px #d9f24b33; }
+.lcard .match-progress { display: grid; grid-template-columns: repeat(4, 1fr); margin: 18px 0 12px; padding: 0; list-style: none; }
+.lcard .match-progress li { position: relative; display: grid; justify-items: center; gap: 5px; margin: 0; color: var(--muted); }
+.match-progress li::before { content: ''; position: absolute; top: 12px; left: -50%; width: 100%; height: 1px; background: var(--line-2); z-index: 0; }
+.match-progress li:first-child::before { display: none; }
+.match-progress li.done::before, .match-progress li.current::before { background: var(--teal); }
+.match-progress li > span { position: relative; display: grid; place-items: center; width: 25px; height: 25px; border: 1px solid var(--line-2); border-radius: 50%; background: var(--surface); color: var(--muted); font-size: 11px; transition: background .3s ease, border-color .3s ease; }
+.match-progress li small { font-size: 10px; letter-spacing: .02em; }
+.match-progress .done > span { color: var(--teal-2); border-color: var(--teal); }
+.match-progress .current > span { background: var(--lime); border-color: var(--lime); color: var(--ink); box-shadow: 0 0 0 4px #d9f24b12; }
+.match-progress .current small { color: var(--text); }
+.match-complete { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 13px; margin: 14px 0; border-radius: 12px; background: linear-gradient(110deg, #d9f24b14, #2ec4b60d); color: var(--lime); animation: score-pop .5s ease both; }
+.match-complete > span { display: grid; gap: 2px; font-size: 11px; }
+.match-complete b { color: var(--text); font-size: 14px; }
+.match-complete > .result-climb { display: flex; align-items: center; gap: 5px; margin-left: auto; color: var(--teal-2); }
+.ladder-duel { width: min(520px, calc(100vw - 28px)); max-height: calc(100dvh - 40px); padding: 0; border: 1px solid #d9f24b66; border-radius: 24px; color: var(--text); background: var(--surface); box-shadow: 0 30px 120px #0009, 0 0 90px #2ec4b615; }
+.ladder-duel[open] { animation: duel-open .35s cubic-bezier(.2,.8,.2,1) both; }
+.ladder-duel::backdrop { background: #03101bd9; backdrop-filter: blur(7px); }
+.duel-content { position: relative; padding: 32px; text-align: center; background: radial-gradient(ellipse at 50% 10%, #2ec4b619, transparent 65%); }
+.duel-close { position: absolute; top: 12px; right: 12px; min-height: 32px; padding: 6px !important; border: 0; box-shadow: none; background: transparent; }
+.duel-content .eyebrow { font-size: 10px; color: var(--teal-2); margin: 0 20px 18px; }
+.duel-content h2 { margin: 20px 0; font-size: clamp(30px, 6vw, 42px); animation: court-arrive .4s ease both; }
+.duel-content > p:not(.eyebrow) { color: var(--soft); font-size: 14px; line-height: 1.65; margin: 20px 0; }
+.duel-court { position: relative; width: 160px; height: 78px; margin: 0 auto; border: 1px solid #2ec4b680; border-radius: 7px; background: #2ec4b608; transform: perspective(300px) rotateX(22deg); }
+.duel-court::before { content: ''; position: absolute; inset: 10px 0; border-block: 1px solid #2ec4b64d; }
+.duel-court::after { content: ''; position: absolute; inset: 10px 20px; border-inline: 1px solid #2ec4b64d; }
+.duel-net { position: absolute; left: 50%; inset-block: -5px; width: 1px; background: var(--teal-2); box-shadow: 0 0 12px #2ec4b655; }
+.duel-ball { position: absolute; left: 15px; top: 22px; display: block; width: 30px; height: 30px; color: var(--lime); filter: drop-shadow(0 3px 10px #d9f24b66); animation: tennis-rally 1.15s cubic-bezier(.3,.1,.6,1) 2 alternate both; }
+.sent .duel-ball { animation: tennis-winner .7s ease both; }
+.duel-players { display: grid; grid-template-columns: minmax(0, 1fr) 35px minmax(0, 1fr); align-items: center; gap: 10px; }
+.duel-players > div { display: grid; gap: 6px; min-width: 0; }
+.duel-players > div > span { font-family: var(--display); font-size: 34px; color: var(--lime); }
+.duel-players strong { overflow-wrap: anywhere; line-height: 1.3; font-size: 16px; }
+.duel-players small { color: var(--muted); font-size: 11px; }
+.duel-players > b { font-family: var(--display); font-size: 17px; color: var(--muted); font-style: italic; }
+.duel-actions { display: grid; gap: 10px; margin-top: 22px; }
+.duel-actions .button { justify-content: center; min-height: 48px; }
+.duel-actions .secondary { justify-content: center; }
+.duel-sparks { position: absolute; inset: 0; }
+.duel-sparks i { position: absolute; left: 50%; top: 50%; width: 5px; height: 9px; border-radius: 2px; background: var(--lime); animation: duel-spark .75s ease-out both; }
+.duel-sparks i:nth-child(even) { background: var(--teal-2); }
+@keyframes court-arrive { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes score-pop { 0% { opacity: .4; transform: translateY(5px) scale(.92); } 65% { transform: translateY(-1px) scale(1.06); } 100% { opacity: 1; transform: none; } }
+@keyframes challenge-sheen { to { transform: translateX(130%); } }
+@keyframes duel-open { from { opacity: 0; transform: translateY(16px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes tennis-rally { 0% { transform: translate(0, 0) rotate(0); } 45% { transform: translate(45px, -24px) rotate(120deg); } 100% { transform: translate(100px, 0) rotate(240deg); } }
+@keyframes tennis-winner { from { transform: translate(100px, 0) scale(1); } to { transform: translate(50px, -5px) scale(1.3) rotate(180deg); } }
+@keyframes duel-spark { from { opacity: 1; transform: rotate(var(--angle)) translateY(0); } to { opacity: 0; transform: rotate(var(--angle)) translateY(-80px) scale(.3); } }
+@media (max-width: 760px) {
+  .challenge-finder { flex-wrap: wrap; gap: 12px; padding: 18px; }
+  .finder-symbol { width: 42px; height: 42px; border-radius: 12px; }
+  .finder-symbol svg { width: 23px; }
+  .finder-body { flex-basis: calc(100% - 54px); }
+  .finder-actions { width: 100%; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 0; }
+  .lgo { align-items: stretch; }
+  .lgo button { justify-content: center; }
+  .lgo small { max-width: none; }
+  .duel-content { padding: 30px 20px 22px; }
+  .duel-players strong { font-size: 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ladder-row, .rank-value, .points-value, .challenge-heading, .challenge .lpanel, .match-complete, .ready .finder-symbol, .ladder-duel[open], .duel-content h2, .duel-ball, .sent .duel-ball, .challenge-trigger::after, .duel-sparks i { animation: none; }
+  .ladder-row, .challenge .lactions .button, .match-progress li > span { transition: none; }
+  .duel-sparks i { opacity: 0; }
+}
+
+/* Snakes and ladders: played only when a live match is confirmed, never on loading history. */
+.ladder-result { width: min(660px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding: 0; border: 1px solid #d9f24b66; border-radius: 26px; background: var(--surface); color: var(--text); box-shadow: 0 30px 120px #000a; }
+.ladder-result[open] { animation: duel-open .4s ease both; }
+.ladder-result::backdrop { background: #03101be8; backdrop-filter: blur(8px); }
+.result-content { position: relative; padding: 28px; text-align: center; background: radial-gradient(ellipse at 20% 30%, #d9f24b0d, transparent 60%), radial-gradient(ellipse at 90% 45%, #2ec4b612, transparent 60%); }
+.result-close { position: absolute; top: 12px; right: 12px; padding: 6px !important; border: 0; background: transparent; }
+.result-content > .eyebrow { margin: 4px 25px 8px; color: var(--teal-2); font-size: 11px; }
+.result-content h2 { margin: 8px 0; font-size: clamp(30px, 6vw, 44px); }
+.result-content > p:not(.eyebrow) { font-size: 13px; color: var(--soft); }
+.result-board { margin: 8px -12px 0; }
+.result-board svg { display: block; width: 100%; overflow: visible; }
+.result-ladder { filter: drop-shadow(0 0 6px #d9f24b44); }
+.result-winner-token { transform: translateY(-145px); animation: winner-climb 2.2s .15s cubic-bezier(.25,.1,.2,1) both; filter: drop-shadow(0 4px 10px #d9f24b55); }
+.result-crown { animation: crown-arrive .4s 2.2s ease both; transform-origin: 140px 25px; }
+.result-loser-token { animation: snake-slide 2.4s .15s cubic-bezier(.35,.1,.4,1) both; }
+.result-snake-head { transform-origin: 460px 215px; animation: snake-gulp .5s 2.3s ease both; }
+.result-gulp { animation: gulp-word .9s 2.5s ease both; }
+.result-players { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; text-align: center; }
+.result-players > div { display: grid; gap: 6px; padding: 14px 8px; border-radius: 14px; border: 1px solid var(--line); background: #ffffff03; }
+.result-players small { font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: var(--teal-2); }
+.result-players > div:first-child small, .result-players > div:first-child b { color: var(--lime); }
+.result-players strong { font-size: 15px; overflow-wrap: anywhere; }
+.result-players span { font-family: var(--display); font-size: 24px; color: var(--soft); }
+.result-players b { font-size: 12px; color: var(--muted); }
+.result-done { width: 100%; margin-top: 22px; justify-content: center; }
+.result-trophy { display: grid; place-items: center; height: 140px; color: var(--lime); animation: score-pop .6s ease both; }
+@keyframes winner-climb { 0% { transform: translateY(0); } 22% { transform: translateY(-27px); } 44% { transform: translateY(-62px); } 66% { transform: translateY(-95px); } 84% { transform: translateY(-122px); } 100% { transform: translateY(-145px); } }
+@keyframes crown-arrive { from { opacity: 0; transform: translateY(-12px) scale(.6); } to { opacity: 1; transform: none; } }
+@keyframes snake-slide { 0%, 8% { transform: translate(0,0); opacity: 1; } 25% { transform: translate(-23px,33px) rotate(-12deg); } 45% { transform: translate(16px,65px) rotate(12deg); } 65% { transform: translate(-30px,100px) rotate(-12deg); } 85% { transform: translate(-14px,135px) scale(.9); opacity: 1; } 100% { transform: translate(15px,174px) scale(0); opacity: 0; } }
+@keyframes snake-gulp { 50% { transform: scale(1.13,1.06); } }
+@keyframes gulp-word { 0% { opacity: 0; } 40%, 70% { opacity: 1; } 100% { opacity: 0; } }
+@media (max-width: 480px) { .result-content { padding: 24px 16px 18px; } .result-players { gap: 8px; } .result-players strong { font-size: 13px; } .result-players small { font-size: 9px; } }
+@media (prefers-reduced-motion: reduce) {
+  .ladder-result[open], .result-winner-token, .result-crown, .result-loser-token, .result-snake-head, .result-gulp, .result-trophy { animation: none; }
+  .result-gulp { display: none; }
+}

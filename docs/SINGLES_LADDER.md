@@ -21,6 +21,22 @@ One app, several formats. `/home` is Player Home; TRIACE 2.0 and the Singles Lad
 "All Formats" is in the header of every TRIACE and Ladder page. Netlify (`netlify.toml`) and Firebase Hosting
 (`firebase.json`) already rewrite every path to `index.html`, so direct URLs and refreshes work.
 
+## Challenges and result animations
+
+On `/ladder`, the Challenge court panel shows your available opponents and explains active limits, busy players,
+exemptions and rematch cooldowns. Challenge buttons stay visible but disabled when an opponent is unavailable.
+Choose an available opponent, review the matchup, then select **Send challenge**. The server still checks every rule.
+Your card shows all active challenges, including ones waiting for an answer.
+
+After a live result is confirmed, both players see the actual points and position changes. When the winner moves up
+and the loser moves down, the winner’s token climbs a glowing ladder and the loser’s token slides into a cartoon
+snake’s mouth. A win with no position changes shows a trophy instead. The animation ends in about three seconds;
+the result remains readable until dismissed. Escape or the close button skips it. Historical results do not replay on
+page load, and reduced-motion preferences disable the movement.
+
+In local demo mode only, a player with no available opponents can use **Try as Demo Player…** to switch to an account
+that has a legal challenge available. This does not change the season’s rules or bypass any challenge restrictions.
+
 ## Where the code is
 
 ```

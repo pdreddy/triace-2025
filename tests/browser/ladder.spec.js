@@ -32,7 +32,7 @@ test('with no season the ladder says so instead of showing made-up standings', a
   expect((await page.request.post('/api/ladder-action', { data: { action: 'createSeason', name: 'Forged', reason: 'forged' } })).status()).toBe(401);
 });
 
-test('organizer creates the season; players challenge, accept, report and confirm; standings move', async ({ page }) => {
+test('organizer creates the season; players challenge, accept, report and confirm; standings move', async ({ page, browser }) => {
   await adminLogin(page);
   await ensureSeason(page);
 
@@ -65,16 +65,43 @@ test('organizer creates the season; players challenge, accept, report and confir
   await page.goto('/ladder');
   const five = page.getByTestId('my-ladder-card');
   await expect(five.getByText('#5', { exact: true })).toBeVisible();
+  const loserContext = await browser.newContext({ baseURL: new URL(page.url()).origin });
+  const loserPage = await loserContext.newPage();
+  await signInAs(loserPage, 3);
+  await loserPage.goto('/ladder/matches');
+  await expect(loserPage.getByText('Waiting for Demo Player 5 to confirm.')).toBeVisible();
   await five.getByRole('button', { name: 'Confirm result' }).click();
+  const result = page.getByRole('dialog', { name: 'Up you go!' });
+  await expect(result).toBeVisible();
+  await expect(result).toContainText('Down the snake');
+  await expect(result).toContainText('#5 → #2');
+  await expect(result).toContainText('#2 → #5');
+  await page.screenshot({ path: 'work/ladder-result-desktop.png' });
+  await result.getByRole('button', { name: 'Back to the ladder' }).click();
+  const loserResult = loserPage.getByRole('dialog', { name: 'The climb continues.' });
+  await expect(loserResult).toBeVisible();
+  await loserPage.setViewportSize({ width: 320, height: 740 });
+  await loserPage.emulateMedia({ reducedMotion: 'reduce' });
+  expect(await loserResult.locator('.result-loser-token').evaluate(node => getComputedStyle(node).animationName)).toBe('none');
+  expect(await loserPage.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+  await loserPage.screenshot({ path: 'work/ladder-result-mobile.png' });
+  await loserPage.keyboard.press('Escape');
+  await expect(loserPage.getByRole('dialog')).toHaveCount(0);
+  await loserContext.close();
   await expect(five.getByText('#2', { exact: true })).toBeVisible();
   await page.goto('/home');
   const card = page.getByRole('link', { name: /Active Singles Ladder/ });
   await expect(card.getByText('#2 of 16')).toBeVisible();
   await expect(card.getByText('Pending challenges')).toBeVisible();
 
-  // Now a top player with no active challenge: challenge the player above.
+  // Historical results never replay when the ladder is opened again.
   await page.goto('/ladder');
-  await page.getByRole('button', { name: 'Challenge Demo Player 1' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  // Now a top player with no active challenge: challenge the player above.
+  await page.getByRole('button', { name: 'Challenge Demo Player 1', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Send challenge', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Challenge sent!' })).toBeVisible();
+  await page.getByRole('dialog').getByRole('button', { name: 'Back to ladder', exact: true }).click();
   await expect(five.getByText('Your move')).toHaveCount(0);
   await page.goto('/ladder/matches');
   await expect(page.getByText('Waiting for an answer')).toBeVisible();
@@ -82,6 +109,46 @@ test('organizer creates the season; players challenge, accept, report and confir
   await page.goto('/ladder/activity');
   await expect(page.getByText('Successful challenge', { exact: true })).toBeVisible();
   await expect(page.getByText('Upset bonus', { exact: true })).toBeVisible();
+});
+
+test('blocked opponents stay visible with reasons, demo switching finds a playable opponent, and the dialog respects reduced motion', async ({ page }) => {
+  await adminLogin(page);
+  await ensureSeason(page);
+  await signInAs(page, 10);
+  await page.goto('/ladder');
+  await expect(page.getByRole('heading', { name: 'No opponents available right now' })).toBeVisible();
+  const list = page.getByRole('list', { name: 'Ladder standings' });
+  await expect(list.getByRole('button', { name: 'Challenge Demo Player 9: Busy', exact: true })).toBeDisabled();
+  await expect(list.getByRole('button', { name: 'Challenge Demo Player 12: Rematch cooldown', exact: true })).toBeDisabled();
+  await expect(list.getByRole('button', { name: 'Challenge Demo Player 8: Outside your range', exact: true })).toBeDisabled();
+  await page.screenshot({ path: 'work/ladder-blocked-desktop.png', fullPage: true });
+  await page.getByRole('button', { name: 'Try as Demo Player 16' }).click();
+  await expect(page.getByTestId('my-ladder-card').getByRole('heading', { name: 'Demo Player 16' })).toBeVisible();
+  await page.getByRole('button', { name: 'Choose opponent' }).click();
+  await expect(list.getByRole('listitem')).toHaveCount(3);
+  const trigger = page.getByRole('button', { name: 'Challenge Demo Player 15', exact: true });
+  await trigger.click();
+  await expect(page.getByRole('dialog', { name: 'Make your move.' })).toBeVisible();
+  await page.screenshot({ path: 'work/ladder-challenge-desktop.png' });
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await page.setViewportSize({ width: 320, height: 740 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await trigger.click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  expect(await dialog.locator('.duel-ball').evaluate(node => getComputedStyle(node).animationName)).toBe('none');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+  await page.screenshot({ path: 'work/ladder-challenge-mobile.png' });
+  for (let i = 0; i < 8; i++) await page.keyboard.press('Tab');
+  expect(await dialog.evaluate(node => node.contains(document.activeElement))).toBeTruthy();
+  await dialog.getByRole('button', { name: 'Send challenge', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Challenge sent!' })).toBeVisible();
+  await dialog.getByRole('link', { name: 'View match' }).click();
+  await expect(page).toHaveURL(/\/ladder\/matches$/);
+  await expect(page.getByText('Waiting for an answer')).toBeVisible();
+  await expect(page.getByRole('list', { name: 'Match progress' }).first()).toBeVisible();
 });
 
 test('organizer rules settings validate, preview and version changes; the Rules page follows', async ({ page }) => {
