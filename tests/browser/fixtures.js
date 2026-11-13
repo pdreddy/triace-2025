@@ -6,14 +6,15 @@ import { once } from 'node:events';
 import { setTimeout as delay } from 'node:timers/promises';
 
 export const test = base.extend({
-  demoServer: [async ({}, use, workerInfo) => {
+  practiceProfile: ['', { option: true, scope: 'worker' }],
+  demoServer: [async ({ practiceProfile }, use, workerInfo) => {
     let activeFile, activeURL, stop;
     async function start() {
       const port = Number(process.env.PW_BASE_PORT || 3100) + workerInfo.parallelIndex;
       const url = `http://127.0.0.1:${port}`;
       // Fail on a busy port rather than accidentally testing somebody else's server.
       const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--mode', 'demo', '--port', String(port)], {
-        env: { ...process.env, TRAICE_ADMIN_PASSWORD: 'local-e2e-test-password',
+        env: { ...process.env, ...(practiceProfile === 'group-a' ? { VITE_MULTICLUB_DATABASE_URL: '/pprc-db' } : {}), TRAICE_DEMO_PROFILE: practiceProfile, TRAICE_ADMIN_PASSWORD: 'local-e2e-test-password',
           TRAICE_DEMO_DATA_DIR: `.local-demo/e2e-${process.pid}-${workerInfo.workerIndex}-${Date.now()}` },
         stdio: ['ignore', 'pipe', 'pipe']
       });

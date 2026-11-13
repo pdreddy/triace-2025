@@ -38,7 +38,7 @@ const Rankings = lazy(() => import('./pages/Rankings'));
 const PprcPlayer = lazy(() => import('./pages/Pprc').then(m => ({ default: m.PprcPlayer })));
 
 const FRIENDLY_ERROR = 'We can’t reach the tournament right now. Please check your connection and try again shortly.';
-const SCREENS = { '/home': 'home', '/triace': 'rules', '/': 'home', '/register': 'register', '/tiers': 'tiers', '/league': 'league', '/players': 'players', '/champions': 'champions', '/partners': 'partners', '/admin/login': 'login', '/captain': 'login', '/admin': 'admin' };
+const SCREENS = { '/home': 'home', '/triace': 'rules', '/': 'home', '/register': 'register', '/tiers': 'tiers', '/league': 'league', '/players': 'players', '/champions': 'champions', '/partners': 'partners', '/admin/login': 'login', '/captain': 'login', '/player-login': 'login', '/admin': 'admin' };
 
 function StatusPill({ mode, connected, online }) {
   const state = !online ? 'offline' : connected ? 'live' : 'connecting';
@@ -103,9 +103,10 @@ function Layout() {
           <div className="topbar-actions">
             <StatusPill mode={service.mode} connected={connected} online={online} />
             {triace && <NavLink className="chip-button admin-chip" to={user?.admin ? '/admin' : '/admin/login'} aria-label="Admin"><Icon name="shield" size={16} /></NavLink>}
-            {!user?.admin && (triace || !user?.captain) && <NavLink className="chip-button" to="/captain" aria-label={triace ? (user?.captain ? 'My team' : 'Captain sign in') : 'Sign in'}><Icon name="user" size={16} /><span>{triace ? (user?.captain ? 'My team' : 'Captain') : 'Sign in'}</span></NavLink>}
+            {user?.player && <NavLink className="chip-button" to="/ladder/matches" aria-label="My ladder"><Icon name="user" size={16} /><span>My ladder</span></NavLink>}
+            {!user?.player && !user?.admin && (triace || !user?.captain) && <NavLink className="chip-button" to={triace ? '/captain' : '/player-login'} aria-label={triace ? (user?.captain ? 'My team' : 'Captain sign in') : 'Sign in'}><Icon name="user" size={16} /><span>{triace ? (user?.captain ? 'My team' : 'Captain') : 'Sign in'}</span></NavLink>}
             {canInstall && <button type="button" className="chip-button" aria-label="Install app" onClick={install}><Icon name="download" size={16} /><span>Install app</span></button>}
-            {(user?.admin || user?.captain) && <button type="button" className="chip-button" aria-label="Sign out" disabled={loggingOut} onClick={logout}><Icon name="logout" size={16} /><span>{loggingOut ? 'Signing out…' : 'Sign out'}</span></button>}
+            {(user?.admin || user?.captain || user?.player) && <button type="button" className="chip-button" aria-label="Sign out" disabled={loggingOut} onClick={logout}><Icon name="logout" size={16} /><span>{loggingOut ? 'Signing out…' : 'Sign out'}</span></button>}
           </div>
         </div>
       </header>
@@ -151,6 +152,7 @@ function Layout() {
             <Route path="/partners" element={<Partners />} />
             <Route path="/status" element={<Status />} />
             <Route path="/captain" element={<CaptainLogin />} />
+            <Route path="/player-login" element={<CaptainLogin playerMode />} />
             <Route path="/champions" element={<Champions />} />
             <Route path="/rankings" element={<Rankings />} />
             <Route path="/pprc" element={<Pprc />} />

@@ -16,6 +16,7 @@ const PAGES = [
   ['/team/any-team', /./],
   ['/player/any-team/captain', /./],
   ['/admin/login', /./],
+  ['/player-login', /./],
   ['/admin', /./],
   ['/no-such-page', /./]
 ];

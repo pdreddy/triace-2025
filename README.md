@@ -34,6 +34,8 @@ This mode runs a local server with cookie-based admin sessions, protected APIs, 
 
 The local data directory and environment files cannot be served by the Vite server. To reset local test data, stop the server and remove only `.local-demo/`. This deletes local demo registrations, not Firebase data. Demo sessions expire after eight hours or when the server stops. Restart the demo after changing its username or password.
 
+For the actual Group A roster, three practice pairings and six password-based player logins, run `npm run demo:group-a`. See [Group A local testing](docs/SINGLES_LADDER.md#actual-group-a-data-with-six-local-player-logins). This uses a separate local data folder.
+
 ## Automated checks
 
 ```sh

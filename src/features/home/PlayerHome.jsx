@@ -36,7 +36,7 @@ export default function PlayerHome() {
         <p className="eyebrow">PPRC · All Formats</p>
         <h1>Player Home</h1>
         <p>Your next match starts here.</p>
-        {!signedIn && <p className="home-signin"><Link className="button small" to="/captain">Player sign in</Link><Link className="secondary small" to="/admin/login">Organizer sign in</Link></p>}
+        {!signedIn && <p className="home-signin"><Link className="button small" to="/player-login">Player sign in</Link><Link className="secondary small" to="/admin/login">Organizer sign in</Link></p>}
       </header>
       <div className="format-grid">
         {MODULES.map(m => {

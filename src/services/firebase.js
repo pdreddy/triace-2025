@@ -5,6 +5,7 @@ import { getDatabase, ref, onValue, get, connectDatabaseEmulator } from 'firebas
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/functions';
 import { rulesOf, DEFAULT_SEASON_NAME } from '../../functions/lib/tournament.js';
 import { dbPaths } from '../config/dbPaths.js';
+import { isPlayerEmail, playerLoginEmail } from '../../functions/lib/playerAccount.js';
 import { isCaptainEmail, loginEmail, normalizePassword } from '../../functions/lib/captainAccount.js';
 import { runSetupChecks } from './setupChecks.js';
 const env = import.meta.env;
@@ -88,7 +89,7 @@ export function createFirebaseService() {
           let token = await getIdTokenResult(user);
           // A sign-in made before the admin role was granted keeps an old token without it: ask for a fresh one once.
           if (!user.isAnonymous && token.claims.admin !== true && !isCaptainEmail(user.email)) token = await getIdTokenResult(user, true);
-          if (!stopped && auth.currentUser?.uid === user.uid) callback({ uid: user.uid, email: user.email, admin: token.claims.admin === true, anonymous: user.isAnonymous, captain: isCaptainEmail(user.email) }); }
+          if (!stopped && auth.currentUser?.uid === user.uid) callback({ uid: user.uid, email: user.email, admin: token.claims.admin === true, anonymous: user.isAnonymous, captain: isCaptainEmail(user.email), player: isPlayerEmail(user.email) }); }
         catch (error) { if (!stopped) onError(new Error(errorMessage(error))); }
       });
       return () => { stopped = true; unsubscribe(); };
@@ -142,6 +143,10 @@ export function createFirebaseService() {
     linkPprc: withError(async payload => (await httpsCallable(functions, 'linkPprc')(payload)).data),
     withdrawTeam: withError(async payload => (await httpsCallable(functions, 'withdrawTeam')(payload)).data),
     resetCaptainLogin: withError(async payload => (await httpsCallable(functions, 'resetCaptainLogin')(payload)).data),
+    async playerLogin(username, password) {
+      try { await signInWithEmailAndPassword(auth, playerLoginEmail(username), String(password)); }
+      catch (error) { throw new Error(['auth/invalid-credential', 'auth/wrong-password', 'auth/user-not-found', 'auth/invalid-email'].includes(error?.code) ? 'Wrong username or password.' : error?.code === 'auth/too-many-requests' ? 'Too many attempts. Wait a few minutes, then try again.' : errorMessage(error)); }
+    },
     async captainLogin(username, password) {
       try { await signInWithEmailAndPassword(auth, loginEmail(username), normalizePassword(password)); }
       catch (error) { throw new Error(['auth/invalid-credential', 'auth/wrong-password', 'auth/user-not-found', 'auth/invalid-email'].includes(error?.code) ? 'Wrong username or password.' : error?.code === 'auth/too-many-requests' ? 'Too many attempts. Wait a few minutes, then try again.' : errorMessage(error)); }

@@ -8,12 +8,14 @@ import { adminEmail, validateAdminUsername, newAdminPassword, checkRemoval } fro
 import { newPassword, usernameAttempt, loginNames, captainUid, loginEmail, normalizePassword } from '../functions/lib/captainLogin.js';
 import { validateLegacySeason } from '../functions/lib/legacy.js';
 import { applyLadder } from '../functions/lib/singlesLadder/engine.js';
+import { groupAPractice, GROUP_A_PASSWORD } from './group-a-practice.mjs';
+import { playerLoginEmail } from '../functions/lib/playerAccount.js';
 import { DEMO_ROSTER, seedDemoLadder, demoUid } from './ladder-dev-fixtures.mjs';
 import { applyCreatePost, applyExpressInterest, applyClosePost, applyMarkPicked, applyReopenPost } from '../functions/lib/partners.js';
 const digest = value => createHash('sha256').update(value).digest();
 // Demo captain logins are kept in the demo state with a salted hash (never the password).
-const hashPassword = (password, salt = randomBytes(16).toString('hex')) => ({ salt, hash: scryptSync(normalizePassword(password), salt, 32).toString('hex') });
-const passwordMatches = (login, password) => !!login && timingSafeEqual(Buffer.from(hashPassword(password, login.salt).hash, 'hex'), Buffer.from(login.hash, 'hex'));
+const hashPassword = (password, salt = randomBytes(16).toString('hex'), normalize = true) => ({ salt, hash: scryptSync(normalize ? normalizePassword(password) : String(password), salt, 32).toString('hex') });
+const passwordMatches = (login, password, normalize = true) => !!login && timingSafeEqual(Buffer.from(hashPassword(password, login.salt, normalize).hash, 'hex'), Buffer.from(login.hash, 'hex'));
 export function demoPlugin(env) {
   // An unset password no longer stops the demo: a random one is made for this run and printed once.
   // A password that is set but shorter than 8 characters is still an error.
@@ -29,7 +31,17 @@ export function demoPlugin(env) {
   let state, queue = Promise.resolve();
   async function initialize() {
     await mkdir(directory, { recursive: true, mode: 0o700 });
-    try { state = JSON.parse(await readFile(file, 'utf8')); } catch (error) { if (error.code !== 'ENOENT') throw error; state = initialState(); await writeFile(file, JSON.stringify(state), { mode: 0o600 }); }
+    try { state = JSON.parse(await readFile(file, 'utf8')); } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+      state = initialState();
+      if (env.TRAICE_DEMO_PROFILE === 'group-a') {
+        const practice = groupAPractice();
+        Object.assign(state, { ladder: practice.ladder, groupAPractice: practice.practice, practicePprc: practice.pprc,
+          playerLogins: Object.fromEntries(practice.accounts.map(account => [account.username, { ...account, seasonId: practice.practice.seasonId, ...hashPassword(GROUP_A_PASSWORD, undefined, false) }])) });
+      }
+      await writeFile(file, JSON.stringify(state), { mode: 0o600 });
+    }
+    if (env.TRAICE_DEMO_PROFILE === 'group-a' && !state.groupAPractice) throw new Error('This folder already contains another demo. Use the separate Group A data folder.');
   }
   const ready = initialize();
   function mutate(operation) {
@@ -47,7 +59,7 @@ export function demoPlugin(env) {
       const host = (req.headers.host || '').split(':')[0];
       if (!['localhost', '127.0.0.1'].includes(host)) { res.statusCode = 403; return res.end('{"error":"Local demo only accepts loopback hosts."}'); }
       let tree;
-      try { tree = JSON.parse(await readFile(treeFile, 'utf8')); } catch { res.statusCode = 404; return res.end(JSON.stringify({ error: 'No local PPRC data. Run: bash run-local.sh --export <your-export.json> --demo' })); }
+      try { await ready; tree = state.practicePprc || JSON.parse(await readFile(treeFile, 'utf8')); } catch { res.statusCode = 404; return res.end(JSON.stringify({ error: 'No local PPRC data. Run: bash run-local.sh --export <your-export.json> --demo' })); }
       const segments = decodeURIComponent(new URL(req.url, 'http://x').pathname).replace(/^\/|\.json$/g, '').split('/').filter(Boolean);
       const value = segments.reduce((node, key) => (node && typeof node === 'object' && Object.hasOwn(node, key) ? node[key] : null), tree);
       res.end(JSON.stringify(value ?? null));
@@ -63,14 +75,14 @@ export function demoPlugin(env) {
         const token = /(?:^|;\s*)traice_demo=([a-f0-9]+)/.exec(req.headers.cookie || '')?.[1];
         let session = token && sessions.get(token);
         const cookie = value => res.setHeader('Set-Cookie', `traice_demo=${value}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800`);
-        function newSession(admin = false, captain = null) { if (token) sessions.delete(token); const value = randomBytes(32).toString('hex'); const created = { uid: captain?.uid || 'demo_' + randomBytes(16).toString('hex'), admin, anonymous: !admin && !captain, ...(admin ? { email } : {}), ...(captain ? { email: loginEmail(captain.username), captain: true } : {}), expires: Date.now() + 28800000 }; sessions.set(value, created); cookie(value); return created; }
+        function newSession(admin = false, captain = null) { if (token) sessions.delete(token); const value = randomBytes(32).toString('hex'); const created = { uid: captain?.uid || 'demo_' + randomBytes(16).toString('hex'), admin, anonymous: !admin && !captain, ...(admin ? { email } : {}), ...(captain ? { email: captain.player ? playerLoginEmail(captain.username) : loginEmail(captain.username), ...(captain.player ? { player: true } : { captain: true }) } : {}), expires: Date.now() + 28800000 }; sessions.set(value, created); cookie(value); return created; }
         if (session?.expires < Date.now()) session = undefined;
         if (!session && endpoint === '/session') session = newSession();
         for (const [key, value] of sessions) if (value.expires < Date.now()) sessions.delete(key);
-        const safeUser = () => ({ uid: session.uid, admin: session.admin, anonymous: session.anonymous, ...(session.captain ? { captain: true } : {}), ...(session.email ? { email: session.email } : {}) });
+        const safeUser = () => ({ uid: session.uid, admin: session.admin, anonymous: session.anonymous, ...(session.captain ? { captain: true } : {}), ...(session.player ? { player: true } : {}), ...(session.email ? { email: session.email } : {}) });
         if (req.method === 'GET') {
           if (endpoint === '/session') return send(200, safeUser());
-          if (endpoint === '/public') return send(200, { ...publicState(state), ...(state.season1 ? { legacySeasons: { s1: state.season1 } } : {}) });
+          if (endpoint === '/public') return send(200, { ...publicState(state), ...(state.season1 ? { legacySeasons: { s1: state.season1 } } : {}), ...(state.groupAPractice ? { ladderPractice: state.groupAPractice } : {}) });
           if (endpoint === '/my-registration') { const reg = state.registrations?.[url.searchParams.get('teamId')]; return reg && session && (session.admin || isOwner(reg, session.uid)) ? send(200, reg) : send(403, { error: 'Only this team’s captain can read it.' }); }
           if (endpoint === '/partner-mine') return send(200, session ? Object.fromEntries(Object.entries(state.partnerPrivate || {}).filter(([, secret]) => secret.ownerUid === session.uid)) : {});
           if (endpoint === '/my-teams') return send(200, session ? state.teamsByOwner?.[session.uid] || {} : {});
@@ -112,6 +124,14 @@ export function demoPlugin(env) {
           });
           return send(200, result.created ? { ...result, login } : result);
         }
+        if (endpoint === '/player-login') {
+          const ip = `player:${req.socket.remoteAddress}`, prior = attempts.get(ip) || { count: 0, until: 0 }, now = Date.now();
+          if (prior.until < now) { prior.count = 0; prior.until = now + 60000; } prior.count++; attempts.set(ip, prior);
+          if (prior.count > 10) return send(429, { error: 'Too many sign-in attempts. Wait one minute.' });
+          const username = String(payload.username || '').trim().toLowerCase(), login = Object.hasOwn(state.playerLogins || {}, username) ? state.playerLogins[username] : null;
+          if (!login || !passwordMatches(login, String(payload.password || ''), false) || state.ladder?.accounts?.[login.uid] !== login.playerId || !state.ladder?.public?.[login.seasonId]?.players?.[login.playerId]) return send(401, { error: 'Wrong username or password.' });
+          session = newSession(false, { uid: login.uid, username, player: true }); attempts.delete(ip); return send(200, safeUser());
+        }
         if (endpoint === '/captain-login') {
           const ip = `captain:${req.socket.remoteAddress}`, prior = attempts.get(ip) || { count: 0, until: 0 }, now = Date.now();
           if (prior.until < now) { prior.count = 0; prior.until = now + 60000; } prior.count++; attempts.set(ip, prior);
@@ -131,8 +151,8 @@ export function demoPlugin(env) {
         if (endpoint === '/ladder-action') {
           if (!session || session.anonymous) return send(401, { error: 'Sign in with your player account.' });
           const data = { ...payload };
-          if (admin && data.action === 'enroll') { const record = Object.hasOwn(DEMO_ROSTER, data.playerId) && DEMO_ROSTER[data.playerId]; if (!record) return send(400, { error: 'The local demo only knows its development roster: ladder_demo_1 to ladder_demo_16.' }); Object.assign(data, record); }
-          if (admin && data.action === 'syncPlayers') data.players = DEMO_ROSTER;
+          if (admin && data.action === 'enroll') { const pprc = state.practicePprc?.pprcMaster?.players?.[data.playerId]; const record = pprc ? { name: pprc.name, utr: pprc.seed?.singles ?? null, verified: true } : Object.hasOwn(DEMO_ROSTER, data.playerId) && DEMO_ROSTER[data.playerId]; if (!record) return send(400, { error: 'The local demo only knows its development roster: ladder_demo_1 to ladder_demo_16.' }); Object.assign(data, record); }
+          if (admin && data.action === 'syncPlayers') data.players = state.practicePprc ? Object.fromEntries(Object.entries(state.practicePprc.pprcMaster.players).map(([id, p]) => [id, { name: p.name, utr: p.seed?.singles ?? null, verified: true }])) : DEMO_ROSTER;
           return send(200, await mutate(current => { const out = applyLadder(current.ladder, data, { uid: session.uid, admin }, { now: Date.now(), id: newId() }); return { state: { ...current, ladder: JSON.parse(JSON.stringify(out.state)) }, result: out.result }; }));
         }
         if (endpoint === '/ladder-demo-seed') {

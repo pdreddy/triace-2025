@@ -10,7 +10,7 @@ const REQUEST_TONE = { pending: 'warn', approved: 'good', denied: 'muted' };
 export default function Activity() {
   const { season, playerId, me, signedIn, requests, notifications, rules, meta, act } = useLadder(), { busy, error, run } = useAction();
   const [until, setUntil] = useState(''), [reason, setReason] = useState(''), [category, setCategory] = useState('');
-  if (!me) return <EmptyState icon="user" title="Your ladder activity">{signedIn ? 'This sign-in is not linked to a ladder player yet. Ask an organizer.' : <>Sign in to see your points, notifications and requests. <Link className="button small" to="/captain">Sign in</Link></>}</EmptyState>;
+  if (!me) return <EmptyState icon="user" title="Your ladder activity">{signedIn ? 'This sign-in is not linked to a ladder player yet. Ask an organizer.' : <>Sign in to see your points, notifications and requests. <Link className="button small" to="/player-login">Sign in</Link></>}</EmptyState>;
   const points = pointsBreakdown(season, playerId), notes = entries(notifications).sort((a, b) => b.at - a.at), mine = entries(requests).sort((a, b) => b.createdAt - a.createdAt);
   const name = id => season.players?.[id]?.name || 'a player';
   return (

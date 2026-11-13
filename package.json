@@ -24,7 +24,8 @@
     "backup": "node scripts/backup.cjs",
     "rules:generate": "node scripts/generate-rules.mjs",
     "rules:check": "node scripts/generate-rules.mjs --check",
-    "rules:deploy": "node scripts/deploy-rules.mjs"
+    "rules:deploy": "node scripts/deploy-rules.mjs",
+    "demo:group-a": "node scripts/group-a-demo.mjs"
   },
   "dependencies": {
     "firebase": "^13.1.0",

@@ -9,7 +9,7 @@ export const MODULES = [
 // Which format a URL belongs to: 'home' for Player Home, a module id for its own paths, otherwise TRIACE (every
 // existing TRIACE route keeps its address: /tiers, /league, /team/..., /admin, ...).
 export function moduleForPath(path) {
-  if (path === '/' || path === '/home') return 'home';
+  if (path === '/' || path === '/home' || path === '/player-login') return 'home';
   const found = MODULES.find(m => m.id !== 'triace' && (path === m.path || path.startsWith(`${m.path}/`)));
   return found ? found.id : 'triace';
 }

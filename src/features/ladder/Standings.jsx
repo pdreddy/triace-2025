@@ -13,7 +13,7 @@ import TableResult, { RankTrail, ResultTag } from './TableResult';
 const utr = value => (Number.isFinite(value) ? value.toFixed(2) : '—');
 function MyCard() {
   const { me, season, playerId, signedIn, identityLoading, meta } = useLadder(), { user } = useTournament();
-  if (!signedIn) return <div className="lcard me"><h2>Play the ladder</h2><p>Sign in to challenge players and report scores.</p><Link className="button small" to="/captain">Sign in</Link></div>;
+  if (!signedIn) return <div className="lcard me"><h2>Play the ladder</h2><p>Sign in to challenge players and report scores.</p><Link className="button small" to="/player-login">Sign in</Link></div>;
   if (identityLoading) return null;
   if (!me) return (
     <div className="lcard me" data-testid="not-linked"><h2>Your account is not on the ladder yet</h2>

@@ -61,6 +61,7 @@ export function createDemoService() {
     syncPprcUtr: payload => request('sync-pprc-utr', payload),
     withdrawTeam: payload => request('withdraw-team', payload),
     resetCaptainLogin: payload => request('reset-captain-login', payload),
+    async playerLogin(username, password) { await request('player-login', { username, password }); await refreshAuth(); },
     async captainLogin(username, password) { await request('captain-login', { username, password }); await refreshAuth(); },
     importSeason1: season => request('import-season1', { season }),
     manageSeason: payload => request('season', payload),

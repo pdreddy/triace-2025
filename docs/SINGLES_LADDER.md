@@ -110,15 +110,13 @@ it, and the generated rules no longer make it readable; tell me and I will add a
 
 ## Identity
 
-Sign-in is the existing Firebase Email/Password accounts (captain logins and admin accounts); the Ladder creates no
-accounts. An organizer links one sign-in to one PPRC player (`ladder/accounts/<uid>`), after confirming with the person;
+Sign-in uses Firebase Email/Password accounts: captains at `/captain`, ladder players at `/player-login`, and admins
+at `/admin/login`. Player usernames map to `@player.traice.local`; captain usernames remain separate. The live Ladder does not provision accounts. An organizer links one sign-in to one PPRC player (`ladder/accounts/<uid>`), after confirming with the person;
 the player reads their account ID on `/ladder` to pass on. A matching name never grants anything, and a captain's
 ability to edit a TRIACE team does not make them that team's players on the Ladder. Every player action is checked
 against this link inside the transaction.
 
-**Gap to know about:** TRIACE has logins for captains only. Ladder players who are not captains have no sign-in yet.
-Creating player logins (who issues them, how they are delivered) is a decision for you; until then such players can be
-enrolled and ranked, and an organizer records their results from the dashboard.
+**Live provisioning:** the player sign-in route supports existing Firebase accounts, but creating live player accounts and linking them remains an organizer task. The six accounts below are created only in the local practice profile; they are not live Firebase accounts.
 
 ## Rules configuration and versioning
 
@@ -259,6 +257,47 @@ npm run demo            # no Firebase. Sign in at /admin/login, open /ladder/adm
 The demo server (`scripts/demo-plugin.mjs`) runs the same engine and applies the same read rules. Its players come
 from `scripts/ladder-dev-fixtures.mjs`, which nothing in `src/` or `functions/` imports: the live site has no demo
 roster and no fallback data. With no season, or when the database cannot be read, the UI says so.
+
+### Actual Group A data with six local player logins
+
+Stop the existing dev server, then run:
+
+```sh
+npm run demo:group-a
+```
+
+Open the printed URL at `/player-login`. Each account has the **local-only test password `groupa2026`**:
+
+| Player | Username |
+| --- | --- |
+| Usman Jehangiri | `groupa.usman` |
+| Vinod Marakoosham | `groupa.vinod` |
+| Mahidhar Penigi | `groupa.mahidhar` |
+| Nagarjuna Saladi | `groupa.nagarjuna` |
+| Mohamed Noufal | `groupa.noufal` |
+| Malla Reddy Cheerke | `groupa.malla` |
+
+The profile uses all 15 actual Group A roster names and three recorded match pairings from `scripts/migration/ladder-2026.psv`.
+UTRs come from `utr-seeds.csv` through the existing PPRC migration and name decisions. An unresolved UTR remains blank
+(Mohamed Noufal is currently unrated under that exact identity). These are checked-in snapshots, not a live-data download.
+Practice points and records start at zero, and historical Group A results remain read-only at `/ladder/2026`.
+
+Three pending challenges are prepared:
+
+| Challenger | Opponent who accepts/confirms | Reference winner | Score from challenger's side |
+| --- | --- | --- | --- |
+| Usman Jehangiri | Vinod Marakoosham | Usman | `7-5 1-6 12-10` |
+| Mahidhar Penigi | Nagarjuna Saladi | Nagarjuna | `4-6 1-6` |
+| Mohamed Noufal | Malla Reddy Cheerke | Malla Reddy | `3-6 6-4 4-6` |
+
+For the first match, sign in as Vinod and accept; sign in as Usman and report the reference score with Usman as winner;
+then sign in as Vinod and confirm. Use separate browser profiles, or sign out between accounts. Reference steps are
+also shown on the Ladder page. All Group A opponents are allowed for practice, either third-set format is accepted,
+and accepted matches get at least three days to play. Other security and ownership checks use the same ladder engine.
+
+This profile persists only under `.local-demo/group-a/`, separately from the normal demo, and serves its PPRC snapshot
+locally. Stop the server and run `npm run demo:group-a -- --reset` to restart these practice matches. The reset refuses
+a data folder that is not marked as Group A practice. No live Firebase accounts or results are changed.
 
 Emulators: `npm run emulators`, `npm run seed:emulators`, `node scripts/seed-ladder-emulators.mjs`, `npm run dev:emulators`.
 

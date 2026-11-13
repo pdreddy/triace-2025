@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import ResultCelebration from './ResultCelebration';
+import PracticeGuide from './PracticeGuide';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { EmptyState } from '../../components/UI';
 import { useLadder } from './LadderContext';
@@ -38,6 +39,7 @@ export default function LadderLayout() {
           {ids.length > 1 && <label className="season-pick"><span className="sr-only">Season</span><select value={seasonId} onChange={e => setSeasonId(e.target.value)}>{ids.map(id => <option key={id} value={id}>{seasons[id].name}</option>)}</select></label>}
         </div>
       </header>
+      {!error && seasonId && <PracticeGuide />}
       {error ? <EmptyState icon="warn" title="The ladder is unavailable">{error}<span>Nothing is shown rather than out-of-date or made-up standings. Please try again shortly.</span></EmptyState>
         : !seasonId && !organizer ? <EmptyState icon="ladder" title="No ladder season yet">An organizer has not created a Singles Ladder season.{admin && <Link className="button small" to="/ladder/admin">Create a season</Link>}</EmptyState>
         : <Outlet context={{ liveResult: !showingResult && tableResult?.key === `${seasonId}:${playerId}` ? tableResult.challenge : null }} />}
