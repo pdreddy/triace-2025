@@ -11,7 +11,7 @@ async function adminLogin(page) {
 }
 // Tests in this file share one demo server, so the season may already exist.
 async function ensureSeason(page) {
-  await page.goto('/ladder/organizer');
+  await page.goto('/ladder/admin');
   const create = page.getByRole('button', { name: 'Create demo season' }), title = page.getByRole('heading', { name: 'Demo Season', level: 1 });
   await expect(create.or(title)).toBeVisible();
   if (await create.isVisible()) await create.click();
@@ -25,10 +25,11 @@ test('with no season the ladder says so instead of showing made-up standings', a
   await expect(page.getByRole('list', { name: 'Ladder standings' })).toHaveCount(0);
   await page.goto('/home');
   await expect(page.getByText('No ladder season has been created yet.')).toBeVisible();
-  await page.goto('/ladder/organizer');
+  await page.goto('/ladder/organizer');                                                   // the earlier address still works
+  await expect(page).toHaveURL(/\/ladder\/admin$/);
   await expect(page.getByText('Organizers only')).toBeVisible();
   // The backend refuses organizer actions from a visitor and from a signed-in non-organizer.
-  expect((await page.request.post('/api/ladder-action', { data: { action: 'createSeason', name: 'Forged' } })).status()).toBe(401);
+  expect((await page.request.post('/api/ladder-action', { data: { action: 'createSeason', name: 'Forged', reason: 'forged' } })).status()).toBe(401);
 });
 
 test('organizer creates the season; players challenge, accept, report and confirm; standings move', async ({ page }) => {
@@ -40,9 +41,15 @@ test('organizer creates the season; players challenge, accept, report and confir
   await page.goto('/ladder');
   const me = page.getByTestId('my-ladder-card');
   await expect(me.getByText('#2', { exact: true })).toBeVisible();
-  await expect(page.getByRole('list', { name: 'Ladder standings' }).getByRole('listitem')).toHaveCount(12);
+  const list = page.getByRole('list', { name: 'Ladder standings' });
+  await expect(list.getByRole('listitem')).toHaveCount(16);
+  await expect(list.getByText('Verified PPRC Player', { exact: true })).toHaveCount(12);   // 12 fixture players have a PPRC match on record
+  await expect(list.getByText('Unverified', { exact: true })).toHaveCount(4);
   await me.getByRole('button', { name: 'Accept' }).click();
   await me.getByRole('button', { name: 'Report score' }).click();
+  await me.getByLabel(/^Score/).fill('6-4 4-6 6-3');
+  await me.getByRole('button', { name: 'Send for confirmation' }).click();
+  await expect(me.getByRole('alert')).toContainText('10-point match tiebreak');           // a full third set is not this season's format
   await me.getByLabel(/^Score/).fill('6-4 6-9');
   await me.getByRole('button', { name: 'Send for confirmation' }).click();
   await expect(me.getByRole('alert')).toContainText('not a valid tennis set score');      // refused by the backend
@@ -62,7 +69,7 @@ test('organizer creates the season; players challenge, accept, report and confir
   await expect(five.getByText('#2', { exact: true })).toBeVisible();
   await page.goto('/home');
   const card = page.getByRole('link', { name: /Active Singles Ladder/ });
-  await expect(card.getByText('#2 of 12')).toBeVisible();
+  await expect(card.getByText('#2 of 16')).toBeVisible();
   await expect(card.getByText('Pending challenges')).toBeVisible();
 
   // Now a top player with no active challenge: challenge the player above.
@@ -102,8 +109,8 @@ test('organizer rules settings validate, preview and version changes; the Rules 
   await expect(page.getByText('You may challenge a player up to 5 positions above you.')).toBeVisible();
 
   // Season freeze stops players; CSV export works.
-  await page.goto('/ladder/organizer');
-  await page.getByLabel('Reason (kept in the audit log)').fill('End of season review');
+  await page.goto('/ladder/admin');
+  await page.getByLabel('Reason (kept in the audit log)').first().fill('End of season review');
   await page.getByRole('button', { name: 'Freeze season' }).click();
   await expect(page.getByText('Frozen', { exact: true })).toBeVisible();
   await page.getByRole('tab', { name: 'Export' }).click();
@@ -120,7 +127,7 @@ test('phone layout: no sideways scrolling on Home or the Ladder', async ({ page 
   await page.setViewportSize({ width: 360, height: 740 });
   await adminLogin(page);
   await ensureSeason(page);
-  for (const path of ['/home', '/ladder', '/ladder/matches', '/ladder/rules', '/ladder/organizer']) {
+  for (const path of ['/home', '/ladder', '/ladder/matches', '/ladder/rules', '/ladder/admin']) {
     await page.goto(path);
     await expect(page.getByRole('link', { name: 'PPRC Player Home' })).toBeVisible();
     await page.waitForTimeout(800);

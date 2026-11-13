@@ -269,6 +269,8 @@ export const backupNow = onCall(options, async request => {
 // contend. The policy is functions/lib/singlesLadder/engine.js; the browser supplies no names, UTRs, roles or time.
 const LADDER_PATH = `${paths.root}/ladder`;
 const ladderMutate = (payload, actor, id) => mutate((state, { now }) => { const out = applyLadder(state, payload, actor, { now, id }); return { state: JSON.parse(JSON.stringify(out.state)), result: out.result }; }, LADDER_PATH);
+// "Verified PPRC Player": the person already has a match on record in TRIACE, KOC or the Ladder.
+const pprcVerified = rating => ((rating?.played?.singles || 0) + (rating?.played?.doubles || 0) + (rating?.wins || 0) + (rating?.losses || 0)) > 0;
 const pprcUtr = player => (Number.isFinite(player?.seed?.singles) && player.seed.singles >= 0 && player.seed.singles <= 16.5 ? player.seed.singles : null);
 export const ladderAction = onCall(options, async request => {
   requireAuth(request);
@@ -284,11 +286,12 @@ export const ladderAction = onCall(options, async request => {
       const player = (await db.ref(`pprcMaster/players/${payload.playerId}`).get()).val();
       if (!player?.name || player.mergedInto || player.retired) throw new HttpsError('failed-precondition', 'Choose a current player from the PPRC list.');
       payload.name = player.name; payload.utr = pprcUtr(player);
+      payload.verified = pprcVerified((await db.ref(`pprcMaster/ratings/${payload.playerId}`).get()).val());
     } else if (payload.action === 'syncPlayers') {
       if (!isLadderKey(payload.seasonId)) throw new HttpsError('invalid-argument', 'Choose a season.');
       const ids = Object.keys((await db.ref(`${LADDER_PATH}/public/${payload.seasonId}/players`).get()).val() || {});
-      const records = await Promise.all(ids.map(async id => (await db.ref(`pprcMaster/players/${id}`).get()).val()));
-      payload.players = Object.fromEntries(ids.map((id, i) => [id, records[i] ? { name: records[i].name, utr: pprcUtr(records[i]) } : null]).filter(([, value]) => value));
+      const records = await Promise.all(ids.map(async id => Promise.all([db.ref(`pprcMaster/players/${id}`).get(), db.ref(`pprcMaster/ratings/${id}`).get()]).then(([player, rating]) => ({ player: player.val(), rating: rating.val() }))));
+      payload.players = Object.fromEntries(ids.map((id, i) => [id, records[i].player ? { name: records[i].player.name, utr: pprcUtr(records[i].player), verified: pprcVerified(records[i].rating) } : null]).filter(([, value]) => value));
     } else {
       if (!isLadderKey(payload.uid)) throw new HttpsError('invalid-argument', 'Choose a sign-in account.');
       const account = await getAuth().getUser(payload.uid).catch(() => null);

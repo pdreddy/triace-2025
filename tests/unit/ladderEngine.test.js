@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { applyLadder, validateScore } from '../../functions/lib/singlesLadder/engine.js';
-import { DEFAULT_RULES } from '../../functions/lib/singlesLadder/config.js';
+import { DEFAULT_RULES, completeRules, validateRules } from '../../functions/lib/singlesLadder/config.js';
 import { T0, HOUR, DAY, admin, run, act, season, lastChallenge, challengeIds, custom, ladder, play, ranks, points } from './ladderHarness.js';
 
 const refuses = (fn, pattern) => assert.throws(fn, error => error.name === 'ValidationError' && pattern.test(error.message), String(pattern));
@@ -32,8 +32,8 @@ test('a player acts only as the player an organizer linked to their sign-in', ()
 });
 test('one sign-in per player; links are explicit and audited', () => {
   let state = ladder();
-  refuses(() => run(state, admin, { action: 'link', uid: 'other', playerId: 'p1' }), /already linked/);
-  refuses(() => run(state, admin, { action: 'link', uid: 'other', playerId: 'nobody' }), /Enroll the player/);
+  refuses(() => run(state, admin, { action: 'link', uid: 'other', playerId: 'p1', reason: 'verified in person' }), /already linked/);
+  refuses(() => run(state, admin, { action: 'link', uid: 'other', playerId: 'nobody', reason: 'verified in person' }), /Enroll the player/);
   refuses(() => run(state, admin, { action: 'unlink', uid: 'u1' }), /Give a reason/);
   state = act(state, admin, { action: 'unlink', uid: 'u1', reason: 'wrong account' });
   assert.equal(state.accounts.u1, undefined);
@@ -161,7 +161,12 @@ test('the challenger can withdraw before an answer', () => {
 
 // ---------- scores, points, positions ----------
 test('score validation', () => {
-  validateScore('6-4 6-3', true); validateScore('6-4, 3-6, 10-8', true); validateScore('4-6 7-6 5-7', false);
+  validateScore('6-4 6-3', true); validateScore('6-4, 3-6, 10-8', true); validateScore('4-6 7-6 11-13', false); validateScore('7-5 6-7 10-0', true);
+  // At one set all the default is a 10-point match tiebreak; a full third set only when the season says so.
+  assert.throws(() => validateScore('4-6 7-6 5-7', false), /10-point match tiebreak/);
+  validateScore('4-6 7-6 5-7', false, 'fullSet'); validateScore('4-6 7-6 5-7', false, 'either'); validateScore('4-6 7-6 8-10', false, 'either');
+  assert.throws(() => validateScore('4-6 7-6 8-10', false, 'fullSet'), /full third set/);
+  for (const bad of ['6-4 4-6 10-9', '6-4 4-6 12-11', '8-6 6-4', '6-6 6-4']) assert.throws(() => validateScore(bad, true), { name: 'ValidationError' });
   for (const [score, challengerWon] of [['6-4', true], ['6-5 6-3', true], ['6-4 6-3 6-2', true], ['6-4 6-3', false], ['abc', true], [null, true]]) assert.throws(() => validateScore(score, challengerWon), { name: 'ValidationError' });
 });
 test('an on-time challenger win: 3 + challenge bonus + upset bonus, and the players swap', () => {
@@ -224,17 +229,17 @@ test('an approved extension permits a late swap; after the extension the result 
     let s = act(ladder({ rules }), 5, { action: 'challenge', opponentId: 'p3' }); const id = lastChallenge(s)[0];
     s = act(s, 3, { action: 'respond', challengeId: id, accept: true });
     const due = season(s).challenges[id].deadline;
-    s = act(s, 5, { action: 'request', type: 'extension', challengeId: id, until: due + 3 * DAY, reason: 'Rain all week' });
+    s = act(s, 5, { action: 'request', type: 'extension', category: 'weather', challengeId: id, until: due + 3 * DAY, reason: 'Rain all week' });
     return { s, id, due };
   };
   let { s, id, due } = setup();
-  refuses(() => run(s, 3, { action: 'request', type: 'extension', challengeId: id, until: due + 2 * DAY, reason: 'me too' }), /already waiting/);
-  refuses(() => run(s, 5, { action: 'decideRequest', playerId: 'p5', requestId: Object.keys(s.private.s1.requests.p5)[0], approve: true }), /Organizer access/);
+  refuses(() => run(s, 3, { action: 'request', type: 'extension', category: 'weather', challengeId: id, until: due + 2 * DAY, reason: 'me too' }), /already waiting/);
+  refuses(() => run(s, 5, { action: 'decideRequest', playerId: 'p5', requestId: Object.keys(s.private.s1.requests.p5)[0], approve: true, reason: 'organizer decision' }), /Organizer access/);
   const requestId = Object.keys(s.private.s1.requests.p5)[0];
   assert.equal(s.private.s1.requests.p5[requestId].reason, 'Rain all week');
   assert.equal(JSON.stringify(s.public).includes('Rain all week'), false);        // the reason stays out of public data
-  refuses(() => run(s, admin, { action: 'decideRequest', playerId: 'p5', requestId, approve: true, until: due + 15 * DAY }), /within 14 days/);
-  const approved = act(s, admin, { action: 'decideRequest', playerId: 'p5', requestId, approve: true });
+  refuses(() => run(s, admin, { action: 'decideRequest', playerId: 'p5', requestId, approve: true, until: due + 15 * DAY, reason: 'organizer decision' }), /within 14 days/);
+  const approved = act(s, admin, { action: 'decideRequest', playerId: 'p5', requestId, approve: true, reason: 'organizer decision' });
   assert.equal(season(approved).challenges[id].extensionUntil, due + 3 * DAY);
   const finish = (state, at) => act(act(state, 5, { action: 'submit', challengeId: id, winnerId: 'p5', score: '6-4 6-3' }, at), 3, { action: 'confirm', challengeId: id }, at);
   const inside = finish(approved, due + 2 * DAY);
@@ -245,9 +250,9 @@ test('an approved extension permits a late swap; after the extension the result 
   assert.deepEqual([points(denied).p5, ranks(denied).p5], [3, 5]);
   // Configured so an extension keeps the points bonuses but not the position change.
   ({ s, id, due } = setup({ extension: { allowSwap: false } }));
-  const noSwap = finish(act(s, admin, { action: 'decideRequest', playerId: 'p5', requestId: Object.keys(s.private.s1.requests.p5)[0], approve: true }), due + 2 * DAY);
+  const noSwap = finish(act(s, admin, { action: 'decideRequest', playerId: 'p5', requestId: Object.keys(s.private.s1.requests.p5)[0], approve: true, reason: 'organizer decision' }), due + 2 * DAY);
   assert.deepEqual([points(noSwap).p5, ranks(noSwap).p5], [5, 5]);
-  refuses(() => run(act(ladder({ rules: { extension: { enabled: false, allowSwap: true } } }), 5, { action: 'challenge', opponentId: 'p3' }), 5, { action: 'request', type: 'extension', challengeId: 'x', until: due, reason: 'please' }), /not found/);
+  refuses(() => run(act(ladder({ rules: { extension: { enabled: false, allowSwap: true } } }), 5, { action: 'challenge', opponentId: 'p3' }), 5, { action: 'request', type: 'extension', category: 'weather', challengeId: 'x', until: due, reason: 'please' }), /not found/);
 });
 test('duplicate score submissions and confirmations never award points twice', () => {
   let state = act(ladder(), 5, { action: 'challenge', opponentId: 'p3' }); const id = lastChallenge(state)[0];
@@ -348,15 +353,15 @@ test('inactivity policy is configurable: automatic, once per season, activity de
   assert.deepEqual(Object.values(season(sweep(state, T0 + 14 * DAY)).penalties).map(p => p.playerId).sort(), ['p1', 'p3']);
 });
 test('players request exemptions; only organizers approve; reasons stay private', () => {
-  let state = act(ladder(), 4, { action: 'request', type: 'exemption', until: T0 + 10 * DAY, reason: 'Knee surgery' });
-  refuses(() => run(state, 4, { action: 'request', type: 'exemption', until: T0 + 12 * DAY, reason: 'Again' }), /already have an exemption request/);
-  refuses(() => run(state, 5, { action: 'request', type: 'exemption', until: T0 - DAY, reason: 'Past' }), /end date/);
+  let state = act(ladder(), 4, { action: 'request', type: 'exemption', category: 'travel', until: T0 + 10 * DAY, reason: 'Knee surgery' });
+  refuses(() => run(state, 4, { action: 'request', type: 'exemption', category: 'travel', until: T0 + 12 * DAY, reason: 'Again' }), /already have an exemption request/);
+  refuses(() => run(state, 5, { action: 'request', type: 'exemption', category: 'travel', until: T0 - DAY, reason: 'Past' }), /end date/);
   const requestId = Object.keys(state.private.s1.requests.p4)[0];
   assert.equal(JSON.stringify(state.public).includes('Knee surgery'), false);
   assert.equal(JSON.stringify(state.audit).includes('Knee surgery'), false);
-  state = act(state, admin, { action: 'decideRequest', playerId: 'p4', requestId, approve: true });
+  state = act(state, admin, { action: 'decideRequest', playerId: 'p4', requestId, approve: true, reason: 'organizer decision' });
   assert.equal(season(state).players.p4.exemptUntil, T0 + 10 * DAY);
-  refuses(() => run(state, admin, { action: 'decideRequest', playerId: 'p4', requestId, approve: false }), /already been decided/);
+  refuses(() => run(state, admin, { action: 'decideRequest', playerId: 'p4', requestId, approve: false, reason: 'organizer decision' }), /already been decided/);
 });
 test('no-show: reporter needs an organizer by default; loser gets 0, winner the configured walkover points', () => {
   const accepted = rules => { let s = act(ladder({ rules }), 5, { action: 'challenge', opponentId: 'p3' }); const id = lastChallenge(s)[0]; return [act(s, 3, { action: 'respond', challengeId: id, accept: true }), id]; };
@@ -412,20 +417,20 @@ test('rule changes are versioned, audited with before/after, and apply to new ch
   assert.deepEqual([points(state).p8, ranks(state).p8, lastChallenge(state)[1].rules.version], [11, 8, 2]);
 });
 test('a new season starts from the shared defaults or a copy; another season’s rules are never replaced', () => {
-  let state = act(ladder({ rules: { points: { win: 7 } } }), admin, { action: 'createSeason', seasonId: 's2', name: 'Spring' });
+  let state = act(ladder({ rules: { points: { win: 7 } } }), admin, { action: 'createSeason', seasonId: 's2', name: 'Spring', reason: 'spring season' });
   assert.deepEqual(state.public.s2.rules.values, DEFAULT_RULES);
-  state = act(state, admin, { action: 'createSeason', seasonId: 's3', name: 'Summer', copyRulesFrom: 's1' });
+  state = act(state, admin, { action: 'createSeason', seasonId: 's3', name: 'Summer', copyRulesFrom: 's1', reason: 'summer season' });
   assert.equal(state.public.s3.rules.values.points.win, 7);
   assert.equal(state.public.s1.rules.values.points.win, 7);
   assert.equal(state.index.current, 's1');
-  refuses(() => run(state, admin, { action: 'createSeason', seasonId: 's2', name: 'Again' }), /already in use/);
+  refuses(() => run(state, admin, { action: 'createSeason', seasonId: 's2', name: 'Again', reason: 'again' }), /already in use/);
   refuses(() => run(state, admin, { seasonId: 's2', action: 'setStatus', status: 'active', reason: 'open' }), /at least two players/);
 });
 
 // ---------- organizer tools, audit, freeze ----------
 test('seeding by UTR, manual positions, points and eligibility are organizer-only and audited', () => {
   let state = ladder({ count: 4, status: 'draft' });
-  state = act(state, admin, { action: 'syncPlayers', players: { p4: { name: 'Player Four', utr: 9.5 }, p1: { utr: 5 }, ghost: { utr: 1 } } });
+  state = act(state, admin, { action: 'syncPlayers', players: { p4: { name: 'Player Four', utr: 9.5, verified: true }, p1: { utr: 5 }, ghost: { utr: 1 } }, reason: 'refresh from PPRC' });
   assert.deepEqual([season(state).players.p4.name, season(state).players.p4.utr, ranks(state).p4], ['Player Four', 9.5, 4]);
   state = act(state, admin, { action: 'seed', reason: 'initial seeding from UTR' });
   assert.deepEqual(ranks(state), { p4: 1, p2: 2, p3: 3, p1: 4 });
@@ -434,7 +439,7 @@ test('seeding by UTR, manual positions, points and eligibility are organizer-onl
   state = act(state, admin, { action: 'adjust', playerId: 'p1', rank: 2, pointsDelta: -3, reason: 'correction after appeal' });
   assert.deepEqual([ranks(state).p1, ranks(state).p2, ranks(state).p3, points(state).p1], [2, 3, 4, -3]);
   const entry = audits(state).at(-1);
-  assert.deepEqual([entry.before, entry.after, entry.reason], [{ rank: 4, points: 0, eligible: true }, { rank: 2, points: -3, eligible: true }, 'correction after appeal']);
+  assert.deepEqual([entry.before, entry.after, entry.reason], [{ rank: 4, points: 0, eligible: true, utr: 5, verified: false }, { rank: 2, points: -3, eligible: true, utr: 5, verified: false }, 'correction after appeal']);
   assert.deepEqual(Object.values(season(state).points).at(-1), { playerId: 'p1', amount: -3, type: 'adjustment', at: T0, note: 'correction after appeal' });
   refuses(() => run(state, admin, { action: 'adjust', playerId: 'p1', rank: 9, reason: 'bad' }), /position on the ladder/);
   refuses(() => run(state, admin, { action: 'adjust', playerId: 'p1', reason: 'nothing' }), /Choose what to change/);
@@ -462,7 +467,7 @@ test('every action is audited with actor, UTC time and target; player reasons ne
 test('a frozen season stops players and automatic rules; organizers can still adjudicate; closed is final', () => {
   let state = act(ladder(), 5, { action: 'challenge', opponentId: 'p3' }); const id = lastChallenge(state)[0];
   state = act(state, admin, { action: 'setStatus', status: 'frozen', reason: 'final week review' });
-  for (const [who, payload] of [[3, { action: 'respond', challengeId: id, accept: true }], [5, { action: 'withdraw', challengeId: id }], [6, { action: 'challenge', opponentId: 'p4' }], [6, { action: 'request', type: 'exemption', until: T0 + DAY, reason: 'away' }]])
+  for (const [who, payload] of [[3, { action: 'respond', challengeId: id, accept: true }], [5, { action: 'withdraw', challengeId: id }], [6, { action: 'challenge', opponentId: 'p4' }], [6, { action: 'request', type: 'exemption', category: 'travel', until: T0 + DAY, reason: 'away' }]])
     refuses(() => run(state, who, payload), /season is frozen/);
   const later = act(state, admin, { action: 'sweep' }, T0 + 30 * DAY);
   assert.deepEqual([season(later).challenges[id].status, Object.keys(season(later).penalties).length], ['pending', 0]);   // no expiry, no inactivity
@@ -477,8 +482,8 @@ test('a frozen season stops players and automatic rules; organizers can still ad
   for (const [who, payload] of [[6, { action: 'challenge', opponentId: 'p4' }], [admin, { action: 'adjust', playerId: 'p1', pointsDelta: 1, reason: 'nope' }], [admin, { action: 'setStatus', status: 'active', reason: 'reopen' }], [admin, { action: 'saveRules', values: DEFAULT_RULES, baseVersion: 1, reason: 'nope' }]])
     refuses(() => run(state, who, payload), /season is closed/);
   // A second season cannot open while one is running; it can once the first is closed.
-  let two = act(ladder(), admin, { action: 'createSeason', seasonId: 's2', name: 'Next' });
-  for (const p of ['p1', 'p2']) two = act(two, admin, { seasonId: 's2', action: 'enroll', playerId: p, name: p });
+  let two = act(ladder(), admin, { action: 'createSeason', seasonId: 's2', name: 'Next', reason: 'next season' });
+  for (const p of ['p1', 'p2']) two = act(two, admin, { seasonId: 's2', action: 'enroll', playerId: p, name: p, reason: 'roster' });
   refuses(() => run(two, admin, { seasonId: 's2', action: 'setStatus', status: 'active', reason: 'open' }), /Close the season that is running/);
   refuses(() => run(two, 1, { seasonId: 's2', action: 'challenge', opponentId: 'p2' }), /not open yet/);
 });
@@ -488,4 +493,64 @@ test('invalid input is refused without changing anything', () => {
     assert.throws(() => applyLadder(state, payload && !Array.isArray(payload) ? { seasonId: 's1', ...payload } : payload, { uid: 'u5' }, { now: T0, id: 'x' }), { name: 'ValidationError' });
   assert.throws(() => applyLadder(state, { seasonId: 's1', action: 'challenge', opponentId: 'p3' }, { uid: null }, { now: T0, id: 'x' }), { name: 'ValidationError' });
   assert.deepEqual(state, copy);
+});
+
+// ---------- verified status, request reasons, admin reasons, older stored rules ----------
+test('verified: set from PPRC history by the server, earned by playing a ladder match, editable by an organizer with UTR', () => {
+  let state = ladder({ count: 4 });
+  assert.equal(season(state).players.p4.verified, false);                        // a new player with no PPRC match on record
+  state = act(state, admin, { action: 'enroll', playerId: 'p9', name: 'Known Player', utr: 5, verified: true, reason: 'late entry' });
+  assert.equal(season(state).players.p9.verified, true);
+  state = act(state, admin, { action: 'syncPlayers', players: { p1: { verified: true }, p9: { verified: false } }, reason: 'refresh from PPRC' });
+  assert.deepEqual([season(state).players.p1.verified, season(state).players.p9.verified], [true, true]);   // a refresh never removes it
+  state = play(state, 4, 2);
+  assert.deepEqual([season(state).players.p4.verified, season(state).players.p2.verified, season(state).players.p3.verified], [true, true, false]);
+  state = act(state, admin, { action: 'adjust', playerId: 'p3', verified: true, utr: 6.25, reason: 'played KOC under another spelling' });
+  assert.deepEqual([season(state).players.p3.verified, season(state).players.p3.utr], [true, 6.25]);
+  assert.deepEqual([Object.values(state.audit).at(-1).before.verified, Object.values(state.audit).at(-1).after.verified, Object.values(state.audit).at(-1).after.utr], [false, true, 6.25]);
+  refuses(() => run(state, admin, { action: 'adjust', playerId: 'p3', utr: 40, reason: 'typo' }), /UTR from 0 to 16.5/);
+  refuses(() => run(state, 3, { action: 'adjust', playerId: 'p3', verified: true, reason: 'me' }), /Organizer access/);
+});
+test('extension and exemption requests need one of the listed reasons: injury, travel, weather, court closure, scheduling', () => {
+  let state = act(ladder(), 5, { action: 'challenge', opponentId: 'p3' }); const id = lastChallenge(state)[0];
+  state = act(state, 3, { action: 'respond', challengeId: id, accept: true });
+  const due = season(state).challenges[id].deadline;
+  refuses(() => run(state, 5, { action: 'request', type: 'extension', challengeId: id, until: due + DAY, reason: 'no category' }), /injury, travel, weather, court closure or scheduling/);
+  refuses(() => run(state, 5, { action: 'request', type: 'exemption', category: 'holiday', until: T0 + 5 * DAY, reason: 'not on the list' }), /injury, travel, weather/);
+  for (const category of ['injury', 'travel', 'weather', 'courtClosure', 'scheduling']) {
+    const asked = act(state, 5, { action: 'request', type: 'extension', category, challengeId: id, until: due + DAY, reason: 'details for the organizer' });
+    assert.equal(Object.values(asked.private.s1.requests.p5)[0].category, category);
+  }
+});
+test('every organizer action needs a reason and is audited with it', () => {
+  const state = act(ladder(), 5, { action: 'challenge', opponentId: 'p3' }), id = lastChallenge(state)[0];
+  for (const payload of [{ action: 'createSeason', seasonId: 's9', name: 'No reason' }, { action: 'enroll', playerId: 'px', name: 'X' }, { action: 'link', uid: 'ux', playerId: 'p1' }, { action: 'unlink', uid: 'u1' },
+    { action: 'syncPlayers', players: {} }, { action: 'seed' }, { action: 'setStatus', status: 'frozen' }, { action: 'saveRules', values: DEFAULT_RULES, baseVersion: 1 }, { action: 'adjust', playerId: 'p1', rank: 2 },
+    { action: 'resolve', challengeId: id, winnerId: 'p5', kind: 'walkover' }, { action: 'cancel', challengeId: id }, { action: 'voidResult', challengeId: id }, { action: 'grant', type: 'exemption', playerId: 'p1', until: T0 + DAY },
+    { action: 'decideRequest', playerId: 'p1', requestId: 'r', approve: true }, { action: 'decidePenalty', penaltyId: 'x', apply: true }])
+    refuses(() => run(state, admin, payload), /Give a reason/);
+  const organizerEntries = Object.values(state.audit).filter(a => a.actor.role === 'organizer');
+  assert.ok(organizerEntries.length > 10 && organizerEntries.every(a => typeof a.reason === 'string' && a.reason.length >= 3));
+});
+test('several ranking changes in one week keep positions unique and are each audited', () => {
+  let state = ladder();
+  state = play(state, 5, 3, { at: T0 });                                         // Mon: 5 <-> 3
+  state = play(state, 8, 6, { at: T0 + DAY });                                   // Tue: 8 <-> 6
+  state = play(state, 4, 1, { at: T0 + 2 * DAY });                               // Wed: 4 <-> 1
+  state = play(state, 7, 3, { at: T0 + 3 * DAY, winner: 3 });                    // Thu: defended, no change
+  state = play(state, 2, 4, { at: T0 + 4 * DAY, winner: 2 });                    // Fri: p2 (#2) beats p4 (#1): swap
+  assert.deepEqual(ranks(state), { p2: 1, p4: 2, p5: 3, p1: 4, p3: 5, p8: 6, p7: 7, p6: 8 });
+  assert.deepEqual(Object.values(season(state).players).map(p => p.rank).sort(), [1, 2, 3, 4, 5, 6, 7, 8]);
+  const moves = Object.values(state.audit).filter(a => a.rankChanges?.length);
+  assert.equal(moves.length, 4);
+  assert.ok(moves.every(a => a.action === 'confirm' && a.rankChanges.length === 2));
+  assert.ok(Object.values(season(state).challenges).every(c => c.outcome.late === false));   // all inside the same Sunday deadline
+});
+test('a season stored before a rule existed gets that rule’s default and nothing else changes', () => {
+  let state = ladder({ rules: { points: { win: 7 } } });
+  delete state.public.s1.rules.values.match;                                     // as written by an earlier version of the app
+  assert.equal(validateRules(state.public.s1.rules.values).ok, false);
+  assert.deepEqual(completeRules(state.public.s1.rules.values).match, DEFAULT_RULES.match);
+  state = act(state, 5, { action: 'challenge', opponentId: 'p3' });
+  assert.deepEqual([season(state).rules.version, season(state).rules.values.points.win, season(state).rules.values.match.thirdSet, lastChallenge(state)[1].rules.values.match.thirdSet], [2, 7, 'matchTiebreak', 'matchTiebreak']);
 });

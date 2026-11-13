@@ -58,7 +58,7 @@ export default function PlayerHome() {
           );
         })}
       </div>
-      {user?.admin && <p className="home-links"><Link to="/admin">TRIACE organizer dashboard →</Link><Link to="/ladder/organizer">Ladder organizer dashboard →</Link></p>}
+      {user?.admin && <p className="home-links"><Link to="/admin">TRIACE organizer dashboard →</Link><Link to="/ladder/admin">Ladder admin dashboard →</Link></p>}
     </section>
   );
 }

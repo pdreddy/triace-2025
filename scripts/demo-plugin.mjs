@@ -131,7 +131,7 @@ export function demoPlugin(env) {
         if (endpoint === '/ladder-action') {
           if (!session || session.anonymous) return send(401, { error: 'Sign in with your player account.' });
           const data = { ...payload };
-          if (admin && data.action === 'enroll') { const record = Object.hasOwn(DEMO_ROSTER, data.playerId) && DEMO_ROSTER[data.playerId]; if (!record) return send(400, { error: 'The local demo only knows its development roster: ladder_demo_1 to ladder_demo_12.' }); Object.assign(data, record); }
+          if (admin && data.action === 'enroll') { const record = Object.hasOwn(DEMO_ROSTER, data.playerId) && DEMO_ROSTER[data.playerId]; if (!record) return send(400, { error: 'The local demo only knows its development roster: ladder_demo_1 to ladder_demo_16.' }); Object.assign(data, record); }
           if (admin && data.action === 'syncPlayers') data.players = DEMO_ROSTER;
           return send(200, await mutate(current => { const out = applyLadder(current.ladder, data, { uid: session.uid, admin }, { now: Date.now(), id: newId() }); return { state: { ...current, ladder: JSON.parse(JSON.stringify(out.state)) }, result: out.result }; }));
         }

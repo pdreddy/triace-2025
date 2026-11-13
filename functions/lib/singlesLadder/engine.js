@@ -8,14 +8,15 @@
 //           private: { [seasonId]: { requests: { [playerId]: {...} }, notifications: { [playerId]: {...} } } },
 //           audit: { [id]: entry }, accounts: { [uid]: playerId }, ops: { [opId]: at } }
 import { ValidationError } from '../tournament.js';
-import { RULES_SCHEMA, DEFAULT_RULES, validateRules, diffRules, inChallengeRange } from './config.js';
+import { RULES_SCHEMA, DEFAULT_RULES, REQUEST_CATEGORIES, validateRules, diffRules, completeRules, inChallengeRange } from './config.js';
 import { nextDeadline } from './time.js';
 
 const DAY = 86400000, HOUR = 3600000;
 export const ACTIVE_STATUSES = ['pending', 'accepted', 'submitted', 'disputed'];
 const PLAYER_ACTIONS = ['challenge', 'respond', 'withdraw', 'submit', 'confirm', 'dispute', 'request'];
 const ORGANIZER_ACTIONS = ['createSeason', 'setStatus', 'saveRules', 'enroll', 'syncPlayers', 'seed', 'adjust', 'link', 'unlink', 'resolve', 'voidResult', 'cancel', 'decideRequest', 'grant', 'decidePenalty', 'sweep'];
-const NEEDS_REASON = ['setStatus', 'saveRules', 'seed', 'adjust', 'unlink', 'resolve', 'voidResult', 'cancel', 'grant', 'decidePenalty'];
+// Every organizer action needs a reason; only the automatic time-based sweep has none.
+const NEEDS_REASON = ORGANIZER_ACTIONS.filter(a => a !== 'sweep');
 
 const check = (ok, message) => { if (!ok) throw new ValidationError(message); };
 export const isKey = value => typeof value === 'string' && !['__proto__', 'prototype', 'constructor'].includes(value) && /^[a-zA-Z0-9_-]{1,128}$/.test(value);
@@ -24,14 +25,17 @@ const isActive = c => ACTIVE_STATUSES.includes(c.status);
 const involves = (c, playerId) => c.challengerId === playerId || c.opponentId === playerId;
 const other = (c, playerId) => (c.challengerId === playerId ? c.opponentId : c.challengerId);
 
-// Best of three from the challenger's side, with an optional deciding match tiebreak: "6-4 3-6 10-8".
-export function validateScore(score, winnerIsChallenger) {
+// Best of three from the challenger's side: sets to 6 (7-5, or 7-6 after the tiebreak at 6-6). At one set all the
+// season's match format decides: a 10-point match tiebreak ("6-4 3-6 10-8"), a full third set, or either.
+export function validateScore(score, winnerIsChallenger, thirdSet = 'matchTiebreak') {
   check(typeof score === 'string' && score.length <= 80 && /^\d{1,2}-\d{1,2}(?:[ ,]+\d{1,2}-\d{1,2}){1,2}$/.test(score.trim()), 'Enter the score from the challenger’s side, such as 6-4 6-3.');
   let a = 0, b = 0;
   score.trim().split(/[ ,]+/).map(set => set.split('-').map(Number)).forEach(([x, y], i) => {
     check(a < 2 && b < 2, 'The score has sets after the match ended.');
     const hi = Math.max(x, y), lo = Math.min(x, y);
-    check((hi === 6 && lo <= 4) || (hi === 7 && [5, 6].includes(lo)) || (i === 2 && ((hi === 10 && lo <= 8) || (hi > 10 && hi - lo === 2))), 'That is not a valid tennis set score.');
+    const set = (hi === 6 && lo <= 4) || (hi === 7 && [5, 6].includes(lo)), tiebreak = (hi === 10 && lo <= 8) || (hi > 10 && hi - lo === 2);
+    if (i < 2) check(set, 'That is not a valid tennis set score.');
+    else check(thirdSet === 'fullSet' ? set : thirdSet === 'either' ? set || tiebreak : tiebreak, thirdSet === 'fullSet' ? 'At one set all this season plays a full third set.' : thirdSet === 'either' ? 'That is not a valid third set or match tiebreak.' : 'At one set all the match is decided by a 10-point match tiebreak, such as 10-8.');
     if (x > y) a++; else b++;
   });
   check(winnerIsChallenger ? a === 2 : b === 2, 'The winner must match the score (challenger’s games first).');
@@ -78,6 +82,7 @@ export function applyLadder(current, payload, actor, ctx) {
     seasonId = id; meta = state.index.seasons[id]; season = state.public[id] ||= {}; hidden = state.private[id] ||= {};
     for (const key of ['players', 'challenges', 'points', 'penalties', 'rulesHistory']) season[key] ||= {};
     hidden.requests ||= {}; hidden.notifications ||= {};
+    if (season.rules?.values) season.rules.values = completeRules(season.rules.values);
     check(meta.status !== 'closed', 'This season is closed. Its records can no longer change.');
   }
   const role = () => (system ? 'system' : organizer ? 'organizer' : 'player');
@@ -155,6 +160,7 @@ export function applyLadder(current, payload, actor, ctx) {
     }
     winner.streak = (winner.streak || 0) + 1; loser.streak = 0;
     winner.wins = (winner.wins || 0) + 1; loser.losses = (loser.losses || 0) + 1;
+    if (played) winner.verified = loser.verified = true;                     // they have now played a PPRC match
     touch(...(played ? [winnerId, loserId] : [winnerId]));
     c.status = 'completed'; c.completedAt = now; c.result.kind = kind;
     c.outcome = { late, extended, moved, bonuses, points: { [winnerId]: winner.points - startPoints[winnerId], [loserId]: loser.points - startPoints[loserId] }, ranksBefore, ranksAfter: { [winnerId]: winner.rank, [loserId]: loser.rank } };
@@ -208,7 +214,7 @@ export function applyLadder(current, payload, actor, ctx) {
     const title = text(payload.name, 2, 80, 'Give the season a name (2 to 80 characters).');
     let values = DEFAULT_RULES;
     if (payload.copyRulesFrom !== undefined && payload.copyRulesFrom !== null) { check(isKey(payload.copyRulesFrom) && state.public[payload.copyRulesFrom]?.rules, 'Choose an existing season to copy rules from.'); values = state.public[payload.copyRulesFrom].rules.values; }
-    const checked = validateRules(structuredClone(values)); check(checked.ok, 'The copied rules are not valid for this version. Review them first.');
+    const checked = validateRules(completeRules(structuredClone(values))); check(checked.ok, 'The copied rules are not valid for this version. Review them first.');
     state.index.seasons[id] = { name: title, status: 'draft', createdAt: now };
     state.index.current ||= id;
     const rules = { schema: RULES_SCHEMA, version: 1, values: checked.values, updatedAt: now };
@@ -270,7 +276,7 @@ export function applyLadder(current, payload, actor, ctx) {
     check(isKey(payload.playerId) && !season.players[payload.playerId], 'That player is already on this ladder.');
     const title = text(payload.name, 1, 120, 'The player needs a name.');
     check(payload.utr === null || payload.utr === undefined || (Number.isFinite(payload.utr) && payload.utr >= 0 && payload.utr <= 16.5), 'The UTR is not valid.');
-    season.players[payload.playerId] = { name: title, utr: payload.utr ?? null, rank: Object.keys(season.players).length + 1, points: 0, streak: 0, wins: 0, losses: 0, eligible: true, joinedAt: now };
+    season.players[payload.playerId] = { name: title, utr: payload.utr ?? null, rank: Object.keys(season.players).length + 1, points: 0, streak: 0, wins: 0, losses: 0, eligible: true, verified: payload.verified === true, joinedAt: now };
     audit({ target: { playerId: payload.playerId }, after: { rank: season.players[payload.playerId].rank, utr: payload.utr ?? null } });
   }
   else if (action === 'syncPlayers') {
@@ -278,8 +284,9 @@ export function applyLadder(current, payload, actor, ctx) {
     const changed = {};
     for (const [id, fresh] of Object.entries(payload.players || {})) {
       const p = season.players[id]; if (!p || !fresh) continue;
-      const next = { name: typeof fresh.name === 'string' && fresh.name.trim() ? fresh.name.trim().slice(0, 120) : p.name, utr: Number.isFinite(fresh.utr) ? fresh.utr : p.utr };
-      if (next.name !== p.name || next.utr !== p.utr) { changed[id] = { before: { name: p.name, utr: p.utr }, after: next }; Object.assign(p, next); }
+      // Verified only ever turns on here (the player has a PPRC match on record); an organizer's decision is not undone.
+      const next = { name: typeof fresh.name === 'string' && fresh.name.trim() ? fresh.name.trim().slice(0, 120) : p.name, utr: Number.isFinite(fresh.utr) ? fresh.utr : p.utr, verified: p.verified === true || fresh.verified === true };
+      if (next.name !== p.name || next.utr !== p.utr || next.verified !== (p.verified === true)) { changed[id] = { before: { name: p.name, utr: p.utr ?? null, verified: p.verified === true }, after: next }; Object.assign(p, next); }
     }
     result.updated = Object.keys(changed).length;
     audit({ target: { seasonId }, after: { updated: result.updated, players: changed } });
@@ -290,8 +297,10 @@ export function applyLadder(current, payload, actor, ctx) {
     audit({ target: { seasonId }, rankChanges: rankChanges(before, season) });
   }
   else if (action === 'adjust') {
-    const p = player(payload.playerId), was = { rank: p.rank, points: p.points, eligible: p.eligible };
-    check(['rank', 'pointsDelta', 'eligible', 'markActive'].some(k => payload[k] !== undefined), 'Choose what to change.');
+    const p = player(payload.playerId), was = { rank: p.rank, points: p.points, eligible: p.eligible, utr: p.utr ?? null, verified: p.verified === true };
+    check(['rank', 'pointsDelta', 'eligible', 'markActive', 'utr', 'verified'].some(k => payload[k] !== undefined), 'Choose what to change.');
+    if (payload.utr !== undefined) { check(Number.isFinite(payload.utr) && payload.utr >= 0 && payload.utr <= 16.5, 'Enter a UTR from 0 to 16.5.'); p.utr = payload.utr; }
+    if (payload.verified !== undefined) { check(typeof payload.verified === 'boolean', 'Choose verified or unverified.'); p.verified = payload.verified; }
     if (payload.rank !== undefined) { check(Number.isInteger(payload.rank) && payload.rank >= 1 && payload.rank <= Object.keys(season.players).length, 'Choose a position on the ladder.'); moveTo(season, payload.playerId, payload.rank); }
     if (payload.pointsDelta !== undefined) { check(Number.isInteger(payload.pointsDelta) && payload.pointsDelta !== 0 && Math.abs(payload.pointsDelta) <= 100, 'Enter a whole number of points to add or remove.'); award(payload.playerId, payload.pointsDelta, 'adjustment', { note: reason }); }
     if (payload.eligible !== undefined) {
@@ -301,7 +310,7 @@ export function applyLadder(current, payload, actor, ctx) {
     }
     if (payload.markActive === true) p.lastActiveAt = now;
     notify(payload.playerId, 'organizer', 'An organizer updated your ladder record.');
-    audit({ target: { playerId: payload.playerId }, before: was, after: { rank: p.rank, points: p.points, eligible: p.eligible }, rankChanges: rankChanges(before, season) });
+    audit({ target: { playerId: payload.playerId }, before: was, after: { rank: p.rank, points: p.points, eligible: p.eligible, utr: p.utr ?? null, verified: p.verified === true }, rankChanges: rankChanges(before, season) });
   }
   else if (action === 'resolve') {
     // Disputes, walkovers, no-shows and results the players could not finish themselves. The organizer's decision is final.
@@ -310,7 +319,7 @@ export function applyLadder(current, payload, actor, ctx) {
     check(involves(c, payload.winnerId), 'Choose one of the two players as the winner.');
     check(['played', 'walkover', 'noShow'].includes(kind), 'Choose played, walkover or no-show.');
     const was = { status: c.status, result: c.result || null };
-    if (kind === 'played') { const score = payload.score ?? c.result?.score; validateScore(score, payload.winnerId === c.challengerId); c.result = { ...c.result, score }; }
+    if (kind === 'played') { const score = payload.score ?? c.result?.score; validateScore(score, payload.winnerId === c.challengerId, c.rules.values.match?.thirdSet); c.result = { ...c.result, score }; }
     c.result = { submittedBy: 'organizer', submittedAt: now, ...c.result, winnerId: payload.winnerId, kind };
     if (kind !== 'played') delete c.result.score;
     c.resolution = { by: actor.uid, at: now };
@@ -386,11 +395,12 @@ export function applyLadder(current, payload, actor, ctx) {
   }
   else if (action === 'request' && payload.type === 'exemption') {
     const why = text(payload.reason, 3, 500, 'Explain the request in 3 to 500 characters. Only organizers can read it.');
+    check(Object.hasOwn(REQUEST_CATEGORIES, payload.category), 'Choose what the request is for: injury, travel, weather, court closure or scheduling.');
     check(Number.isSafeInteger(payload.until) && payload.until > now && payload.until <= now + 365 * DAY, 'Choose an end date within the next year.');
     check(payload.from === undefined || payload.from === null || (Number.isSafeInteger(payload.from) && payload.from < payload.until), 'The exemption must start before it ends.');
     check(!Object.values(hidden.requests[me] || {}).some(r => r.type === 'exemption' && r.status === 'pending'), 'You already have an exemption request waiting.');
     const id = newId();
-    (hidden.requests[me] ||= {})[id] = { type: 'exemption', from: payload.from ?? null, until: payload.until, reason: why, status: 'pending', createdAt: now };
+    (hidden.requests[me] ||= {})[id] = { type: 'exemption', category: payload.category, from: payload.from ?? null, until: payload.until, reason: why, status: 'pending', createdAt: now };
     result.requestId = id; audit({ target: { playerId: me, requestId: id }, after: { type: 'exemption', until: payload.until } });
   }
   else {
@@ -422,7 +432,7 @@ export function applyLadder(current, payload, actor, ctx) {
       } else {
         check(kind === 'played', 'Choose a played match or a no-show.');
         check(involves(c, payload.winnerId), 'Choose one of the two players as the winner.');
-        validateScore(payload.score, payload.winnerId === c.challengerId);
+        validateScore(payload.score, payload.winnerId === c.challengerId, v.match?.thirdSet);
         c.result = { winnerId: payload.winnerId, score: payload.score.trim(), kind, submittedBy: me, submittedAt: now };
         c.status = 'submitted';
         notify(other(c, me), 'score', `${name(me)} reported ${c.result.score}. Confirm or dispute it.`, id);
@@ -438,10 +448,11 @@ export function applyLadder(current, payload, actor, ctx) {
       check(v.extension.enabled, 'Extensions are not available for this match.');
       check(c.status === 'accepted', 'Only an accepted match that is still to be played can be extended.');
       const why = text(payload.reason, 3, 500, 'Explain the request in 3 to 500 characters. Only organizers can read it.');
+      check(Object.hasOwn(REQUEST_CATEGORIES, payload.category), 'Choose what the request is for: injury, travel, weather, court closure or scheduling.');
       check(Number.isSafeInteger(payload.until) && payload.until > Math.max(now, c.deadline) && payload.until <= c.deadline + v.extension.maxDays * DAY, `Choose a new deadline after the current one and within ${v.extension.maxDays} days of it.`);
       check(!Object.values(hidden.requests).some(list => Object.values(list).some(r => r.challengeId === id && r.status === 'pending')), 'An extension request for this match is already waiting.');
       const requestId = newId();
-      (hidden.requests[me] ||= {})[requestId] = { type: 'extension', challengeId: id, until: payload.until, reason: why, status: 'pending', createdAt: now };
+      (hidden.requests[me] ||= {})[requestId] = { type: 'extension', category: payload.category, challengeId: id, until: payload.until, reason: why, status: 'pending', createdAt: now };
       result.requestId = requestId; audit({ target: { playerId: me, challengeId: id, requestId }, after: { type: 'extension', until: payload.until } });
     } else check(false, 'Choose an exemption or an extension.');
   }

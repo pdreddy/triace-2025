@@ -44,7 +44,7 @@ test('admin login opens Player Home with organizer navigation', async ({ page })
   await page.getByLabel('Password', { exact: true }).fill('local-e2e-test-password');
   await page.getByRole('button', { name: 'Sign in ↗', exact: true }).click();
   await expect(page).toHaveURL(/\/home$/);
-  await expect(page.getByRole('link', { name: 'Ladder organizer dashboard →' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Ladder admin dashboard →' })).toBeVisible();
   await page.getByRole('link', { name: 'TRIACE organizer dashboard →' }).click();
   await expect(page).toHaveURL(/\/admin$/);
 });

@@ -5,7 +5,8 @@ import { Link } from 'react-router-dom';
 import { EmptyState, Message } from '../../components/UI';
 import PprcLookup from '../../components/PprcLookup';
 import { useLadder, useLadderAdmin, useAction } from './LadderContext';
-import { standings, entries, isActive, exportCsv, STATUS_LABELS } from './selectors';
+import { standings, entries, isActive, exportCsv, STATUS_LABELS, verifiedLabel } from './selectors';
+import { REQUEST_CATEGORIES } from '../../../functions/lib/singlesLadder/config.js';
 import { Chip, Form, Input, Select, When, endOfDay } from './ui';
 import RulesSettings from './RulesSettings';
 
@@ -15,7 +16,7 @@ const ok = reason => reason.trim().length >= 3;
 
 function SeasonTab() {
   const { seasons, seasonId, meta, act, demo, season } = useLadder(), { busy, error, run } = useAction();
-  const [name, setName] = useState(''), [copy, setCopy] = useState(''), [reason, setReason] = useState(''), [note, setNote] = useState('');
+  const [name, setName] = useState(''), [copy, setCopy] = useState(''), [reason, setReason] = useState(''), [why, setWhy] = useState(''), [note, setNote] = useState('');
   const status = to => run(async () => { await act({ action: 'setStatus', status: to, reason }); setReason(''); });
   return (
     <>
@@ -34,15 +35,16 @@ function SeasonTab() {
           <p className="lmeta">Frozen: players cannot challenge, answer or report, and automatic penalties stop; organizers can still settle disputes. Closed is permanent.</p>
         </>}
       </div>}
-      <Form label="Create a season" className="lcard" onSubmit={() => run(async () => { await act({ action: 'createSeason', name, ...(copy ? { copyRulesFrom: copy } : {}) }); setName(''); setNote('Season created as a draft. Enroll players, check the rules, then open it.'); })}>
+      <Form label="Create a season" className="lcard" onSubmit={() => run(async () => { await act({ action: 'createSeason', name, reason: why, ...(copy ? { copyRulesFrom: copy } : {}) }); setName(''); setWhy(''); setNote('Season created as a draft. Enroll players, check the rules, then open it.'); })}>
         <h3>Create a season</h3>
         <Input label="Season name" id="season-name" required minLength={2} maxLength={80} value={name} onChange={e => setName(e.target.value)} />
         <Select label="Starting rules" id="season-copy" value={copy} onChange={e => setCopy(e.target.value)}><option value="">Initial defaults</option>{Object.entries(seasons).map(([id, s]) => <option key={id} value={id}>Copy from {s.name}</option>)}</Select>
-        <button className="button small" disabled={busy || name.trim().length < 2}>Create draft season</button>
+        <Reason id="season-create-reason" value={why} onChange={setWhy} />
+        <button className="button small" disabled={busy || name.trim().length < 2 || !ok(why)}>Create draft season</button>
       </Form>
       {demo && <div className="lcard demo-tools"><h3>Local demo tools</h3><p className="lmeta">Only in the local demo. Creates a made-up roster through the real rules engine; never available on the live site.</p>
         <div className="lactions">{!seasonId && <button className="secondary small" disabled={busy} onClick={() => run(() => demo.seed())}>Create demo season</button>}
-          {seasonId && standings(season).slice(0, 12).map(p => p.id.startsWith('ladder_demo_') && <button key={p.id} className="secondary small" disabled={busy} onClick={() => run(() => demo.loginAs(p.id))}>Sign in as {p.name}</button>)}</div></div>}
+          {seasonId && standings(season).map(p => p.id.startsWith('ladder_demo_') && <button key={p.id} className="secondary small" disabled={busy} onClick={() => run(() => demo.loginAs(p.id))}>Sign in as {p.name}</button>)}</div></div>}
       <Message error>{error}</Message><Message>{note}</Message>
     </>
   );
@@ -50,13 +52,13 @@ function SeasonTab() {
 
 function PlayerRow({ player, uid }) {
   const { act, season } = useLadder(), { busy, error, run } = useAction();
-  const [open, setOpen] = useState(false), [rank, setRank] = useState(''), [delta, setDelta] = useState(''), [reason, setReason] = useState(''), [account, setAccount] = useState(''), [until, setUntil] = useState('');
+  const [open, setOpen] = useState(false), [rank, setRank] = useState(''), [delta, setDelta] = useState(''), [reason, setReason] = useState(''), [account, setAccount] = useState(''), [until, setUntil] = useState(''), [utr, setUtr] = useState('');
   const tz = season.rules.values.deadline.timezone;
   const adjust = extra => run(async () => { await act({ action: 'adjust', playerId: player.id, reason, ...extra }); setRank(''); setDelta(''); });
   return (
     <li className="org-player">
       <button type="button" className="org-player-head" aria-expanded={open} onClick={() => setOpen(!open)}>
-        <span className="lrank">{player.rank}</span><strong>{player.name}</strong><span>{player.points} pts · UTR {player.utr ?? '—'}</span><Chip tone={player.status.tone}>{player.status.label}</Chip><Chip tone={uid ? 'good' : 'warn'}>{uid ? 'Linked' : 'No sign-in'}</Chip>
+        <span className="lrank">{player.rank}</span><strong>{player.name}</strong><span>{player.points} pts · UTR {player.utr ?? '—'}</span><Chip tone={player.status.tone}>{player.status.label}</Chip><Chip tone={player.verified ? 'sky' : 'muted'}>{verifiedLabel(player)}</Chip><Chip tone={uid ? 'good' : 'warn'}>{uid ? 'Linked' : 'No sign-in'}</Chip>
       </button>
       {open && <div className="lpanel">
         <p className="lmeta">Player ID <code>{player.id}</code>{uid && <> · account <code>{uid}</code></>} · last active {player.lastActiveAt ? <When at={player.lastActiveAt} /> : 'never'}{player.exemptUntil > Date.now() && <> · exempt until <When at={player.exemptUntil} /></>}</p>
@@ -64,16 +66,18 @@ function PlayerRow({ player, uid }) {
         <div className="org-grid">
           <Form label="Move position" onSubmit={() => adjust({ rank: Number(rank) })}><Input label="New position" id={`rank-${player.id}`} type="number" min="1" max={Object.keys(season.players).length} required value={rank} onChange={e => setRank(e.target.value)} /><button className="secondary small" disabled={busy || !rank || !ok(reason)}>Move</button></Form>
           <Form label="Adjust points" onSubmit={() => adjust({ pointsDelta: Number(delta) })}><Input label="Points to add (negative removes)" id={`points-${player.id}`} type="number" min="-100" max="100" required value={delta} onChange={e => setDelta(e.target.value)} /><button className="secondary small" disabled={busy || !Number(delta) || !ok(reason)}>Adjust</button></Form>
+          <Form label="Edit UTR" onSubmit={() => run(async () => { await act({ action: 'adjust', playerId: player.id, utr: Number(utr), reason }); setUtr(''); })}><Input label="UTR" id={`utr-${player.id}`} type="number" min="0" max="16.5" step="0.01" required placeholder={player.utr ?? ''} value={utr} onChange={e => setUtr(e.target.value)} /><button className="secondary small" disabled={busy || utr === '' || !ok(reason)}>Save UTR</button></Form>
           <Form label="Grant exemption" onSubmit={() => run(async () => { await act({ action: 'grant', type: 'exemption', playerId: player.id, until: endOfDay(until, tz), reason }); setUntil(''); })}><Input label="Exempt until" id={`exempt-${player.id}`} type="date" required value={until} onChange={e => setUntil(e.target.value)} /><button className="secondary small" disabled={busy || !until || !ok(reason)}>Grant exemption</button></Form>
         </div>
         <div className="lactions">
           <button className="secondary small" disabled={busy || !ok(reason)} onClick={() => adjust({ eligible: !player.eligible })}>{player.eligible ? 'Mark not eligible' : 'Mark eligible'}</button>
+          <button className="secondary small" disabled={busy || !ok(reason)} onClick={() => adjust({ verified: !player.verified })}>{player.verified ? 'Mark unverified' : 'Mark verified'}</button>
           <button className="secondary small" disabled={busy || !ok(reason)} onClick={() => adjust({ markActive: true })}>Record activity today</button>
           {uid && <button className="secondary small" disabled={busy || !ok(reason)} onClick={() => run(() => act({ action: 'unlink', uid, reason }))}>Unlink sign-in</button>}
         </div>
-        {!uid && <Form label="Link sign-in" onSubmit={() => run(async () => { await act({ action: 'link', uid: account.trim(), playerId: player.id }); setAccount(''); })}>
+        {!uid && <Form label="Link sign-in" onSubmit={() => run(async () => { await act({ action: 'link', uid: account.trim(), playerId: player.id, reason }); setAccount(''); })}>
           <Input label="Verified account ID" id={`uid-${player.id}`} required autoCapitalize="none" spellCheck="false" value={account} onChange={e => setAccount(e.target.value)} hint="The player reads this ID on their Ladder page after signing in. Confirm with them in person that the account is theirs; a matching name is not proof." />
-          <button className="button small" disabled={busy || !account.trim()}>Link verified sign-in</button>
+          <button className="button small" disabled={busy || !account.trim() || !ok(reason)}>Link verified sign-in</button>
         </Form>}
         <Message error>{error}</Message>
       </div>}
@@ -82,24 +86,25 @@ function PlayerRow({ player, uid }) {
 }
 function PlayersTab() {
   const { season, act, meta } = useLadder(), { accounts } = useLadderAdmin(), { busy, error, run } = useAction();
-  const [query, setQuery] = useState(''), [picked, setPicked] = useState(null), [manual, setManual] = useState(''), [reason, setReason] = useState(''), [note, setNote] = useState('');
+  const [query, setQuery] = useState(''), [picked, setPicked] = useState(null), [manual, setManual] = useState(''), [reason, setReason] = useState(''), [why, setWhy] = useState(''), [note, setNote] = useState('');
   const uidOf = Object.fromEntries(Object.entries(accounts).map(([uid, playerId]) => [playerId, uid])), rows = standings(season), playerId = picked?.id || manual.trim();
   const canSeed = meta.status === 'draft' || !Object.keys(season.challenges || {}).length;
   return (
     <>
-      <Form label="Enroll a player" className="lcard" onSubmit={() => run(async () => { await act({ action: 'enroll', playerId }); setQuery(''); setPicked(null); setManual(''); setNote('Player enrolled at the bottom of the ladder. The name and UTR come from the PPRC list.'); })}>
+      <Form label="Enroll a player" className="lcard" onSubmit={() => run(async () => { await act({ action: 'enroll', playerId, reason: why }); setQuery(''); setWhy(''); setPicked(null); setManual(''); setNote('Player enrolled at the bottom of the ladder. The name, UTR and verified status come from the PPRC list.'); })}>
         <h3>Enroll a player</h3>
         <Input label="Find a PPRC player by name" id="enroll-name" autoComplete="off" value={query} onChange={e => { setQuery(e.target.value); setPicked(null); }} />
         <PprcLookup query={query} linked={picked} onPick={setPicked} onUnlink={() => setPicked(null)} />
         {!picked && <Input label="or enter the PPRC player ID" id="enroll-id" autoCapitalize="none" spellCheck="false" value={manual} onChange={e => setManual(e.target.value)} hint="Players are always existing PPRC records; the ladder never creates a player from a typed name." />}
-        <button className="button small" disabled={busy || !playerId || meta.status === 'closed'}>Enroll</button>
+        <Reason id="enroll-reason" value={why} onChange={setWhy} />
+        <button className="button small" disabled={busy || !playerId || !ok(why) || meta.status === 'closed'}>Enroll</button>
       </Form>
       <div className="lcard">
         <h3>Seeding and PPRC data</h3>
         <Reason id="seed-reason" value={reason} onChange={setReason} />
         <div className="lactions">
           <button className="secondary small" disabled={busy || !canSeed || !ok(reason)} title={canSeed ? '' : 'Only before the first challenge'} onClick={() => run(async () => { await act({ action: 'seed', reason }); setNote('Positions set from UTR, highest first.'); })}>Seed positions from UTR</button>
-          <button className="secondary small" disabled={busy} onClick={() => run(async () => { const result = await act({ action: 'syncPlayers' }); setNote(`${result.updated} player record${result.updated === 1 ? '' : 's'} refreshed from the PPRC list. Positions and points did not change.`); })}>Refresh names and UTRs from PPRC</button>
+          <button className="secondary small" disabled={busy || !ok(reason)} onClick={() => run(async () => { const result = await act({ action: 'syncPlayers', reason }); setNote(`${result.updated} player record${result.updated === 1 ? '' : 's'} refreshed from the PPRC list. Positions and points did not change.`); })}>Refresh names and UTRs from PPRC</button>
         </div>
         {!canSeed && <p className="lmeta">Seeding from UTR is only possible before the first challenge. After that, move players one at a time so each change has its own reason.</p>}
       </div>
@@ -157,8 +162,8 @@ function RequestsTab() {
       <div className="lcard"><Reason id="decision-reason" value={reason} onChange={setReason} /><p className="lmeta">Used for every decision below. Player reasons on this page are private to organizers.</p></div>
       <h3 className="lsection">Exemption and extension requests ({pending.length})</h3>
       {pending.length ? <ul className="org-list">{pending.map(r => (
-        <li key={r.id} className="lcard"><p><b>{name(r.playerId)}</b> asks for {r.type === 'exemption' ? 'an exemption' : `an extension for ${name(season.challenges?.[r.challengeId]?.challengerId)} v ${name(season.challenges?.[r.challengeId]?.opponentId)}`} until <When at={r.until} /></p><p className="lmeta">“{r.reason}” · asked <When at={r.createdAt} /></p>
-          <div className="lactions"><button className="button small" disabled={busy} onClick={() => run(() => act({ action: 'decideRequest', playerId: r.playerId, requestId: r.id, approve: true, reason }))}>Approve</button><button className="secondary small" disabled={busy} onClick={() => run(() => act({ action: 'decideRequest', playerId: r.playerId, requestId: r.id, approve: false, reason }))}>Deny</button></div></li>
+        <li key={r.id} className="lcard"><p><b>{name(r.playerId)}</b> asks for {r.category ? `${(REQUEST_CATEGORIES[r.category] || r.category).toLowerCase()}: ` : ''}{r.type === 'exemption' ? 'an exemption' : `an extension for ${name(season.challenges?.[r.challengeId]?.challengerId)} v ${name(season.challenges?.[r.challengeId]?.opponentId)}`} until <When at={r.until} /></p><p className="lmeta">“{r.reason}” · asked <When at={r.createdAt} /></p>
+          <div className="lactions"><button className="button small" disabled={busy || !ok(reason)} onClick={() => run(() => act({ action: 'decideRequest', playerId: r.playerId, requestId: r.id, approve: true, reason }))}>Approve</button><button className="secondary small" disabled={busy || !ok(reason)} onClick={() => run(() => act({ action: 'decideRequest', playerId: r.playerId, requestId: r.id, approve: false, reason }))}>Deny</button></div></li>
       ))}</ul> : <p className="lmeta">No requests are waiting.</p>}
       <h3 className="lsection">Penalties</h3>
       {penalties.length ? <ul className="org-list">{penalties.map(p => (
@@ -189,12 +194,13 @@ function AuditTab() {
 }
 
 function ExportTab() {
-  const { season, meta } = useLadder();
+  const { season, meta, seasonId } = useLadder(), { audit } = useLadderAdmin();
   function download(kind) {
-    const url = URL.createObjectURL(new Blob([exportCsv(kind, season)], { type: 'text/csv;charset=utf-8' })), link = document.createElement('a');
+    const log = Object.fromEntries(Object.entries(audit).filter(([, a]) => !a.seasonId || a.seasonId === seasonId));
+    const url = URL.createObjectURL(new Blob([exportCsv(kind, season, Date.now(), log)], { type: 'text/csv;charset=utf-8' })), link = document.createElement('a');
     link.href = url; link.download = `ladder-${meta.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${kind}.csv`; link.click(); URL.revokeObjectURL(url);
   }
-  return <div className="lcard"><h3>Export to CSV</h3><p className="lmeta">Times are in UTC. Private request reasons and account IDs are never exported.</p><div className="lactions">{['standings', 'players', 'matches', 'points'].map(kind => <button key={kind} className="secondary small" onClick={() => download(kind)}>Download {kind}</button>)}</div></div>;
+  return <div className="lcard"><h3>Export to CSV</h3><p className="lmeta">Times are in UTC. Private request reasons and account IDs are never exported.</p><div className="lactions">{['standings', 'players', 'matches', 'points', 'audit'].map(kind => <button key={kind} className="secondary small" onClick={() => download(kind)}>Download {kind}</button>)}</div></div>;
 }
 
 export default function Organizer() {

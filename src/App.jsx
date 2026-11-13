@@ -98,7 +98,7 @@ function Layout() {
             <NavLink to="/ladder/activity"><Icon name="bolt" /><span>Activity</span></NavLink>
             <NavLink to="/ladder/rules"><Icon name="rules" /><span>Rules</span></NavLink>
             <NavLink to="/ladder/2026"><Icon name="trophy" /><span>2026</span></NavLink>
-            {user?.admin && <NavLink to="/ladder/organizer"><Icon name="shield" /><span>Organizer</span></NavLink>}
+            {user?.admin && <NavLink to="/ladder/admin"><Icon name="shield" /><span>Admin</span></NavLink>}
           </nav>}
           <div className="topbar-actions">
             <StatusPill mode={service.mode} connected={connected} online={online} />
@@ -135,7 +135,8 @@ function Layout() {
                 <Route path="matches" element={<LadderMatches />} />
                 <Route path="activity" element={<LadderActivity />} />
                 <Route path="rules" element={<LadderRules />} />
-                <Route path="organizer" element={<LadderOrganizer />} />
+                <Route path="admin" element={<LadderOrganizer />} />
+                <Route path="organizer" element={<Navigate to="/ladder/admin" replace />} />
               </Route>
             </Route>
             <Route path="/ladder/2026" element={<Ladder2026 />} />

@@ -50,21 +50,28 @@ test('points breakdown adds up to the player’s total', () => {
 });
 test('CSV exports: standings, players, matches and points, safely quoted, with no private data', () => {
   let state = play(ladder({ count: 4 }), 4, 2);
-  state = act(state, 3, { action: 'request', type: 'exemption', until: T0 + 9 * DAY, reason: 'Private medical reason' });
+  state = act(state, 3, { action: 'request', type: 'exemption', category: 'injury', until: T0 + 9 * DAY, reason: 'Private medical reason' });
   const s = season(state);
-  assert.equal(exportCsv('standings', s, T0 + HOUR).split('\r\n')[0], 'Position,Player,Points,UTR,Wins,Losses,Streak,Status');
-  assert.equal(exportCsv('standings', s, T0 + HOUR).split('\r\n')[2], '2,Player 4,5,7,1,0,1,Active');
+  assert.equal(exportCsv('standings', s, T0 + HOUR).split('\r\n')[0], 'Position,Player,Points,UTR,Wins,Losses,Streak,Status,Verified');
+  assert.equal(exportCsv('standings', s, T0 + HOUR).split('\r\n')[2], '2,Player 4,5,7,1,0,1,Active,yes');
   assert.match(exportCsv('players', s), /p4,Player 4,2,7,yes,2026-11-09T18:00:00.000Z,2026-11-09T19:00:00.000Z,/);
   assert.match(exportCsv('matches', s), /,Player 4,Player 2,completed,.*,Player 4,6-4 6-3,played,.*,no,yes,1\r\n/);
   assert.equal(exportCsv('points', s).trim().split('\r\n').length, 5);
   for (const kind of ['standings', 'players', 'matches', 'points']) { const csv = exportCsv(kind, s); assert.ok(!csv.includes('Private medical')); assert.ok(!/\bu[1-4]\b/.test(csv), 'no account ids'); }
   assert.equal(toCsv(['a'], [['x,y'], ['say "hi"'], ['=SUM(A1)'], [null]]), 'a\r\n"x,y"\r\n"say ""hi"""\r\n"\'=SUM(A1)"\r\n\r\n');
+  // The audit log export is built from the admin-only log: organizer reasons yes, players' private reasons never.
+  const audit = exportCsv('audit', s, T0, state.audit).trim().split('\r\n');
+  assert.equal(audit[0], 'Time (UTC),Action,By,Player,Reason,Position changes,Target');
+  assert.equal(audit.length, Object.keys(state.audit).length + 1);
+  assert.ok(audit.some(line => /,confirm,player,Player 2,,Player 4 4>2; Player 2 2>4,/.test(line)));
+  assert.ok(audit.some(line => line.includes(',enroll,organizer,,test roster,')));
+  assert.ok(!audit.join().includes('Private medical'));
   assert.throws(() => exportCsv('secrets', s));
 });
 test('the development seed builds a valid season through the engine and never replaces an existing one', () => {
   const state = seedDemoLadder({}, T0), s = state.public.demo;
   assert.equal(Object.keys(s.players).length, Object.keys(DEMO_ROSTER).length);
-  assert.deepEqual(Object.values(s.players).map(p => p.rank).sort((a, b) => a - b), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  assert.deepEqual(Object.values(s.players).map(p => p.rank).sort((a, b) => a - b), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
   assert.equal(state.index.seasons.demo.status, 'active');
   assert.throws(() => seedDemoLadder(state, T0), /never replaces/);
 });

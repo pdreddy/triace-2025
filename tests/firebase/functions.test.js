@@ -54,25 +54,31 @@ test('health diagnostics require no login and leave tournament data and Auth use
 const ladder = (data, bearer = adminToken) => call('ladderAction', data, bearer);
 const ladderNode = async path => (await database.ref(`traice2_0/ladder/${path}`).get()).val();
 async function ladderSeason(players) {
-  assert.equal((await ladder({ action: 'createSeason', seasonId: 's1', name: 'Emulator season' })).status, 200);
+  assert.equal((await ladder({ action: 'createSeason', seasonId: 's1', name: 'Emulator season', reason: 'emulator test' })).status, 200);
   for (const [playerId, uid, utr] of players) {
     await database.ref(`pprcMaster/players/${playerId}`).set({ name: `Name ${playerId}`, seed: { singles: utr, doubles: utr } });
-    assert.equal((await ladder({ action: 'enroll', seasonId: 's1', playerId })).status, 200);
-    if (uid) assert.equal((await ladder({ action: 'link', uid, playerId })).status, 200);
+    assert.equal((await ladder({ action: 'enroll', seasonId: 's1', playerId, reason: 'emulator test' })).status, 200);
+    if (uid) assert.equal((await ladder({ action: 'link', uid, playerId, reason: 'emulator test' })).status, 200);
   }
 }
 test('Ladder: organizer actions need the current admin; names and UTRs come from the PPRC list, never the request', async () => {
   await database.ref('pprcMaster/players/ladder_p1').set({ name: 'Real Name', seed: { singles: 6.4, doubles: 6 } });
-  assert.equal((await ladder({ action: 'createSeason', seasonId: 's1', name: 'Forged' }, null)).status, 401);
-  assert.notEqual((await ladder({ action: 'createSeason', seasonId: 's1', name: 'Forged' }, guestToken)).status, 200);
+  assert.equal((await ladder({ action: 'createSeason', seasonId: 's1', name: 'Forged', reason: 'emulator test' }, null)).status, 401);
+  assert.notEqual((await ladder({ action: 'createSeason', seasonId: 's1', name: 'Forged', reason: 'emulator test' }, guestToken)).status, 200);
   assert.equal(await ladderNode('index'), null);
-  assert.equal((await ladder({ action: 'createSeason', seasonId: 's1', name: 'Emulator season' })).status, 200);
-  assert.equal((await ladder({ action: 'enroll', seasonId: 's1', playerId: 'ladder_p1' }, guestToken)).status, 403);
-  assert.notEqual((await ladder({ action: 'enroll', seasonId: 's1', playerId: 'not_in_pprc' })).status, 200);
-  assert.equal((await ladder({ action: 'enroll', seasonId: 's1', playerId: 'ladder_p1', name: 'Forged Name', utr: 16, rank: 1, points: 99 })).status, 200);
-  assert.deepEqual(await ladderNode('public/s1/players/ladder_p1'), { name: 'Real Name', utr: 6.4, rank: 1, points: 0, streak: 0, wins: 0, losses: 0, eligible: true, joinedAt: (await ladderNode('public/s1/players/ladder_p1/joinedAt')) });
-  assert.notEqual((await ladder({ action: 'link', uid: 'missing_account', playerId: 'ladder_p1' })).status, 200);
-  assert.equal((await ladder({ action: 'link', uid: 'x', playerId: 'ladder_p1' }, guestToken)).status, 403);
+  assert.equal((await ladder({ action: 'createSeason', seasonId: 's1', name: 'Emulator season', reason: 'emulator test' })).status, 200);
+  assert.equal((await ladder({ action: 'enroll', seasonId: 's1', playerId: 'ladder_p1', reason: 'emulator test' }, guestToken)).status, 403);
+  assert.notEqual((await ladder({ action: 'enroll', seasonId: 's1', playerId: 'not_in_pprc', reason: 'emulator test' })).status, 200);
+  assert.equal((await ladder({ action: 'enroll', seasonId: 's1', playerId: 'ladder_p1', name: 'Forged Name', utr: 16, rank: 1, points: 99, reason: 'emulator test' })).status, 200);
+  assert.deepEqual(await ladderNode('public/s1/players/ladder_p1'), { name: 'Real Name', utr: 6.4, rank: 1, points: 0, streak: 0, wins: 0, losses: 0, eligible: true, verified: false, joinedAt: (await ladderNode('public/s1/players/ladder_p1/joinedAt')) });
+  assert.notEqual((await ladder({ action: 'link', uid: 'missing_account', playerId: 'ladder_p1', reason: 'emulator test' })).status, 200);
+  // Verified comes from the PPRC match history the server reads, never from the request.
+  await database.ref('pprcMaster/players/ladder_p2').set({ name: 'Played Before', seed: { singles: 5 } });
+  await database.ref('pprcMaster/ratings/ladder_p2').set({ played: { singles: 4, doubles: 0 }, wins: 3, losses: 1 });
+  assert.equal((await ladder({ action: 'enroll', seasonId: 's1', playerId: 'ladder_p2', verified: false, reason: 'emulator test' })).status, 200);
+  assert.equal(await ladderNode('public/s1/players/ladder_p2/verified'), true);
+  assert.notEqual((await ladder({ action: 'enroll', seasonId: 's1', playerId: 'ladder_p2' })).status, 200);   // no reason, no action
+  assert.equal((await ladder({ action: 'link', uid: 'x', playerId: 'ladder_p1', reason: 'emulator test' }, guestToken)).status, 403);
   // Rules: only organizers, validated on the server, versioned and audited; the stored rules are never replaced by defaults.
   const rules = await ladderNode('public/s1/rules');
   assert.equal(rules.version, 1);

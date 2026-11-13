@@ -62,6 +62,7 @@ export function nextStep(c, playerId) {
   return null;
 }
 export const STATUS_LABELS = { pending: 'Waiting for an answer', accepted: 'To be played', submitted: 'Score reported', disputed: 'With the organizer', completed: 'Completed', declined: 'Declined', expired: 'Lapsed', withdrawn: 'Withdrawn', cancelled: 'Cancelled', voided: 'Voided' };
+export const verifiedLabel = player => (player.verified ? 'Verified PPRC Player' : 'Unverified');
 export const POINT_LABELS = { win: 'Win', loss: 'Loss', challengeBonus: 'Successful challenge', defenseBonus: 'Successful defense', upsetBonus: 'Upset bonus', walkoverWin: 'Walkover win', walkoverLoss: 'Walkover given', noShow: 'No-show', declinePenalty: 'Decline penalty', adjustment: 'Organizer adjustment', void: 'Voided result' };
 export function pointsBreakdown(season, playerId) {
   const lines = entries(season?.points).filter(e => e.playerId === playerId).sort((a, b) => b.at - a.at);
@@ -74,12 +75,14 @@ export function pointsBreakdown(season, playerId) {
 const cell = value => { const text = value === null || value === undefined ? '' : String(value); return /[",\n\r]/.test(text) || /^[=+\-@]/.test(text) ? `"${(/^[=+\-@]/.test(text) ? `'${text}` : text).replaceAll('"', '""')}"` : text; };
 export const toCsv = (header, rows) => [header, ...rows].map(row => row.map(cell).join(',')).join('\r\n') + '\r\n';
 const iso = ts => (ts ? new Date(ts).toISOString() : '');
-export function exportCsv(kind, season, now = Date.now()) {
+export function exportCsv(kind, season, now = Date.now(), audit = {}) {
   const name = id => season.players?.[id]?.name || id;
-  if (kind === 'standings') return toCsv(['Position', 'Player', 'Points', 'UTR', 'Wins', 'Losses', 'Streak', 'Status'], standings(season, now).map(p => [p.rank, p.name, p.points, p.utr, p.wins || 0, p.losses || 0, p.streak || 0, p.status.label]));
-  if (kind === 'players') return toCsv(['Player ID', 'Player', 'Position', 'UTR', 'Eligible', 'Joined (UTC)', 'Last active (UTC)', 'Exempt until (UTC)'], standings(season, now).map(p => [p.id, p.name, p.rank, p.utr, p.eligible ? 'yes' : 'no', iso(p.joinedAt), iso(p.lastActiveAt), iso(p.exemptUntil)]));
+  if (kind === 'standings') return toCsv(['Position', 'Player', 'Points', 'UTR', 'Wins', 'Losses', 'Streak', 'Status', 'Verified'], standings(season, now).map(p => [p.rank, p.name, p.points, p.utr, p.wins || 0, p.losses || 0, p.streak || 0, p.status.label, p.verified ? 'yes' : 'no']));
+  if (kind === 'players') return toCsv(['Player ID', 'Player', 'Position', 'UTR', 'Eligible', 'Joined (UTC)', 'Last active (UTC)', 'Exempt until (UTC)', 'Verified'], standings(season, now).map(p => [p.id, p.name, p.rank, p.utr, p.eligible ? 'yes' : 'no', iso(p.joinedAt), iso(p.lastActiveAt), iso(p.exemptUntil), p.verified ? 'yes' : 'no']));
   if (kind === 'matches') return toCsv(['Challenge ID', 'Challenger', 'Opponent', 'Status', 'Created (UTC)', 'Deadline (UTC)', 'Extended to (UTC)', 'Winner', 'Score', 'Result type', 'Reported (UTC)', 'Completed (UTC)', 'Late', 'Positions changed', 'Rules version'],
     entries(season.challenges).sort((a, b) => a.createdAt - b.createdAt).map(c => [c.id, name(c.challengerId), name(c.opponentId), c.status, iso(c.createdAt), iso(c.deadline), iso(c.extensionUntil), c.result ? name(c.result.winnerId) : '', c.result?.score, c.result?.kind, iso(c.result?.submittedAt), iso(c.completedAt), c.outcome ? (c.outcome.late ? 'yes' : 'no') : '', c.outcome ? (c.outcome.moved ? 'yes' : 'no') : '', c.rules?.version]));
   if (kind === 'points') return toCsv(['Time (UTC)', 'Player', 'Type', 'Points', 'Challenge ID', 'Rules version', 'Note'], entries(season.points).sort((a, b) => a.at - b.at).map(e => [iso(e.at), name(e.playerId), POINT_LABELS[e.type] || e.type, e.amount, e.challengeId, e.rulesVersion, e.note]));
+  // Organizers only: `audit` is the admin-only log for this season. Reasons are the organizers' own; players' private request reasons are never in it.
+  if (kind === 'audit') return toCsv(['Time (UTC)', 'Action', 'By', 'Player', 'Reason', 'Position changes', 'Target'], entries(audit).sort((a, b) => a.at - b.at).map(a => [iso(a.at), a.action, a.actor?.role, a.actor?.playerId ? name(a.actor.playerId) : '', a.reason, (a.rankChanges || []).map(c => `${name(c.playerId)} ${c.from}>${c.to}`).join('; '), Object.entries(a.target || {}).filter(([k]) => k !== 'uid').map(([k, v]) => `${k}=${k === 'playerId' ? name(v) : v}`).join('; ')]));
   throw new Error('Unknown export.');
 }

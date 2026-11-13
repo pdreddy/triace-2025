@@ -18,10 +18,10 @@ export const lastChallenge = state => { const id = challengeIds(state).at(-1); r
 export const custom = changes => { const values = structuredClone(DEFAULT_RULES); for (const [group, fields] of Object.entries(changes)) Object.assign(values[group], fields); return values; };
 // An active season `s1` with `count` players p1..pN ranked in that order, each linked to account u1..uN.
 export function ladder({ count = 8, rules, status = 'active' } = {}) {
-  let state = act({}, admin, { action: 'createSeason', seasonId: 's1', name: 'Test season' });
+  let state = act({}, admin, { action: 'createSeason', seasonId: 's1', name: 'Test season', reason: 'test season' });
   for (let i = 1; i <= count; i++) {
-    state = act(state, admin, { action: 'enroll', playerId: `p${i}`, name: `Player ${i}`, utr: 8 - i * 0.25 });
-    state = act(state, admin, { action: 'link', uid: `u${i}`, playerId: `p${i}` });
+    state = act(state, admin, { action: 'enroll', playerId: `p${i}`, name: `Player ${i}`, utr: 8 - i * 0.25, reason: 'test roster' });
+    state = act(state, admin, { action: 'link', uid: `u${i}`, playerId: `p${i}`, reason: 'verified in person' });
   }
   if (rules) state = act(state, admin, { action: 'saveRules', values: custom(rules), baseVersion: 1, reason: 'test rules' });
   if (status !== 'draft') state = act(state, admin, { action: 'setStatus', status: 'active', reason: 'open season' });

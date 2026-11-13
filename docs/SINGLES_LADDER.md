@@ -14,7 +14,7 @@ One app, several formats. `/home` is Player Home; TRIACE 2.0 and the Singles Lad
 | `/ladder/matches` | Your active challenges, your history, latest results |
 | `/ladder/activity` | Points breakdown, notifications, exemption requests |
 | `/ladder/rules` | Rules, written from the season's configuration |
-| `/ladder/organizer` | Organizer dashboard (admins only; enforced on the server) |
+| `/ladder/admin` | Admin dashboard (admins only; enforced on the server). `/ladder/organizer` redirects here |
 | `/ladder/2026` | Ladder 2026 as played: champions and playoffs, the four groups with records and results by week. Read-only, built from `scripts/migration/ladder-2026.psv` with names settled by `name-decisions.json`; add new result rows to that file and the page (and the next PPRC refresh) picks them up |
 | `/po`, `/koc` | Reserved, Coming Soon |
 
@@ -73,11 +73,12 @@ in TRIACE, the PPRC ratings and the Ladder. Nothing existing is renamed, moved o
 
 1. Deploy the Cloud Functions (`ladderAction`, `ladderSweep`) and the merged database rules. No existing node changes;
    `ladder` simply does not exist until an organizer creates a season, and the UI says "No ladder season yet".
-2. Create the season: either in `/ladder/organizer`, or from the real roster:
+2. Create the season: either in `/ladder/admin`, or from the real roster:
    `node scripts/ladder-setup.mjs --database-url <url>` (read-only plan), then add `--write`. It matches the 62 players
    of `scripts/migration/ladder-2026.psv` through `pprcMaster/nameIndex`, seeds by PPRC singles UTR, lists anyone it
    could not match, writes only under `<root>/ladder`, and leaves the season a draft.
 3. Review Rules settings, link each player's sign-in, then Open season.
+   After deploying, press "Refresh names and UTRs from PPRC" once so players enrolled earlier get their verified status.
 4. Rollback is deleting nothing: unpublish the routes or leave the season in draft. TRIACE data is never touched (the
    ladder transaction is scoped to the `ladder` node).
 
@@ -99,8 +100,8 @@ enrolled and ranked, and an organizer records their results from the dashboard.
 
 ## Rules configuration and versioning
 
-`config.js` defines 13 groups (challenge range, top players, win streak, rematches, responding, deadline, position
-changes, late results, extensions, points, declines, inactivity, no-shows). `DEFAULT_RULES` are the initial defaults
+`config.js` defines 14 groups (challenge range, top players, win streak, rematches, responding, deadline, match format,
+position changes, late results, extensions, points, declines, inactivity, no-shows). `DEFAULT_RULES` are the initial defaults
 and are only used when a season is created; an existing season's rules are never replaced by them.
 
 - **Typed and validated**: every field has a type and limits; unknown or missing fields are refused; contradictory
@@ -137,6 +138,68 @@ and are only used when a season is created; an existing season's rules are never
 | Frozen season | Players and automatic rules stop; organizers can still settle disputes and adjust. Closed is permanent |
 | Voiding a result | Reverses its points with new ledger lines; positions are moved back only by an explicit organizer adjustment (fixed) |
 
+## How the written specification maps to this implementation
+
+Two parts of the specification were implemented differently on purpose. Both are decisions you can reverse; say so and
+I will restructure.
+
+**Data paths.** The specification lists `players/{uid}` and `ladder/seasons/{seasonId}/...` keyed by Firebase uid.
+This implementation keys players by their existing PPRC player id and keeps the sign-in link separately, because (a)
+only TRIACE captains have sign-ins today, so the 62 real ladder players could not be enrolled under a uid, (b) the
+existing player profiles are `pprcMaster/players`, and a new root `players` node in the shared project would duplicate
+them, and (c) Realtime Database rules cannot hide a private child under a public parent, so public and private data
+live in separate branches.
+
+| Specified path | Where it is |
+| --- | --- |
+| `players/{uid}` | `pprcMaster/players/{playerId}` (existing) + `ladder/accounts/{uid} = playerId` |
+| `ladder/seasons/{seasonId}` | `ladder/index/seasons/{seasonId}` (name, status, dates) |
+| `.../rules` | `ladder/public/{seasonId}/rules` (+ `rulesHistory`) |
+| `.../entries/{uid}` | `ladder/public/{seasonId}/players/{playerId}` |
+| `.../challenges/{challengeId}` | `ladder/public/{seasonId}/challenges/{id}` |
+| `.../matches/{matchId}` | the same challenge record: `result`, `outcome` and its rules snapshot (one record per match, so a result can never detach from its challenge) |
+| `.../extensions/{extensionId}` | `ladder/private/{seasonId}/requests/{playerId}/{id}` (`type`, `category`, `until`, `reason`, `status`) |
+| `.../disputes/{disputeId}` | the challenge record: `status: disputed`, `review`, then `resolution`; the organizer's reasoning is in the audit log |
+| `.../auditLog/{eventId}` | `ladder/audit/{id}` with `seasonId` |
+| `.../notifications/{uid}/{id}` | `ladder/private/{seasonId}/notifications/{playerId}/{id}` |
+
+Entry fields: `currentRank` → `rank`, `consecutiveLadderWins` → `streak`, `lastMatchAt` → `lastActiveAt`,
+`validDeclineCount` → counted from the declined challenges (so the counting window in the rules always applies),
+`updatedAt` → the audit entry of the change; `points`, `utr`, `verified`, `eligible`, `wins`, `losses` as specified.
+
+**Commands.** All thirteen specified commands exist as actions of one callable, `ladderAction`, rather than thirteen
+separately deployed functions. Each one authenticates the caller, checks role or ownership, validates the season's
+rules, applies the change in one transaction, notifies the players involved and writes an audit entry.
+
+| Specified command | `ladderAction` action |
+| --- | --- |
+| `createChallenge` | `challenge` |
+| `respondToChallenge` | `respond` (accept / decline), `withdraw` |
+| `expireChallenges` | `sweep` (hourly `ladderSweep`, and "Run time-based checks now") |
+| `submitMatchScore` | `submit` (played, or no-show report) |
+| `confirmMatchScore` | `confirm`; `dispute` opens a score dispute |
+| `resolveScoreDispute` | `resolve` |
+| `approveExtension` | `decideRequest` (approve / deny), `grant` |
+| `applyWalkover` | `resolve` with `kind: walkover` or `noShow` |
+| `applyInactivityReview` | `decidePenalty` (apply / waive the drop raised by `sweep`) |
+| `manualRankAdjustment` | `adjust` (position, points, UTR, eligibility, verification) |
+| `freezeSeasonStandings` | `setStatus: frozen` |
+| `closeSeason` | `setStatus: closed` |
+| `exportSeasonData` | CSV built in the admin's browser from data the rules already let an admin read (standings, players, matches, points, audit log) |
+
+**Verified PPRC Player.** Set by the server when a player is enrolled or refreshed, from `pprcMaster/ratings` (any
+match on record in TRIACE, KOC or the Ladder), and switched on when a ladder match is confirmed. An admin can change
+it with a reason. Everyone else shows "Unverified".
+
+**Match format.** Best of three, no-ad, tiebreak at 6–6, and a 10-point match tiebreak at one set all. Reported scores
+are checked against it (a full third set is refused unless Rules settings allow it).
+
+**Reasons.** Every admin action requires a reason (3 to 500 characters) and writes an audit entry; only the automatic
+hourly sweep has none. Extension and exemption requests carry one of: injury, travel, weather, court closure, scheduling.
+
+**Sample season.** `scripts/ladder-dev-fixtures.mjs` builds 16 players and an active season through the real engine,
+for the local demo and the emulators only.
+
 ## Security and authorization
 
 - **Database rules** (`database.rules.template.json` → `npm run rules:generate`): `ladder/index` and `ladder/public`
@@ -159,15 +222,15 @@ and are only used when a season is created; an existing season's rules are never
 
 Season: create (initial defaults or a copy of another season's rules), open, freeze, unfreeze, close; "Run time-based
 checks now" (also runs hourly). Players: enroll from the PPRC list, seed positions from UTR (before the first
-challenge), refresh names/UTRs from PPRC, move position, adjust points, eligibility, record activity, grant an
-exemption, link/unlink a sign-in. Matches: decide a result (played, walkover, no-show), extend a deadline, cancel,
+challenge), refresh names/UTRs/verified from PPRC, move position, adjust points, edit UTR, eligibility, verification,
+record activity, grant an exemption, link/unlink a sign-in. Matches: decide a result (played, walkover, no-show), extend a deadline, cancel,
 void. Requests: approve/deny exemptions and extensions, apply/waive penalties. Rules settings. Audit. Export
-(standings, players, matches, points as CSV; UTC times; no private reasons or account ids).
+(standings, players, matches, points and the audit log as CSV; UTC times; no player request reasons or account ids).
 
 ## Local development
 
 ```sh
-npm run demo            # no Firebase. Sign in at /admin/login, open /ladder/organizer, "Create demo season",
+npm run demo            # no Firebase. Sign in at /admin/login, open /ladder/admin, "Create demo season",
                         # then "Sign in as Demo Player N" to act as a player.
 ```
 

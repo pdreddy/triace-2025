@@ -43,6 +43,10 @@ export const RULE_GROUPS = [
     timezone: { type: 'timezone', default: 'America/Chicago', label: 'Season timezone', help: 'Deadlines and displayed times use this timezone. Times are stored in UTC.' },
     minDays: int(0, 0, 13, 'Minimum days to play', 'A match accepted with fewer than this many days before the deadline is due the following week instead. 0 means always the next deadline.')
   } },
+  { id: 'match', title: 'Match format', fields: {
+    thirdSet: choice('matchTiebreak', { matchTiebreak: 'A 10-point match tiebreak', fullSet: 'A full third set', either: 'Either, as the players agree' }, 'At one set all', 'How a match level at one set all is decided. Reported scores are checked against this.'),
+    noAd: bool(true, 'No-ad scoring', 'At deuce the next point wins the game. Shown on the Rules page; game scores are not recorded.')
+  } },
   { id: 'swap', title: 'Position changes', fields: {
     enabled: bool(true, 'Winning challengers move up', 'An on-time win by a challenger over a higher-ranked opponent changes positions.'),
     mode: choice('swap', { swap: 'The two players swap positions', takePlace: 'The winner takes the position; everyone between moves down one' }, 'How positions change', 'What happens to the two players and those between them.'),
@@ -101,6 +105,15 @@ export const RULE_GROUPS = [
 
 const FIELD = Object.fromEntries(RULE_GROUPS.map(g => [g.id, g.fields]));
 export const DEFAULT_RULES = Object.freeze(Object.fromEntries(RULE_GROUPS.map(g => [g.id, Object.freeze(Object.fromEntries(Object.entries(g.fields).map(([k, f]) => [k, f.default])))])));
+
+// The reasons a player may give for an exemption or an extension request.
+export const REQUEST_CATEGORIES = { injury: 'Injury', travel: 'Travel', weather: 'Weather', courtClosure: 'Court closure', scheduling: 'Scheduling' };
+// A stored configuration written before a rule existed is completed with that rule's initial default (nothing else
+// changes), so an app update never leaves a season without a value.
+export function completeRules(values) {
+  if (!values || typeof values !== 'object') return values;
+  return Object.fromEntries(RULE_GROUPS.map(g => [g.id, Object.fromEntries(Object.entries(g.fields).map(([k, f]) => [k, values[g.id]?.[k] ?? f.default]))]));
+}
 
 export const isTimezone = tz => { if (typeof tz !== 'string' || !tz || tz.length > 64) return false; try { new Intl.DateTimeFormat('en-US', { timeZone: tz }); return true; } catch { return false; } };
 
@@ -172,6 +185,7 @@ export function describeRules(v) {
   add('Playing the match',
     `Accepted matches are due ${WEEKDAYS[v.deadline.day]} at ${formatTime(v.deadline.time)} (${v.deadline.timezone}).`,
     v.deadline.minDays > 0 && `A match accepted fewer than ${plural(v.deadline.minDays, 'day')} before that deadline is due the following ${WEEKDAYS[v.deadline.day]}.`,
+    `Best of three sets${v.match.noAd ? ', no-ad scoring' : ''}, tiebreak at 6–6. At one set all: ${{ matchTiebreak: 'a 10-point match tiebreak', fullSet: 'a full third set', either: 'a 10-point match tiebreak or a full third set' }[v.match.thirdSet]}.`,
     'Either player reports the score; the other player confirms or disputes it.',
     v.extension.enabled ? `Either player may request an extension of up to ${plural(v.extension.maxDays, 'day')}; an organizer decides.` : 'Deadline extensions are not available this season.');
   add('Positions',

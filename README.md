@@ -5,7 +5,7 @@ A mobile-friendly tennis tournament app built with React, Vite, Firebase Authent
 ## PPRC Player Home and Singles Ladder
 
 The app opens at `/home` (Player Home) with a card for each format: TRIACE 2.0 and the Singles Ladder are active, PO and
-KOC are reserved. TRIACE keeps every earlier URL. The Ladder (`/ladder`, organizer tools at `/ladder/organizer`) has
+KOC are reserved. TRIACE keeps every earlier URL. The Ladder (`/ladder`, organizer tools at `/ladder/admin`) has
 per-season configurable rules enforced by the `ladderAction` Cloud Function. Setup, Firebase schema, identity mapping,
 rules configuration and versioning, security rules, deployment order and tests are in
 [docs/SINGLES_LADDER.md](docs/SINGLES_LADDER.md). To create a draft season from the real Ladder 2026 roster:

@@ -10,7 +10,7 @@
 // is listed and left out: enroll them from the organizer page once their PPRC record exists. Positions are seeded from
 // the PPRC singles UTR; a player with no UTR on file is seeded from the ladder rating when the file has one, and is
 // flagged. The season is created with the initial default rules and stays a draft: review the rules, link each
-// player's sign-in, then open it from /ladder/organizer. It never writes outside <root>/ladder and refuses to touch a
+// player's sign-in, then open it from /ladder/admin. It never writes outside <root>/ladder and refuses to touch a
 // season id that already exists.
 import fs from 'node:fs';
 import { ladderRoster } from '../functions/lib/ladder.js';
@@ -36,7 +36,7 @@ export function matchRoster(roster, { index, players, decisions }) {
     if (!playerId) { const found = resolveName(registry, name); playerId = found.id; how = found.how; candidates = found.candidates; }
     if (!playerId) { missing.push({ name: person.name, candidates: candidates.map(id => players[id].name) }); continue; }
     const record = players[playerId], utr = Number.isFinite(record.seed?.singles) ? record.seed.singles : null;
-    if (!resolved.some(r => r.playerId === playerId)) resolved.push({ playerId, name: record.name, utr: utr ?? person.rating, flagged: utr === null, from: person.name, how });
+    if (!resolved.some(r => r.playerId === playerId)) resolved.push({ playerId, name: record.name, utr: utr ?? person.rating, flagged: utr === null, from: person.name, how, verified: true });   // everyone in the results file has played the Ladder
   }
   return { resolved, missing };
 }
@@ -45,8 +45,8 @@ export function matchRoster(roster, { index, players, decisions }) {
 export function planSeason(resolved, { seasonId, title, now, existing = null }) {
   const organizer = { uid: 'ladder_setup_script', admin: true }; let state = existing || {}, n = 0;
   const step = payload => { state = applyLadder(state, { seasonId, ...payload }, organizer, { now, id: `setup_${seasonId.replaceAll('-', '_')}_${String(++n).padStart(3, '0')}` }).state; };
-  step({ action: 'createSeason', name: title });
-  for (const p of resolved) step({ action: 'enroll', playerId: p.playerId, name: p.name, utr: p.utr });
+  step({ action: 'createSeason', name: title, reason: 'Season created from the Ladder 2026 roster (setup script)' });
+  for (const p of resolved) step({ action: 'enroll', playerId: p.playerId, name: p.name, utr: p.utr, verified: p.verified === true, reason: 'Ladder 2026 roster (setup script)' });
   step({ action: 'seed', reason: 'Initial seeding from UTR (setup script)' });
   return JSON.parse(JSON.stringify(state));
 }
@@ -81,11 +81,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     for (const p of plan(preview)) console.log(`  ${String(p.rank).padStart(2)}. ${p.name}  ${p.utr ?? '—'}${resolved.find(r => r.name === p.name)?.flagged ? '  (no UTR on file: seeded from the ladder rating)' : ''}`);
     const renamed = resolved.filter(r => nameKey(r.from) !== nameKey(r.name));
     if (renamed.length) console.log(`\nMatched under a different spelling (please check these are the same people):\n  ${renamed.map(r => `${r.from}  ->  ${r.name}  (${r.how === 'tokens' ? 'only PPRC player these name parts fit' : r.how})`).join('\n  ')}`);
-    if (missing.length) console.log(`\nNot matched, left out (enroll them from /ladder/organizer once they are in the PPRC list):\n  ${missing.map(m => `${m.name}${m.candidates.length ? `  (could be: ${m.candidates.join(' / ')})` : ''}`).join('\n  ')}`);
+    if (missing.length) console.log(`\nNot matched, left out (enroll them from /ladder/admin once they are in the PPRC list):\n  ${missing.map(m => `${m.name}${m.candidates.length ? `  (could be: ${m.candidates.join(' / ')})` : ''}`).join('\n  ')}`);
     if (!write) { console.log('\nDry run: nothing was written. Add --write to create this draft season.'); process.exit(0); }
     const now = Date.now(), result = await db.ref(ladderPath).transaction(current => (current?.index?.seasons?.[seasonId] ? undefined : planSeason(resolved, { seasonId, title, now, existing: current })));
     if (!result.committed) throw new Error('The season was not created (it may have been created meanwhile). Nothing was changed.');
-    console.log(`\nCreated as a draft. Next: open /ladder/organizer, review Rules settings, link each player’s sign-in, then Open season.`);
+    console.log(`\nCreated as a draft. Next: open /ladder/admin, review Rules settings, link each player’s sign-in, then Open season.`);
     process.exit(0);
   } catch (error) { console.error(`Failed: ${error.message}`); process.exit(4); }
 }

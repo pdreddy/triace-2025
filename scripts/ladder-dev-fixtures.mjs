@@ -1,11 +1,11 @@
-// DEVELOPMENT ONLY. A made-up roster and a short season for the local demo (npm run demo) and the Firebase emulators.
+// DEVELOPMENT ONLY. A made-up roster of 16 players and a short active season for the local demo (npm run demo) and the Firebase emulators.
 // Nothing in the web app or the Cloud Functions imports this file, so it can never reach production data.
 import { applyLadder } from '../functions/lib/singlesLadder/engine.js';
 import { ValidationError } from '../functions/lib/tournament.js';
 
 const DAY = 86400000, HOUR = 3600000;
 export const DEMO_SEASON = 'demo';
-export const DEMO_ROSTER = Object.fromEntries(Array.from({ length: 12 }, (_, i) => [`ladder_demo_${i + 1}`, { name: `Demo Player ${i + 1}`, utr: Number((7 - i * 0.21).toFixed(2)) }]));
+export const DEMO_ROSTER = Object.fromEntries(Array.from({ length: 16 }, (_, i) => [`ladder_demo_${i + 1}`, { name: `Demo Player ${i + 1}`, utr: Number((7 - i * 0.21).toFixed(2)), verified: i < 12 }]));
 export const demoUid = playerId => `demo_${playerId}`;
 
 // Builds the demo season through the real rules engine (so it obeys every rule) and refuses to touch an existing ladder.
@@ -15,8 +15,8 @@ export function seedDemoLadder(ladder, now, uidFor = demoUid) {
   let state = ladder || {}, count = 0;
   const step = (actor, at, payload) => { const out = applyLadder(state, { seasonId: DEMO_SEASON, ...payload }, actor, { now: at, id: `seed${String(++count).padStart(3, '0')}` }); state = out.state; return out.result; };
   const start = now - 10 * DAY;
-  step(organizer, start, { action: 'createSeason', seasonId: DEMO_SEASON, name: 'Demo Season' });
-  for (const [playerId, record] of Object.entries(DEMO_ROSTER)) { step(organizer, start, { action: 'enroll', playerId, ...record }); step(organizer, start, { action: 'link', uid: uidFor(playerId), playerId }); }
+  step(organizer, start, { action: 'createSeason', seasonId: DEMO_SEASON, name: 'Demo Season', reason: 'Development sample season' });
+  for (const [playerId, record] of Object.entries(DEMO_ROSTER)) { step(organizer, start, { action: 'enroll', playerId, ...record, reason: 'Development roster' }); step(organizer, start, { action: 'link', uid: uidFor(playerId), playerId, reason: 'Development sign-in' }); }
   step(organizer, start, { action: 'seed', reason: 'Initial seeding from UTR' });
   step(organizer, start, { action: 'setStatus', status: 'active', reason: 'Demo season opened' });
   const challenge = (a, b, at) => { const { challengeId } = step(player(a), at, { action: 'challenge', opponentId: id(b) }); return challengeId; };

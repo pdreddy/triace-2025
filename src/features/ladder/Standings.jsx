@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { EmptyState, Message } from '../../components/UI';
 import { useTournament } from '../../hooks/useTournament';
 import { useLadder, useAction } from './LadderContext';
-import { standings, challengeOption, challengesOf, isActive, nextStep } from './selectors';
+import { standings, challengeOption, challengesOf, isActive, nextStep, verifiedLabel } from './selectors';
 import { ChallengeCard, Chip } from './ui';
 
 const utr = value => (Number.isFinite(value) ? value.toFixed(2) : '—');
@@ -45,7 +45,7 @@ export default function Standings() {
                 <span className="lrank" aria-label={`Position ${p.rank}`}>{p.rank}</span>
                 <div className="lwho">
                   <strong>{p.name}{p.id === playerId && <em> you</em>}</strong>
-                  <span><Chip tone={p.status.tone}>{p.status.label}</Chip>{p.recent.length > 0 && <span className="lform-dots" aria-label={`Recent results: ${p.recent.join(' ')}`}>{p.recent.map((r, i) => <i key={i} className={r}>{r}</i>)}</span>}</span>
+                  <span><Chip tone={p.status.tone}>{p.status.label}</Chip><Chip tone={p.verified ? 'sky' : 'muted'}>{verifiedLabel(p)}</Chip>{p.recent.length > 0 && <span className="lform-dots" aria-label={`Recent results: ${p.recent.join(' ')}`}>{p.recent.map((r, i) => <i key={i} className={r}>{r}</i>)}</span>}</span>
                 </div>
                 <div className="lnums"><b>{p.points}</b><small>pts</small></div>
                 <div className="lnums utr"><b>{utr(p.utr)}</b><small>UTR</small></div>

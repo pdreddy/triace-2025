@@ -3,6 +3,7 @@
 // service.ladderAction call that the backend validates and applies atomically.
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useTournament } from '../../hooks/useTournament';
+import { completeRules } from '../../../functions/lib/singlesLadder/config.js';
 
 const Context = createContext(null);
 const newOpId = () => (crypto.randomUUID ? crypto.randomUUID().replaceAll('-', '') : `${Date.now()}${Math.random().toString(36).slice(2)}`);
@@ -35,7 +36,7 @@ export function LadderProvider({ children }) {
   const act = useCallback(payload => service.ladderAction({ seasonId, ...payload, opId: newOpId() }), [service, seasonId]);
   const value = useMemo(() => ({
     loading: index.loading || (!!seasonId && season.loading), error: index.error || season.error,
-    seasons, seasonId, setSeasonId: setChosen, meta: seasonId ? seasons[seasonId] : null, season: season.value, rules: season.value?.rules?.values || null,
+    seasons, seasonId, setSeasonId: setChosen, meta: seasonId ? seasons[seasonId] : null, season: season.value, rules: season.value?.rules?.values ? completeRules(season.value.rules.values) : null,
     playerId, me: enrolled ? season.value.players[playerId] : null, signedIn, admin: user?.admin === true, identityLoading: signedIn && account.loading,
     requests: requests.value || {}, notifications: notifications.value || {}, act, demo: service.ladderDemo || null
   }), [index, season, account, requests, notifications, seasonId, playerId, enrolled, signedIn, user?.admin, act, service]);   // eslint-disable-line react-hooks/exhaustive-deps

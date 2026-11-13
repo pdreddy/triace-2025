@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { Message } from '../../components/UI';
 import { formatInZone, zonedTime } from '../../../functions/lib/singlesLadder/time.js';
+import { REQUEST_CATEGORIES } from '../../../functions/lib/singlesLadder/config.js';
 import { useLadder, useAction } from './LadderContext';
 import { nextStep, opponentOf, STATUS_LABELS, dueAt } from './selectors';
 
@@ -14,13 +15,15 @@ export const Form = ({ label, onSubmit, children, className = '' }) => <form cla
 export function Input({ label, hint, id, ...props }) {
   return <label className="lfield" htmlFor={id}><span>{label}</span><input id={id} {...props} />{hint && <small>{hint}</small>}</label>;
 }
+// Why an exemption or extension is being asked for (the list the server accepts).
+export function CategorySelect({ id, value, onChange }) { return <Select label="What is it for?" id={id} required value={value} onChange={e => onChange(e.target.value)}><option value="">Choose…</option>{Object.entries(REQUEST_CATEGORIES).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</Select>; }
 export function Select({ label, id, children, ...props }) { return <label className="lfield" htmlFor={id}><span>{label}</span><select id={id} {...props}>{children}</select></label>; }
 
 const TONES = { pending: 'warn', accepted: 'sky', submitted: 'warn', disputed: 'danger', completed: 'good' };
 // One challenge with everything the signed-in player may do about it. The server re-checks every action.
 export function ChallengeCard({ challenge: c, compact = false }) {
   const { season, playerId, rules, act } = useLadder(), { busy, error, run } = useAction();
-  const [panel, setPanel] = useState(null), [winnerId, setWinner] = useState(c.challengerId), [score, setScore] = useState(''), [until, setUntil] = useState(''), [reason, setReason] = useState('');
+  const [panel, setPanel] = useState(null), [winnerId, setWinner] = useState(c.challengerId), [score, setScore] = useState(''), [until, setUntil] = useState(''), [reason, setReason] = useState(''), [category, setCategory] = useState('');
   const name = id => season.players?.[id]?.name || 'Unknown player', step = nextStep(c, playerId), mine = !!step || c.challengerId === playerId || c.opponentId === playerId;
   const send = (payload, done) => run(async () => { await act({ challengeId: c.id, ...payload }); setPanel(null); done?.(); });
   const v = c.rules?.values, due = dueAt(c), tz = rules?.deadline.timezone || 'America/Chicago';
@@ -58,10 +61,11 @@ export function ChallengeCard({ challenge: c, compact = false }) {
           <Input label={`Score (${name(c.challengerId)}’s games first)`} id={`s-${c.id}`} required placeholder="6-4 3-6 10-8" inputMode="text" autoComplete="off" value={score} onChange={e => setScore(e.target.value)} />
           <button className="button small" disabled={busy || !score.trim()}>Send for confirmation</button>
         </Form>}
-        {panel === 'extend' && <Form label="Request extension" className="lpanel" onSubmit={() => send({ action: 'request', type: 'extension', until: endOfDay(until, tz), reason })}>
+        {panel === 'extend' && <Form label="Request extension" className="lpanel" onSubmit={() => send({ action: 'request', type: 'extension', category, until: endOfDay(until, tz), reason })}>
+          <CategorySelect id={`c-${c.id}`} value={category} onChange={setCategory} />
           <Input label="New deadline (end of day, season time)" id={`u-${c.id}`} type="date" required value={until} onChange={e => setUntil(e.target.value)} hint={`At most ${v.extension.maxDays} days after the current deadline. An organizer decides.`} />
           <Input label="Reason (organizers only)" id={`r-${c.id}`} required minLength={3} maxLength={500} value={reason} onChange={e => setReason(e.target.value)} />
-          <button className="button small" disabled={busy || !until || reason.trim().length < 3}>Send request</button>
+          <button className="button small" disabled={busy || !until || !category || reason.trim().length < 3}>Send request</button>
         </Form>}
         {panel === 'noShow' && <div className="lpanel"><p>Report a no-show only if {name(opponentOf(c, playerId))} had not arrived {v.noShow.graceMinutes} minutes after the agreed time and gave no notice. {v.noShow.requireOrganizer ? 'An organizer will decide.' : 'They can confirm or dispute it.'}</p><button className="secondary small" disabled={busy} onClick={() => send({ action: 'submit', kind: 'noShow' })}>Report no-show</button></div>}
         <Message error>{error}</Message>

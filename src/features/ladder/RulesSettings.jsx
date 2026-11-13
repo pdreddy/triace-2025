@@ -2,12 +2,12 @@
 // definition; validation here is the same function the server runs, and the server runs it again before saving.
 import { useEffect, useMemo, useState } from 'react';
 import { Message } from '../../components/UI';
-import { RULE_GROUPS, validateRules, diffRules, describeRules } from '../../../functions/lib/singlesLadder/config.js';
+import { RULE_GROUPS, validateRules, diffRules, describeRules, completeRules } from '../../../functions/lib/singlesLadder/config.js';
 import { useLadder, useAction } from './LadderContext';
 
 export default function RulesSettings() {
   const { season, act, meta } = useLadder(), { busy, error, run } = useAction();
-  const saved = season.rules.values, version = season.rules.version;
+  const version = season.rules.version, saved = useMemo(() => completeRules(season.rules.values), [season.rules.values]);
   const [draft, setDraft] = useState(() => structuredClone(saved)), [base, setBase] = useState(version), [reason, setReason] = useState(''), [note, setNote] = useState('');
   // Someone else saved a newer version while this form was open: start again from it rather than overwrite it.
   useEffect(() => { if (version !== base) { setDraft(structuredClone(saved)); setBase(version); } }, [version]);   // eslint-disable-line react-hooks/exhaustive-deps
