@@ -2,8 +2,8 @@
 // It reads first and changes nothing unless --write is given.
 //
 //   node scripts/ladder-setup.mjs                                              the roster in the file (no network)
-//   node scripts/ladder-setup.mjs --database-url <url>                         read-only: match everyone to PPRC, show the plan
-//   node scripts/ladder-setup.mjs --database-url <url> --write                 create the draft season
+//   node scripts/ladder-setup.mjs --database-url <url>                         read-only, no key needed: match everyone to PPRC, show the plan
+//   node scripts/ladder-setup.mjs --database-url <url> --write                 create the draft season (needs GOOGLE_APPLICATION_CREDENTIALS)
 //   options: --season-id ladder-2026   --name "Singles Ladder 2026"   --root traice2_0
 //
 // Players are matched through pprcMaster/nameIndex (the same lookup the rest of the app uses). Anyone it cannot match
@@ -39,9 +39,18 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     process.exit(0);
   }
   try {
-    const { openDatabase } = await import('./lib/rtdb.mjs');
-    const db = await openDatabase(url), ladderPath = `${resolveDbPaths({ root: opt('--root') }).root}/ladder`;
-    const read = async path => (await db.ref(path).once('value')).val();
+    const ladderPath = `${resolveDbPaths({ root: opt('--root') }).root}/ladder`;
+    // The plan only needs data that is already public (the PPRC list), so it reads over plain HTTPS with no key.
+    // Only --write needs the service-account key: nobody can write ladder data from outside the server.
+    let db = null;
+    if (write) db = await (await import('./lib/rtdb.mjs')).openDatabase(url);
+    const read = async path => {
+      if (db) return (await db.ref(path).once('value')).val();
+      const response = await fetch(`${url.replace(/\/+$/, '')}/${path}.json`);
+      if (response.status === 401 || response.status === 403) { if (path.startsWith(ladderPath)) return null; throw new Error(`“${path}” is not publicly readable in this database.`); }   // ladder rules not deployed yet: no season can exist
+      if (!response.ok) throw new Error(`Could not read “${path}” (HTTP ${response.status}). Check the database URL.`);
+      return response.json();
+    };
     const [index, players, seasons] = await Promise.all([read('pprcMaster/nameIndex'), read('pprcMaster/players'), read(`${ladderPath}/index/seasons`)]);
     if (seasons?.[seasonId]) throw new Error(`Season “${seasonId}” already exists at ${ladderPath}. Nothing was changed. Choose another --season-id.`);
     const resolved = [], missing = [];
