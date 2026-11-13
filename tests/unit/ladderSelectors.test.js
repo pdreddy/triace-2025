@@ -80,3 +80,13 @@ test('real-roster setup: every player in the Ladder 2026 file once, seeded by UT
   assert.equal(state.index.current, 's1');
   assert.throws(() => planSeason([], { seasonId: 's1', title: 'Again', now: T0, existing }), /already in use/);
 });
+test('roster names are matched like the PPRC migration: settled spellings, exact names, unique name parts, never a guess', async () => {
+  const { matchRoster } = await import('../../scripts/ladder-setup.mjs'), { nameKey } = await import('../../functions/lib/pprc.js');
+  const players = { p_dinesh_reddy_timmareddy: { name: 'Dinesh Reddy Timmareddy', seed: { singles: 5.46 } }, p_joel_kodoru: { name: 'Joel Kodoru', seed: { singles: 4.4 } }, p_raj_chava: { name: 'Raj Chava' },
+    p_krishna_vennapusa: { name: 'Krishna Vennapusa' }, p_krishna_pamarthi: { name: 'Krishna Pamarthi' }, p_old: { name: 'Old Name', mergedInto: 'p_raj_chava' } };
+  const index = Object.fromEntries(Object.entries(players).map(([id, p]) => [nameKey(p.name), id]));
+  const roster = ['Dinesh Timmareddy', 'Joel Kodooru', 'Raj Chava', 'Krishna', 'Old Name', 'Nobody Here'].map(name => ({ name, key: nameKey(name), rating: 4 }));
+  const { resolved, missing } = matchRoster(roster, { index, players, decisions: { 'Joel Kodooru': 'Joel Kodoru', 'Team A1::Krishna': 'Krishna Pamarthi' } });
+  assert.deepEqual(resolved.map(r => [r.from, r.playerId, r.how, r.utr, r.flagged]), [['Dinesh Timmareddy', 'p_dinesh_reddy_timmareddy', 'tokens', 5.46, false], ['Joel Kodooru', 'p_joel_kodoru', 'name decision', 4.4, false], ['Raj Chava', 'p_raj_chava', 'exact', 4, true]]);
+  assert.deepEqual(missing, [{ name: 'Krishna', candidates: ['Krishna Vennapusa', 'Krishna Pamarthi'] }, { name: 'Old Name', candidates: [] }, { name: 'Nobody Here', candidates: [] }]);
+});
