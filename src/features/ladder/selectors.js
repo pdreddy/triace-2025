@@ -86,3 +86,14 @@ export function exportCsv(kind, season, now = Date.now(), audit = {}) {
   if (kind === 'audit') return toCsv(['Time (UTC)', 'Action', 'By', 'Player', 'Reason', 'Position changes', 'Target'], entries(audit).sort((a, b) => a.at - b.at).map(a => [iso(a.at), a.action, a.actor?.role, a.actor?.playerId ? name(a.actor.playerId) : '', a.reason, (a.rankChanges || []).map(c => `${name(c.playerId)} ${c.from}>${c.to}`).join('; '), Object.entries(a.target || {}).filter(([k]) => k !== 'uid').map(([k, v]) => `${k}=${k === 'playerId' ? name(v) : v}`).join('; ')]));
   throw new Error('Unknown export.');
 }
+
+
+// A completed match's own ledger, never inferred from today's position or points.
+export function resultHighlights(challenge) {
+  if (challenge?.status !== 'completed' || !challenge.result) return {};
+  const winnerId = challenge.result.winnerId;
+  return Object.fromEntries([challenge.challengerId, challenge.opponentId].map(id => {
+    const from = challenge.outcome?.ranksBefore?.[id], to = challenge.outcome?.ranksAfter?.[id];
+    return [id, { role: id === winnerId ? 'winner' : 'loser', from, to, change: Number.isFinite(from) && Number.isFinite(to) ? from - to : 0, points: challenge.outcome?.points?.[id] ?? 0 }];
+  }));
+}

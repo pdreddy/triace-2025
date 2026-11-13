@@ -35,6 +35,8 @@ test('a confirmed win without rank changes shows a trophy and never swallows a p
   await expect(result.locator('.result-board')).toHaveCount(0);
   await expect(result.locator('.result-trophy')).toBeVisible();
   await result.getByRole('button', { name: 'Back to the ladder' }).click();
+  await expect(page).toHaveURL(/\/ladder$/);
+  await page.goto('/ladder/matches');
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Your history' })).toBeVisible();
   await expect(page.getByRole('dialog')).toHaveCount(0);

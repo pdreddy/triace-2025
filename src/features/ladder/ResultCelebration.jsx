@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Icon } from '../../components/Icons';
 import { useLadder } from './LadderContext';
 
-export default function ResultCelebration({ challenge: c, onClose }) {
+export default function ResultCelebration({ challenge: c, onClose, onViewStandings }) {
   const { season, playerId } = useLadder(), dialog = useRef(null);
   const winnerId = c.result.winnerId, loserId = winnerId === c.challengerId ? c.opponentId : c.challengerId;
   const winner = season.players[winnerId], loser = season.players[loserId], won = playerId === winnerId;
@@ -37,7 +37,7 @@ export default function ResultCelebration({ challenge: c, onClose }) {
       </div> : <div className="result-trophy" aria-hidden="true"><Icon name="trophy" size={64} /></div>}
       <div className="result-players"><div><small>Winner{moved ? ' · Up the ladder' : ''}</small><strong>{winner.name}</strong><span>{rank(winnerId)}</span><b>{points(winnerId)}</b></div><div><small>{moved ? 'Down the snake' : 'Opponent'}</small><strong>{loser.name}</strong><span>{rank(loserId)}</span><b>{points(loserId)}</b></div></div>
       {!moved && <p className="lmeta">Positions unchanged under this match’s rules.</p>}
-      <button className="button result-done" onClick={onClose}>Back to the ladder <Icon name="arrow" size={18} /></button>
+      <button className="button result-done" onClick={onViewStandings || onClose}>Back to the ladder <Icon name="arrow" size={18} /></button>
     </div>
   </dialog>;
 }

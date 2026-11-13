@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { standings, challengeOption, ladderSummary, nextStep, pointsBreakdown, exportCsv, toCsv, playerStatus } from '../../src/features/ladder/selectors.js';
+import { standings, challengeOption, ladderSummary, nextStep, pointsBreakdown, exportCsv, toCsv, playerStatus, resultHighlights } from '../../src/features/ladder/selectors.js';
 import { seedDemoLadder, DEMO_ROSTER } from '../../scripts/ladder-dev-fixtures.mjs';
 import { T0, HOUR, DAY, admin, act, season, lastChallenge, ladder, play } from './ladderHarness.js';
 
@@ -120,4 +120,26 @@ test('every blocked opponent has an explanation while allowed challenges stay ac
   assert.deepEqual(challengeOption(season(state), 'p8', 'p7', T0), { ok: true });
   state = act(state, 8, { action: 'challenge', opponentId: 'p7' });
   assert.deepEqual(challengeOption(season(state), 'p8', 'p6', T0 + 2 * DAY), { ok: false, why: 'Your active limit' });
+});
+
+
+test('table highlights use the confirmed match’s own ranks and points', () => {
+  let state = play(ladder(), 5, 3);
+  const match = { ...lastChallenge(state)[1], id: lastChallenge(state)[0] };
+  assert.deepEqual(resultHighlights(match), {
+    p5: { role: 'winner', from: 5, to: 3, change: 2, points: 5 },
+    p3: { role: 'loser', from: 3, to: 5, change: -2, points: 1 }
+  });
+  state = act(state, admin, { action: 'adjust', playerId: 'p5', rank: 1, reason: 'organizer correction' });
+  assert.equal(resultHighlights(match).p5.to, 3, 'the match record is not rewritten by a later position change');
+  assert.deepEqual(resultHighlights({ ...match, status: 'voided' }), {});
+  assert.deepEqual(resultHighlights({ status: 'pending' }), {});
+});
+test('a win without position changes never gets a ladder or snake delta', () => {
+  const state = play(ladder({ rules: { swap: { enabled: false }, extension: { allowSwap: false } } }), 5, 3);
+  const highlights = resultHighlights(lastChallenge(state)[1]);
+  assert.equal(highlights.p5.role, 'winner');
+  assert.equal(highlights.p3.role, 'loser');
+  assert.equal(highlights.p5.change, 0);
+  assert.equal(highlights.p3.change, 0);
 });

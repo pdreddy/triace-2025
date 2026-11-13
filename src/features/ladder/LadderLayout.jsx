@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import ResultCelebration from './ResultCelebration';
-import { Link, Outlet, useLocation } from 'react-router-dom';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { EmptyState } from '../../components/UI';
 import { useLadder } from './LadderContext';
 import { Chip } from './ui';
@@ -9,15 +9,20 @@ const STATUS = { draft: ['Not open yet', 'muted'], active: ['Season open', 'good
 // Frame for every /ladder page: season title, state, and honest loading / unavailable / empty states.
 export default function LadderLayout() {
   const { loading, error: loadError, seasons, seasonId, setSeasonId, meta, admin, season, playerId } = useLadder(), organizer = /^\/ladder\/(admin|organizer)/.test(useLocation().pathname);
-  const previous = useRef(null), [result, setResult] = useState(null);
+  const previous = useRef(null), [result, setResult] = useState(null), [tableResult, setTableResult] = useState(null), navigate = useNavigate();
   useEffect(() => {
     const key = `${seasonId}:${playerId}`, challenges = season?.challenges || {};
-    if (previous.current?.key === key && playerId) {
-      const confirmed = Object.entries(challenges).filter(([id, c]) => c.status === 'completed' && previous.current.statuses[id] && previous.current.statuses[id] !== 'completed' && (c.challengerId === playerId || c.opponentId === playerId)).sort((a, b) => b[1].completedAt - a[1].completedAt);
-      if (confirmed.length) setResult({ key, challenge: confirmed[0][1] });
+    if (previous.current?.key === key) {
+      const confirmed = Object.entries(challenges).filter(([id, c]) => c.status === 'completed' && previous.current.statuses[id] && previous.current.statuses[id] !== 'completed').sort((a, b) => b[1].completedAt - a[1].completedAt);
+      if (confirmed.length) {
+        const challenge = { ...confirmed[0][1], id: confirmed[0][0] }, update = { key, challenge };
+        setTableResult(update);
+        if (playerId && (challenge.challengerId === playerId || challenge.opponentId === playerId)) setResult(update);
+      }
     }
     previous.current = { key, statuses: Object.fromEntries(Object.entries(challenges).map(([id, c]) => [id, c.status])) };
   }, [season, seasonId, playerId]);
+  const showingResult = result?.key === `${seasonId}:${playerId}`;
   if (loading) return <div className="page-loading" aria-busy="true"><span className="spinner" /> Loading the ladder…</div>;
   const error = loadError || (seasonId && !season ? 'This season’s data could not be read.' : '');
   const ids = Object.keys(seasons).sort((a, b) => seasons[b].createdAt - seasons[a].createdAt);
@@ -35,8 +40,8 @@ export default function LadderLayout() {
       </header>
       {error ? <EmptyState icon="warn" title="The ladder is unavailable">{error}<span>Nothing is shown rather than out-of-date or made-up standings. Please try again shortly.</span></EmptyState>
         : !seasonId && !organizer ? <EmptyState icon="ladder" title="No ladder season yet">An organizer has not created a Singles Ladder season.{admin && <Link className="button small" to="/ladder/admin">Create a season</Link>}</EmptyState>
-        : <Outlet />}
-      {result?.key === `${seasonId}:${playerId}` && <ResultCelebration challenge={result.challenge} onClose={() => setResult(null)} />}
+        : <Outlet context={{ liveResult: !showingResult && tableResult?.key === `${seasonId}:${playerId}` ? tableResult.challenge : null }} />}
+      {showingResult && <ResultCelebration challenge={result.challenge} onClose={() => setResult(null)} onViewStandings={() => { setResult(null); navigate('/ladder'); }} />}
     </section>
   );
 }

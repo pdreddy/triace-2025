@@ -34,6 +34,12 @@ snake’s mouth. A win with no position changes shows a trophy instead. The anim
 the result remains readable until dismissed. Escape or the close button skips it. Historical results do not replay on
 page load, and reduced-motion preferences disable the movement.
 
+The standings also show a **Latest match** strip and WIN/LOSS badges on the two affected rows. **Replay on table**
+plays miniature ladder/snake tokens, colored row highlights and the recorded move between positions, while each
+player’s actual current rank remains readable. Live results play on the table after the result dialog is dismissed;
+spectators see them directly. A replay never changes data, does not move rows if an organizer has since changed the
+positions, and respects reduced motion. Refreshing the page keeps the last-match badges but does not autoplay them.
+
 In local demo mode only, a player with no available opponents can use **Try as Demo Player…** to switch to an account
 that has a legal challenge available. This does not change the season’s rules or bypass any challenge restrictions.
 

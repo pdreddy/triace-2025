@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useOutletContext } from 'react-router-dom';
 import { EmptyState, Message } from '../../components/UI';
 import { useTournament } from '../../hooks/useTournament';
 import { useLadder, useAction } from './LadderContext';
-import { standings, challengeOption, challengesOf, isActive, verifiedLabel } from './selectors';
+import { standings, challengeOption, challengesOf, isActive, verifiedLabel, entries, resultHighlights } from './selectors';
 import { ChallengeCard, Chip } from './ui';
 import { Icon } from '../../components/Icons';
 import ChallengeDialog from './ChallengeDialog';
 import { useRankMotion } from './useRankMotion';
+import TableResult, { RankTrail, ResultTag } from './TableResult';
 
 const utr = value => (Number.isFinite(value) ? value.toFixed(2) : '—');
 function MyCard() {
@@ -56,13 +57,29 @@ function ChallengeFinder({ rows, options, onFind }) {
 
 export default function Standings() {
   const { season, seasonId, playerId, me, meta } = useLadder();
+  const { liveResult } = useOutletContext() || {};
+  const [playback, setPlayback] = useState(null), sequence = useRef(0);
+  useEffect(() => { setPlayback(null); }, [seasonId, playerId]);
+  useEffect(() => { if (liveResult) setPlayback({ id: liveResult.id, challenge: liveResult, sequence: ++sequence.current }); }, [liveResult]);
+  useEffect(() => { if (!playback) return; const timer = setTimeout(() => setPlayback(null), 4000); return () => clearTimeout(timer); }, [playback]);
   const [selected, setSelected] = useState(null), [onlyAvailable, setOnlyAvailable] = useState(false), list = useRef(null);
   useEffect(() => { setSelected(null); }, [seasonId, playerId, meta.status]);
   const rows = standings(season), canPlay = me && meta.status === 'active';
   const options = Object.fromEntries(rows.map(p => [p.id, canPlay ? challengeOption(season, playerId, p.id) : { ok: false }]));
   const available = rows.filter(p => options[p.id].ok), filtered = canPlay && onlyAvailable && available.length > 0;
   const shown = filtered ? available : rows;
-  useRankMotion(list, seasonId, shown.map(p => `${p.id}:${p.rank}`).join('|'));
+  const latest = entries(season.challenges).filter(c => c.status === 'completed').sort((a, b) => b.completedAt - a.completedAt)[0];
+  const lastMatch = liveResult && season.challenges?.[liveResult.id]?.status === 'completed' ? liveResult : latest;
+  const highlights = resultHighlights(lastMatch), playing = playback?.id === lastMatch?.id && !!playback;
+  useRankMotion(list, seasonId, shown.map(p => `${p.id}:${p.rank}`).join('|'), playing ? playback : null);
+  function replayResult() {
+    setOnlyAvailable(false);
+    setPlayback({ id: lastMatch.id, challenge: lastMatch, sequence: ++sequence.current });
+    requestAnimationFrame(() => {
+      const row = [...(list.current?.children || [])].find(node => node.dataset.playerId === lastMatch.result.winnerId);
+      row?.scrollIntoView({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    });
+  }
   function findOpponent() {
     setOnlyAvailable(true);
     list.current?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
@@ -72,15 +89,17 @@ export default function Standings() {
       <MyCard />
       {canPlay && <ChallengeFinder rows={rows} options={options} onFind={findOpponent} />}
       <div className="standings-heading"><h2 className="lsection">{filtered ? 'Available opponents' : 'Standings'}</h2>{filtered && <button className="secondary small" onClick={() => setOnlyAvailable(false)}>Show all players</button>}</div>
+      {lastMatch && <TableResult challenge={lastMatch} players={season.players} onReplay={replayResult} playing={playing} />}
       {!rows.length ? <EmptyState icon="users" title="No players yet">Players appear here once an organizer enrolls them.</EmptyState> : (
         <ol ref={list} className="ladder-list" aria-label="Ladder standings">
           {shown.map((p, index) => {
             const option = options[p.id];
             return (
-              <li key={p.id} data-player-id={p.id} data-rank={p.rank} className={`ladder-row${p.id === playerId ? ' you' : ''}${option.ok ? ' challengeable' : ''}${p.rank <= 3 ? ' podium' : ''}`} style={{ '--row-delay': `${Math.min(index, 12) * 20}ms` }}>
-                <span className="lrank" aria-label={`Position ${p.rank}`}>{p.rank}</span>
+              <li key={p.id} data-player-id={p.id} data-rank={p.rank} className={`ladder-row${p.id === playerId ? ' you' : ''}${option.ok ? ' challengeable' : ''}${p.rank <= 3 ? ' podium' : ''}${highlights[p.id] ? ` result-${highlights[p.id].role}` : ''}${playing && highlights[p.id] ? ' result-playing' : ''}`} style={{ '--row-delay': `${Math.min(index, 12) * 20}ms` }}>
+                <span className="rank-slot"><span key={`${p.rank}:${playing ? playback.sequence : 'idle'}`} className="lrank" aria-label={`Position ${p.rank}`}>{p.rank}</span>{highlights[p.id]?.change !== 0 && highlights[p.id]?.change !== undefined && <RankTrail key={playing ? playback.sequence : 'idle'} direction={highlights[p.id].change > 0 ? 'up' : 'down'} />}</span>
                 <div className="lwho">
                   <strong>{p.name}{p.id === playerId && <em> you</em>}</strong>
+                  {highlights[p.id] && <ResultTag highlight={highlights[p.id]} />}
                   <span><Chip tone={p.status.tone}>{p.status.label}</Chip><Chip tone={p.verified ? 'sky' : 'muted'}>{verifiedLabel(p)}</Chip>{p.recent.length > 0 && <span className="lform-dots" aria-label={`Recent results: ${p.recent.join(' ')}`}>{p.recent.map((r, i) => <i key={i} className={r}>{r}</i>)}</span>}</span>
                 </div>
                 <div className="lnums"><b key={p.points} className="points-value">{p.points}</b><small>pts</small></div>
