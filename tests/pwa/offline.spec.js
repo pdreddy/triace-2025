@@ -2,6 +2,8 @@ import { test, expect } from '@playwright/test';
 
 const PAGES = [
   ['/', /./],
+  ['/home', /./],
+  ['/triace', /./],
   ['/register', /./],
   ['/tiers', /./],
   ['/league', /./],
@@ -41,7 +43,9 @@ test('installs once, then every page opens offline from the cache', async ({ pag
   await context.setOffline(true);
   for (const [path] of PAGES) {
     await page.goto(path);
-    await expect(page.locator('nav.tabs'), `${path} shows the app shell offline`).toBeVisible();
+    await expect(page.getByRole('banner'), `${path} shows the app shell offline`).toBeVisible();
+    await expect(page.getByRole('main')).toBeVisible();
+    if (path === '/' || path === '/home') await expect(page.getByRole('heading', { name: 'Player Home', level: 1 })).toBeVisible();
     await expect(page.locator('body')).not.toContainText('ERR_INTERNET_DISCONNECTED');
   }
   // Season 1 is bundled, so Champions and History have real content with no network and no saved data.

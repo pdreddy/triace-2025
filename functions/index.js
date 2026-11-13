@@ -111,16 +111,16 @@ export const registerTeam = onCall(options, async request => {
 export const saveConfiguration = onCall(options, async request => { await requireAdmin(request); return mutate(state => applyConfiguration(state, request.data)); });
 export const recalculateTiers = onCall(options, async request => { await requireAdmin(request); return mutate(state => applyRecalculation(state)); });
 export const generateFixtures = onCall(options, async request => { await requireAdmin(request); return mutate(state => applyGenerateFixtures(state, request.data)); });
-export const submitResult = onCall(options, async request => { requireAuth(request); return mutate(state => applySubmitResult(state, request.data, request.auth.uid, request.auth.token.admin === true)); });
+export const submitResult = onCall(options, async request => { requireAuth(request); const admin = await currentAdmin(request); return mutate(state => applySubmitResult(state, request.data, request.auth.uid, admin)); });
 export const reviewResult = onCall(options, async request => { await requireAdmin(request); return mutate(state => applyReviewResult(state, request.data)); });
 export const generatePlayoffs = onCall(options, async request => { await requireAdmin(request); return mutate(state => applyGeneratePlayoffs(state, request.data)); });
 // Find a partner: public posts, private contact details, and a swap of WhatsApp numbers when someone replies.
 const newId = () => randomUUID().replaceAll('-', '').slice(0, 20);
 export const createPartnerPost = onCall(options, async request => { requireAuth(request); const id = newId(); return mutate((state, { now }) => applyCreatePost(state, request.data, request.auth.uid, now, id)); });
 export const expressInterest = onCall(options, async request => { requireAuth(request); const id = newId(); return mutate((state, { now }) => applyExpressInterest(state, request.data, request.auth.uid, now, id)); });
-export const closePartnerPost = onCall(options, async request => { requireAuth(request); return mutate(state => applyClosePost(state, request.data, request.auth.uid, request.auth?.token?.admin === true)); });
-export const markPartnerPicked = onCall(options, async request => { requireAuth(request); return mutate(state => applyMarkPicked(state, request.data, request.auth.uid, request.auth?.token?.admin === true)); });
-export const reopenPartnerPost = onCall(options, async request => { requireAuth(request); return mutate(state => applyReopenPost(state, request.data, request.auth.uid, request.auth?.token?.admin === true)); });
+export const closePartnerPost = onCall(options, async request => { requireAuth(request); const admin = await currentAdmin(request); return mutate(state => applyClosePost(state, request.data, request.auth.uid, admin)); });
+export const markPartnerPicked = onCall(options, async request => { requireAuth(request); const admin = await currentAdmin(request); return mutate(state => applyMarkPicked(state, request.data, request.auth.uid, admin)); });
+export const reopenPartnerPost = onCall(options, async request => { requireAuth(request); const admin = await currentAdmin(request); return mutate(state => applyReopenPost(state, request.data, request.auth.uid, admin)); });
 export const saveEarlyBird = onCall(options, async request => { await requireAdmin(request); return mutate(state => applyEarlyBird(state, request.data)); });
 export const saveCalendar = onCall(options, async request => { await requireAdmin(request); return mutate(state => applyCalendar(state, request.data)); });
 export const autoSchedule = onCall(options, async request => { await requireAdmin(request); return mutate(state => applyAutoSchedule(state, request.data)); });

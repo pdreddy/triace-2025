@@ -92,6 +92,7 @@ export function applyExpressInterest(current, payload, uid, now = Date.now(), in
   assert(NAME.test(name), 'Use letters only for your name.');
   const whatsapp = normalizeWhatsAppPhone(payload.whatsapp);
   const state = structuredClone(current);
+  state.partnerPrivate[payload.postId].interests ||= {};
   state.partnerPrivate[payload.postId].interests[interestId] = { id: interestId, uid, name, whatsapp, message, at: now };
   state.partnerPosts[payload.postId].interested = Object.keys(state.partnerPrivate[payload.postId].interests).length;
   return { state, result: { postId: payload.postId, firstName: post.firstName, contact: secret.whatsapp } };

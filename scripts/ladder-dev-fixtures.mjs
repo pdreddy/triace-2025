@@ -1,6 +1,7 @@
 // DEVELOPMENT ONLY. A made-up roster of 16 players and a short active season for the local demo (npm run demo) and the Firebase emulators.
 // Nothing in the web app or the Cloud Functions imports this file, so it can never reach production data.
 import { applyLadder } from '../functions/lib/singlesLadder/engine.js';
+import { localDate, zonedTime } from '../functions/lib/singlesLadder/time.js';
 import { ValidationError } from '../functions/lib/tournament.js';
 
 const DAY = 86400000, HOUR = 3600000;
@@ -21,6 +22,11 @@ export function seedDemoLadder(ladder, now, uidFor = demoUid) {
   step(organizer, start, { action: 'setStatus', status: 'active', reason: 'Demo season opened' });
   const challenge = (a, b, at) => { const { challengeId } = step(player(a), at, { action: 'challenge', opponentId: id(b) }); return challengeId; };
   const played = (a, b, at, challengerWins, score) => {
+    // Historical samples finish in the afternoon, never across Sunday's deadline.
+    // Otherwise their positions depend on the wall-clock time when the demo is seeded.
+    const timezone = state.public[DEMO_SEASON].rules.values.deadline.timezone;
+    const date = localDate(at, timezone);
+    at = zonedTime(date.year, date.month, date.day, 12, 0, timezone);
     const challengeId = challenge(a, b, at);
     step(player(b), at + HOUR, { action: 'respond', challengeId, accept: true });
     step(player(a), at + 2 * HOUR, { action: 'submit', challengeId, winnerId: id(challengerWins ? a : b), score });

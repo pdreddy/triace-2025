@@ -162,3 +162,14 @@ test('picked posts disappear from the board after two weeks', () => {
   assert.equal(later.partnerPosts.post_000001, undefined);
   assert.equal(later.partnerPrivate.post_000001, undefined, 'the private side goes too');
 });
+
+
+test('the first reply works after Firebase removes the empty interests object', () => {
+  const state = post(initialState(), player()).state;
+  delete state.partnerPrivate.post_000001.interests;
+  const { state: next, result } = applyExpressInterest(state, interest(), 'u2', 2000, 'int_0000001');
+  assert.equal(result.contact, '+15550102000');
+  assert.equal(next.partnerPosts.post_000001.interested, 1);
+  assert.equal(next.partnerPrivate.post_000001.interests.int_0000001.uid, 'u2');
+  assert.equal(state.partnerPrivate.post_000001.interests, undefined);
+});

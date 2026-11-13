@@ -4,7 +4,8 @@ import { initializeApp, deleteApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getDatabase } from 'firebase-admin/database';
 import { randomUUID } from 'node:crypto';
-import { initialState } from '../../functions/lib/tournament.js';
+import { initialState, applyRegistration } from '../../functions/lib/tournament.js';
+import { applyGenerateFixtures } from '../../functions/lib/league.js';
 process.env.FIREBASE_AUTH_EMULATOR_HOST ||= '127.0.0.1:9099'; process.env.FIREBASE_DATABASE_EMULATOR_HOST ||= '127.0.0.1:9000';
 const authURL = `http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}`, functionsURL = `http://${process.env.FIREBASE_FUNCTIONS_EMULATOR_HOST || '127.0.0.1:5001'}`;
 const app=initializeApp({projectId:'demo-traice-2',databaseURL:'https://demo-traice-2-default-rtdb.firebaseio.com'}),database=getDatabase(app),auth=getAuth(app);
@@ -127,4 +128,42 @@ test('Ladder: concurrent challenges create exactly one; ownership is the linked 
   assert.notEqual((await ladder({ action: 'challenge', seasonId: 's1', opponentId: 'ladder_three' }, guestToken)).status, 200);
   // TRIACE data is untouched by ladder transactions.
   assert.deepEqual((await database.ref('traice2_0/settings').get()).val(), initialState().settings);
+});
+
+
+test('removed admins cannot use a stale token to manage partner posts or finalize scores', async () => {
+  const stale = await token(true), { uid } = await auth.verifyIdToken(stale);
+  await auth.setCustomUserClaims(uid, { admin: false });
+  const created = await call('createPartnerPost', { kind: 'player', firstName: 'Maya', singlesUtr: 625, doublesUtr: null, note: '', whatsapp: '+15550102000' });
+  assert.equal(created.status, 200);
+  const { postId } = created.result;
+  const picked = await call('markPartnerPicked', { postId }, stale);
+  assert.notEqual(picked.status, 200);
+  assert.match(picked.error.message, /Only the person/);
+  assert.equal((await call('markPartnerPicked', { postId })).status, 200);
+  assert.notEqual((await call('reopenPartnerPost', { postId }, stale)).status, 200);
+  assert.notEqual((await call('closePartnerPost', { postId }, stale)).status, 200);
+  assert.equal((await database.ref(`traice2_0/partnerPosts/${postId}/status`).get()).val(), 'picked');
+
+  let state = initialState();
+  for (const owner of ['ownerA', 'ownerB']) state = applyRegistration(state, team(), owner, Date.now()).state;
+  state = applyGenerateFixtures(state, { tierId: 'goat' }).state;
+  await database.ref('traice2_0').set(state);
+  const fixture = Object.values(state.fixtures.goat)[0];
+  const doubles = { sets: [{ home: 4, away: 1 }, { home: 4, away: 1 }] };
+  const score = { tierId: 'goat', fixtureId: fixture.id, courts: { d1: doubles, d2: doubles, s: { set: { home: 8, away: 3 } } } };
+  const refused = await call('submitResult', score, stale);
+  assert.notEqual(refused.status, 200);
+  assert.match(refused.error.message, /Only the captains/);
+  assert.equal((await call('submitResult', score, adminToken)).status, 200);
+});
+
+test('partner replies work with Firebase’s stored form of a new post', async () => {
+  const created = await call('createPartnerPost', { kind: 'player', firstName: 'Maya', singlesUtr: 625, doublesUtr: null, note: '', whatsapp: '+15550102000' });
+  assert.equal(created.status, 200);
+  const { postId } = created.result;
+  const reply = await call('expressInterest', { postId, name: 'Sam', whatsapp: '+15550104000', message: 'Saturday works' }, await token());
+  assert.equal(reply.status, 200);
+  assert.equal(reply.result.contact, '+15550102000');
+  assert.equal((await database.ref(`traice2_0/partnerPosts/${postId}/interested`).get()).val(), 1);
 });

@@ -15,6 +15,8 @@ rules configuration and versioning, security rules, deployment order and tests a
 
 Use Node.js 24.12+ (below 25) for the web app and tooling; deployed Functions use Node 22. The locked Firebase web SDK requires Node 24.12 or newer.
 
+The web manifest overrides `@grpc/grpc-js` to a patched 1.x release; the Functions manifest overrides `uuid` to its patched, CommonJS-compatible 11.x release. These replace vulnerable transitive versions without upgrading the Firebase SDK majors. Keep both lockfiles in sync with their manifests, and check `npm audit --omit=dev` in both the root and `functions/` after dependency changes.
+
 ```sh
 npm run setup
 cp .env.demo.example .env.demo.local
@@ -48,7 +50,7 @@ npm run test:browser
 
 On a Linux machine with system Chromium, run `CHROMIUM_PATH=/usr/bin/chromium npm run test:browser` instead. The browser suite starts its own local demo on port 3100 with an isolated data directory and a test-only password. It tests registration, promotion, public privacy, denied private/admin access, username sign-in, CSV, tier management, safe removal, recalculation, registration closure, sign-out, and mobile layout. It does not touch live Firebase.
 
-`npm run check` runs unit tests, a production build, and browser tests. Browser installation is a prerequisite. Backend rules and deployed callable-function integration are tested separately using Firebase Emulators below.
+`npm run check` runs unit tests, a production build, static PWA checks, browser tests, and offline PWA tests. Browser installation is a prerequisite. CI also runs the Firebase Emulator rules and callable-function integration tests described below.
 
 ## Firebase Emulators — real local Firebase integration
 

@@ -554,3 +554,34 @@ test('a season stored before a rule existed gets that rule’s default and nothi
   state = act(state, 5, { action: 'challenge', opponentId: 'p3' });
   assert.deepEqual([season(state).rules.version, season(state).rules.values.points.win, season(state).rules.values.match.thirdSet, lastChallenge(state)[1].rules.values.match.thirdSet], [2, 7, 'matchTiebreak', 'matchTiebreak']);
 });
+
+
+test('an extension must advance the currently approved deadline', () => {
+  let state = act(ladder(), 5, { action: 'challenge', opponentId: 'p3' });
+  const [challengeId] = lastChallenge(state);
+  state = act(state, 3, { action: 'respond', challengeId, accept: true });
+  const due = season(state).challenges[challengeId].deadline;
+  state = act(state, admin, { action: 'grant', type: 'extension', challengeId, until: due + 3 * DAY, reason: 'courts closed' });
+  refuses(() => run(state, admin, { action: 'grant', type: 'extension', challengeId, until: due + DAY, reason: 'shorter extension' }), /after the.*deadline/);
+  refuses(() => run(state, 5, { action: 'request', type: 'extension', category: 'weather', challengeId, until: due + 2 * DAY, reason: 'rain forecast' }), /after the current/);
+});
+
+test('voiding a result rebuilds both players’ streaks from the remaining results', () => {
+  let state = play(ladder(), 5, 3);
+  const firstId = lastChallenge(state)[0];
+  state = play(state, 5, 2, { at: T0 + DAY });
+  const secondId = lastChallenge(state)[0];
+  assert.equal(season(state).players.p5.streak, 2);
+  state = act(state, admin, { action: 'voidResult', challengeId: firstId, reason: 'duplicate match' }, T0 + 2 * DAY);
+  assert.equal(season(state).players.p5.streak, 1);
+  state = act(state, admin, { action: 'voidResult', challengeId: secondId, reason: 'incorrect match' }, T0 + 2 * DAY);
+  assert.equal(season(state).players.p5.streak, 0);
+
+  state = play(ladder(), 5, 3);
+  state = play(state, 5, 2, { winner: 2, at: T0 + DAY });
+  const lossId = lastChallenge(state)[0];
+  assert.equal(season(state).players.p5.streak, 0);
+  state = act(state, admin, { action: 'voidResult', challengeId: lossId, reason: 'incorrect winner' }, T0 + 2 * DAY);
+  assert.equal(season(state).players.p5.streak, 1);
+  assert.equal(season(state).players.p2.streak, 0);
+});

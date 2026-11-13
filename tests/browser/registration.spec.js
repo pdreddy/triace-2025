@@ -54,6 +54,8 @@ test('admin sees the captain username and can reset the login; the old password 
  await issued.getByRole('button',{name:/Done/}).click();await expect(issued).toHaveCount(0);
 });
 test('league: admin schedules fixtures, a captain submits a score, the admin approves it and standings update',async({browser})=>{
+ // Three browser sessions cover registration, scheduling, scoring and approval end to end.
+ test.setTimeout(90000);
  const captain=await (await browser.newContext()).newPage(),rival=await (await browser.newContext()).newPage(),admin=await (await browser.newContext()).newPage();
  await register(captain,'LeagueCap');await captain.getByRole('button',{name:'Register team ↗'}).click();await expect(captain.getByText('Team registered successfully!',{exact:false})).toBeVisible();
  await register(rival,'RivalCap');await rival.getByRole('button',{name:'Register team ↗'}).click();await expect(rival.getByText('Team registered successfully!',{exact:false})).toBeVisible();

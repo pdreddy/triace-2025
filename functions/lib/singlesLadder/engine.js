@@ -201,7 +201,7 @@ export function applyLadder(current, payload, actor, ctx) {
     } else {
       const c = challengeOf(target), v = c.rules.values;
       check(c.status === 'accepted' && c.deadline, 'Only an accepted match that is still to be played can be extended.');
-      check(until > c.deadline && until <= c.deadline + v.extension.maxDays * DAY, `An extension must end after the deadline and within ${v.extension.maxDays} days of it.`);
+      check(until > (c.extensionUntil || c.deadline) && until <= c.deadline + v.extension.maxDays * DAY, `An extension must end after the deadline and within ${v.extension.maxDays} days of it.`);
       c.extensionUntil = until;
       for (const id of [c.challengerId, c.opponentId]) notify(id, 'extension', 'The deadline for your match was extended.', target);
     }
@@ -335,6 +335,11 @@ export function applyLadder(current, payload, actor, ctx) {
     const winner = season.players[c.result.winnerId], loser = season.players[other(c, c.result.winnerId)];
     winner.wins = Math.max(0, (winner.wins || 0) - 1); loser.losses = Math.max(0, (loser.losses || 0) - 1);
     c.status = 'voided'; c.voided = { at: now, by: actor.uid };
+    // A voided win cannot unlock a streak challenge; a voided loss cannot break a valid streak.
+    const completed = Object.values(season.challenges).filter(match => match.status === 'completed').sort((a, b) => a.completedAt - b.completedAt);
+    for (const id of [c.challengerId, c.opponentId]) {
+      season.players[id].streak = completed.filter(match => involves(match, id)).reduce((streak, match) => match.result.winnerId === id ? streak + 1 : 0, 0);
+    }
     for (const id of [c.challengerId, c.opponentId]) notify(id, 'organizer', 'An organizer voided one of your results. Its points were reversed.', payload.challengeId);
     audit({ target: { challengeId: payload.challengeId }, before: { status: 'completed', outcome: c.outcome }, after: { status: 'voided' } });
   }
@@ -449,7 +454,7 @@ export function applyLadder(current, payload, actor, ctx) {
       check(c.status === 'accepted', 'Only an accepted match that is still to be played can be extended.');
       const why = text(payload.reason, 3, 500, 'Explain the request in 3 to 500 characters. Only organizers can read it.');
       check(Object.hasOwn(REQUEST_CATEGORIES, payload.category), 'Choose what the request is for: injury, travel, weather, court closure or scheduling.');
-      check(Number.isSafeInteger(payload.until) && payload.until > Math.max(now, c.deadline) && payload.until <= c.deadline + v.extension.maxDays * DAY, `Choose a new deadline after the current one and within ${v.extension.maxDays} days of it.`);
+      check(Number.isSafeInteger(payload.until) && payload.until > Math.max(now, c.extensionUntil || c.deadline) && payload.until <= c.deadline + v.extension.maxDays * DAY, `Choose a new deadline after the current one and within ${v.extension.maxDays} days of it.`);
       check(!Object.values(hidden.requests).some(list => Object.values(list).some(r => r.challengeId === id && r.status === 'pending')), 'An extension request for this match is already waiting.');
       const requestId = newId();
       (hidden.requests[me] ||= {})[requestId] = { type: 'extension', category: payload.category, challengeId: id, until: payload.until, reason: why, status: 'pending', createdAt: now };

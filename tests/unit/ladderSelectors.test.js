@@ -97,3 +97,14 @@ test('roster names are matched like the PPRC migration: settled spellings, exact
   assert.deepEqual(resolved.map(r => [r.from, r.playerId, r.how, r.utr, r.flagged]), [['Dinesh Timmareddy', 'p_dinesh_reddy_timmareddy', 'tokens', 5.46, false], ['Joel Kodooru', 'p_joel_kodoru', 'name decision', 4.4, false], ['Raj Chava', 'p_raj_chava', 'exact', 4, true]]);
   assert.deepEqual(missing, [{ name: 'Krishna', candidates: ['Krishna Vennapusa', 'Krishna Pamarthi'] }, { name: 'Old Name', candidates: [] }, { name: 'Nobody Here', candidates: [] }]);
 });
+
+
+test('demo history stays on time and keeps its sample ranks on every weekday', () => {
+  for (let day = 0; day < 7; day++) for (const hour of [4, 18]) {
+    const now = Date.UTC(2026, 10, 9 + day, hour, 30);
+    const state = seedDemoLadder({}, now), s = state.public.demo;
+    assert.equal(s.players.ladder_demo_3.rank, 2, new Date(now).toISOString());
+    assert.equal(s.players.ladder_demo_5.rank, 5);
+    assert.ok(Object.values(s.challenges).filter(c => c.status === 'completed').every(c => !c.outcome.late));
+  }
+});

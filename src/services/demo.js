@@ -1,5 +1,6 @@
 export function createDemoService() {
   const authListeners = new Set();
+  let authRequest;
   async function request(path, data) {
     const response = await fetch(`/api/${path}`, { credentials: 'same-origin', headers: data ? { 'Content-Type': 'application/json' } : {}, method: data ? 'POST' : 'GET', ...(data ? { body: JSON.stringify(data) } : {}) });
     const body = await response.json(); if (!response.ok) throw new Error(body.error || 'The local demo request failed.'); return body;
@@ -9,7 +10,12 @@ export function createDemoService() {
     async function tick() { try { const data = await request(path); if (!stopped) callback(data); } catch (e) { if (!stopped) error(e); } finally { if (!stopped) timer = setTimeout(tick, 600); } }
     tick(); return () => { stopped = true; clearTimeout(timer); };
   }
-  async function refreshAuth() { const user = await request('session'); authListeners.forEach(fn => fn(user)); }
+  async function refreshAuth() {
+    // Concurrent subscriptions must not create competing anonymous session cookies.
+    authRequest ||= request('session').finally(() => { authRequest = null; });
+    const user = await authRequest;
+    authListeners.forEach(fn => fn(user));
+  }
   return {
     mode: 'Local demo',
     info: { projectId: 'local demo (no Firebase)', root: 'in-memory demo state', season1Path: 'in-memory demo state', emulators: false, demo: true },
