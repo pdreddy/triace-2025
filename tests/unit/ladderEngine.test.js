@@ -98,7 +98,7 @@ test('rematch cooldown: 14 days by default, configurable, optional after unplaye
   refuses(() => run(declined(), 5, { action: 'challenge', opponentId: 'p3' }, T0 + DAY), /again 14 days/);
   assert.equal(challengeIds(act(declined({ rematch: { afterUnplayed: false } }), 5, { action: 'challenge', opponentId: 'p3' }, T0 + DAY)).length, 2);
 });
-test('two consecutive wins unlock any higher position; a loss resets the streak; thresholds are configurable', () => {
+test('two consecutive wins unlock up to five higher positions; a loss resets the streak; thresholds are configurable', () => {
   let state = play(ladder(), 8, 7);                          // p8 and p7 swap
   refuses(() => run(state, 8, { action: 'challenge', opponentId: 'p2' }, T0 + DAY), /outside/);
   state = play(state, 8, 5, { at: T0 + DAY });               // p8 now #5, streak 2

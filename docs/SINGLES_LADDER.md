@@ -280,7 +280,7 @@ Open the printed URL at `/player-login`. Each account has the **local-only test 
 The profile uses all 15 actual Group A roster names and three recorded match pairings from `scripts/migration/ladder-2026.psv`.
 UTRs come from `utr-seeds.csv` through the existing PPRC migration and name decisions. An unresolved UTR remains blank
 (Mohamed Noufal is currently unrated under that exact identity). These are checked-in snapshots, not a live-data download.
-Practice points and records start at zero, and historical Group A results remain read-only at `/ladder/2026`.
+Two sample rounds (six completed matches) are preloaded, with practice points, rank swaps and three two-win streaks. These sample outcomes are not official results. Historical Group A results remain read-only at `/ladder/2026`. Click **Watch snake & ladder** for the animated result, **Replay on table** for row movement, or expand **Completed practice rounds** to replay any result.
 
 Three pending challenges are prepared:
 
@@ -292,12 +292,12 @@ Three pending challenges are prepared:
 
 For the first match, sign in as Vinod and accept; sign in as Usman and report the reference score with Usman as winner;
 then sign in as Vinod and confirm. Use separate browser profiles, or sign out between accounts. Reference steps are
-also shown on the Ladder page. All Group A opponents are allowed for practice, either third-set format is accepted,
+also shown on the Ladder page. The range is **3 places up**, **5 places up after 2 consecutive wins**, and **at most 3 places down for the top 3**. Noufal starts with two wins and a legal pending challenge four places above him. Either third-set format is accepted,
 and accepted matches get at least three days to play. Other security and ownership checks use the same ladder engine.
 
-This profile persists only under `.local-demo/group-a/`, separately from the normal demo, and serves its PPRC snapshot
+This profile persists only under `.local-demo/group-a-v2/`, separately from the normal demo, and serves its PPRC snapshot
 locally. Stop the server and run `npm run demo:group-a -- --reset` to restart these practice matches. The reset refuses
-a data folder that is not marked as Group A practice. No live Firebase accounts or results are changed.
+a data folder that is not marked as Group A practice. The previous `.local-demo/group-a/` folder is preserved; the new default folder provides the completed rounds without deleting older tests. No live Firebase accounts or results are changed.
 
 Emulators: `npm run emulators`, `npm run seed:emulators`, `node scripts/seed-ladder-emulators.mjs`, `npm run dev:emulators`.
 
@@ -322,3 +322,11 @@ npm run build && npm run rules:check
 - **Emulator suite** (`npm run test:rules`) could not run in the sandbox; run it locally or in CI before deploying.
 - **Deployment**: functions and rules are not deployed. Until they are, `/ladder` on the live site shows the
   unavailable state.
+
+### Manual rules coverage in Group A practice
+
+- **Completed results:** expand both practice rounds and replay; compare recorded before/after ranks and points with standings. All six seed results use the real challenge/accept/report/confirm engine.
+- **Challenge boundaries:** after finishing or withdrawing a pending challenge, test 3 versus 4 places up without a streak, 5 versus 6 after two wins, and 3 versus 4 places down from the top three. A loss resets the streak. Active limits, exemption and cooldown restrictions still apply.
+- **Match workflow:** use the three pending references for accept/decline/withdraw, invalid score rejection, correct score submission, confirmation and disputes. Use separate player browser profiles.
+- **Organizer actions:** sign in as a local organizer to test dispute resolution, extensions, exemptions, walkovers/no-shows, position/point adjustments, and season freeze/close. Player accounts must not get organizer access.
+- **Timed rules:** response expiry, late matches, repeated declines and inactivity need the corresponding events/time and organizer sweep. They are covered by the engine unit tests; precompleted rounds alone do not prove these paths. Run `npm test` for the full automated rule suite.

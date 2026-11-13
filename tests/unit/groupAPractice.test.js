@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { groupAPractice, GROUP_A_SEASON } from '../../scripts/group-a-practice.mjs';
 import { applyLadder, validateScore } from '../../functions/lib/singlesLadder/engine.js';
+import { DEFAULT_RULES, inChallengeRange } from '../../functions/lib/singlesLadder/config.js';
 import { playerLoginEmail, isPlayerEmail } from '../../functions/lib/playerAccount.js';
 const now = Date.parse('2026-11-13T18:00:00Z');
 
@@ -23,7 +24,19 @@ test('Group A uses the real roster, six separate identity links and recorded UTR
   assert.equal(season.players.p_mohamed_noufal.utr, null);
   assert.equal(ladder.index.seasons[GROUP_A_SEASON].status, 'active');
   assert.equal(practice.matches.length, 3);
-  assert.ok(Object.values(season.players).every(p => p.points === 0 && p.wins === 0));
+  assert.equal(practice.rounds.length, 2);
+  assert.ok(practice.rounds.every(r => r.matches.length === 3));
+  for (const round of practice.rounds) for (const match of round.matches) {
+    const c = season.challenges[match.challengeId];
+    assert.equal(c.status, 'completed');
+    assert.ok(c.outcome.ranksBefore[c.result.winnerId] > c.outcome.ranksAfter[c.result.winnerId]);
+  }
+  assert.equal(season.players.p_mohamed_noufal.streak, 2);
+  assert.equal(season.players.p_mohamed_noufal.wins, 2);
+  assert.ok(season.players.p_mohamed_noufal.points > 0);
+  assert.deepEqual(season.rules.values.challenge, DEFAULT_RULES.challenge);
+  assert.deepEqual(season.rules.values.streak, DEFAULT_RULES.streak);
+  assert.deepEqual(season.rules.values.top, DEFAULT_RULES.top);
 });
 
 test('all three actual Group A references can be accepted, reported and confirmed with their six linked accounts', () => {
@@ -63,4 +76,22 @@ test('the Group A reset refuses to delete an ordinary demo data file', () => {
     assert.match(run.stderr, /Refusing to reset/);
     assert.equal(fs.readFileSync(file, 'utf8'), original);
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('Group A and engine enforce 3 up, streak 5 up, top three 3 down, without bypassing active limits', () => {
+  const { ladder } = groupAPractice(now), rules = ladder.public[GROUP_A_SEASON].rules.values;
+  assert.equal(inChallengeRange(rules, 12, 9, 0, 15), true);
+  assert.equal(inChallengeRange(rules, 12, 8, 0, 15), false);
+  assert.equal(inChallengeRange(rules, 12, 7, 2, 15), true);
+  assert.equal(inChallengeRange(rules, 12, 6, 2, 15), false);
+  assert.equal(inChallengeRange(rules, 3, 6, 2, 15), true);
+  assert.equal(inChallengeRange(rules, 3, 7, 2, 15), false);
+  assert.equal(inChallengeRange(rules, 4, 5, 2, 15), false);
+  // Withdraw Noufal's prepared challenge, then test the actual server boundary at #13.
+  const uid = 'local_group_a_p_mohamed_noufal', pending = Object.entries(ladder.public[GROUP_A_SEASON].challenges).find(([, c]) => c.challengerId === 'p_mohamed_noufal' && c.status === 'pending');
+  const state = applyLadder(ladder, { action: 'withdraw', seasonId: GROUP_A_SEASON, challengeId: pending[0] }, { uid }, { now, id: 'withdraw-boundary' }).state;
+  const target = rank => Object.entries(state.public[GROUP_A_SEASON].players).find(([, p]) => p.rank === rank)[0];
+  const challenge = rank => applyLadder(state, { action: 'challenge', seasonId: GROUP_A_SEASON, opponentId: target(rank) }, { uid }, { now, id: `boundary-${rank}` });
+  assert.doesNotThrow(() => challenge(8));
+  assert.throws(() => challenge(7), /outside/i);
 });

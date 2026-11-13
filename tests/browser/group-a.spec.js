@@ -65,3 +65,28 @@ test('the three actual Group A match references complete through accept, report 
     } finally { await homeContext.close(); await awayContext.close(); }
   }
 });
+
+test('two completed practice rounds expose the snake and ladder replay on desktop and mobile', async ({ page }) => {
+  await page.goto('/ladder');
+  const guide = page.getByRole('region', { name: 'Group A practice guide' });
+  await expect(guide).toContainText('2 sample rounds · 6 completed matches');
+  await expect(guide).toContainText('up to 5');
+  await guide.getByRole('button', { name: 'Watch snake & ladder' }).click();
+  const result = page.getByRole('dialog');
+  await expect(result.locator('.result-board')).toBeVisible();
+  await expect(result).toContainText('Down the snake');
+  await expect(result).toContainText('Hari Mothukuri');
+  await expect(result.locator('.result-winner-token')).toHaveCSS('animation-name', 'winner-climb');
+  await expect(result.locator('.result-loser-token')).toHaveCSS('animation-name', 'snake-slide');
+  await expect(result).toHaveCSS('opacity', '1');
+  await page.screenshot({ path: 'work/group-a-snake-ladder.png' });
+  await result.getByRole('button', { name: 'Back to the ladder' }).click();
+  await expect(page.getByRole('region', { name: 'Latest ladder result' })).toBeVisible();
+  await page.getByRole('button', { name: 'Replay on table' }).click();
+  await expect(page.locator('.rank-trail.up').first()).toBeVisible();
+  await expect(page.locator('.rank-trail.down').first()).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await guide.getByRole('button', { name: 'Watch snake & ladder' }).click();
+  await expect(result.locator('.result-board')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});

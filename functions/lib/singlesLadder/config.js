@@ -26,7 +26,7 @@ export const RULE_GROUPS = [
   { id: 'streak', title: 'Win streak', fields: {
     enabled: bool(true, 'Win streak unlocks a wider range', 'Consecutive ladder wins let a player challenge beyond the normal range. A loss ends the streak.'),
     wins: int(2, 1, 20, 'Consecutive wins needed', 'Wins in a row (walkover wins count) before the wider range opens.'),
-    maxUp: int(0, 0, 100, 'Unlocked positions above', 'How many positions above a player on a streak may challenge. 0 means any higher position.')
+    maxUp: int(5, 0, 100, 'Unlocked positions above', 'How many positions above a player on a streak may challenge. 0 means any higher position.')
   } },
   { id: 'rematch', title: 'Rematches', fields: {
     enabled: bool(true, 'Rematch cooldown', 'Stops the same two players from meeting again straight away.'),

@@ -23,18 +23,17 @@ export function groupAPractice(now = Date.now()) {
   const { resolved, missing } = matchRoster(group.players.map(p => ({ name: p.name, key: p.key, rating: null })), { index: tree.pprcMaster.nameIndex, players: tree.pprcMaster.players, decisions });
   if (missing.length) throw new Error(`Cannot resolve Group A players: ${missing.map(p => p.name).join(', ')}`);
   const records = new Map(resolved.map(p => [nameKey(p.from), p]));
-  const organizer = { uid: 'local_group_a_setup', admin: true }; let ladder = {}, n = 0;
+  const organizer = { uid: 'local_group_a_setup', admin: true }; let ladder = {}, n = 0, clock = now - 120000;
   const step = (payload, actor = organizer) => {
-    const out = applyLadder(ladder, { seasonId: GROUP_A_SEASON, ...payload }, actor, { now, id: `groupa_${++n}` });
+    const out = applyLadder(ladder, { seasonId: GROUP_A_SEASON, ...payload }, actor, { now: clock++, id: `groupa_${++n}` });
     ladder = out.state; return out.result;
   };
   step({ action: 'createSeason', name: 'Group A · Local practice', reason: 'Practice with the actual Group A roster' });
   for (const player of resolved) step({ action: 'enroll', playerId: player.playerId, name: player.name, utr: player.utr, verified: true, reason: 'Actual Group A roster and recorded UTR seeds' });
   step({ action: 'seed', reason: 'Practice positions seeded from recorded singles UTRs' });
   const values = structuredClone(DEFAULT_RULES);
-  values.challenge.maxUp = resolved.length - 1; values.top.threshold = resolved.length; values.top.maxDown = resolved.length - 1;
   values.match.thirdSet = 'either'; values.deadline.minDays = 3;
-  step({ action: 'saveRules', values, baseVersion: 1, reason: 'Local Group A practice: allow all group pairings and either recorded third-set format' });
+  step({ action: 'saveRules', values, baseVersion: 1, reason: 'Local practice: three places up, five after two wins, top three may challenge three down' });
   const accounts = [], fixtures = [];
   for (const [home, away, homeUsername, awayUsername] of PAIRS) {
     const match = group.matches.find(m => m.home.key === nameKey(home) && m.away.key === nameKey(away) && m.kind === 'played' && m.confirmed);
@@ -47,6 +46,26 @@ export function groupAPractice(now = Date.now()) {
     fixtures.push({ match, home: records.get(nameKey(home)), away: records.get(nameKey(away)) });
   }
   step({ action: 'setStatus', status: 'active', reason: 'Open the isolated local Group A practice season' });
+  // These six results are SAMPLE practice outcomes, never imported official results.
+  // Every challenge goes through the real range, acceptance, scoring and confirmation checks.
+  const rounds = [
+    [['Mohamed Noufal', 'Abhishek Kadavil Venugopalan'], ['Brian Chong', 'Durga Kalavakolanu'], ['Hari Mothukuri', 'Saket Raizada']],
+    [['Mohamed Noufal', 'Damodhara Palavali'], ['Brian Chong', 'Uday Katikala'], ['Hari Mothukuri', 'Durga Kalavakolanu']]
+  ].map((pairs, index) => ({ round: index + 1, matches: pairs.map(([homeName, awayName]) => {
+    const home = records.get(nameKey(homeName)), away = records.get(nameKey(awayName));
+    const actor = player => {
+      const uid = `local_group_a_${player.playerId}`;
+      if (!ladder.accounts[uid]) step({ action: 'link', uid, playerId: player.playerId, reason: 'Local-only sample round participant' });
+      return { uid };
+    };
+    const homeActor = actor(home), awayActor = actor(away);
+    const { challengeId } = step({ action: 'challenge', opponentId: away.playerId }, homeActor);
+    step({ action: 'respond', challengeId, accept: true }, awayActor);
+    step({ action: 'submit', challengeId, score: '6-4 6-3', winnerId: home.playerId }, homeActor);
+    step({ action: 'confirm', challengeId }, awayActor);
+    return { challengeId, home: home.name, away: away.name, winner: home.name, score: '6-4 6-3' };
+  }) }));
+  clock = now;
   const matches = fixtures.map(({ match, home, away }) => {
     const uid = accounts.find(a => a.playerId === home.playerId).uid;
     const { challengeId } = step({ action: 'challenge', opponentId: away.playerId }, { uid });
@@ -58,7 +77,7 @@ export function groupAPractice(now = Date.now()) {
   });
   return {
     ladder: JSON.parse(JSON.stringify(ladder)), accounts,
-    practice: { seasonId: GROUP_A_SEASON, name: 'Group A local practice', players: resolved.length, matches, source: 'scripts/migration/ladder-2026.psv', utrSource: 'scripts/migration/utr-seeds.csv' },
+    practice: { seasonId: GROUP_A_SEASON, version: 2, name: 'Group A local practice', players: resolved.length, rounds, matches, source: 'scripts/migration/ladder-2026.psv', utrSource: 'scripts/migration/utr-seeds.csv' },
     pprc: { pprcMaster: tree.pprcMaster, pprcClubs: tree.clubs }
   };
 }

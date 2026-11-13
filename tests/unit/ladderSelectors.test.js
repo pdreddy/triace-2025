@@ -25,7 +25,7 @@ test('challenge buttons follow the same season rules the server enforces', () =>
   assert.equal(challengeOption(season(state), 'p5', 'p4', T0).ok, false);
   const played = play(ladder(), 5, 4);
   assert.deepEqual(challengeOption(season(played), 'p4', 'p5', T0 + DAY), { ok: false, why: 'Rematch cooldown' });
-  const custom = ladder({ rules: { challenge: { maxUp: 6 } } });
+  const custom = ladder({ rules: { challenge: { maxUp: 6 }, streak: { maxUp: 8 } } });
   assert.equal(challengeOption(season(custom), 'p8', 'p2', T0).ok, true);
 });
 test('Player Home summary: rank, points, UTR, pending challenges and the next deadline', () => {

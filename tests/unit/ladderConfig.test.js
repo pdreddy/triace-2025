@@ -58,9 +58,13 @@ test('challenge range: normal, top players downward, streak unlock, custom', () 
   assert.deepEqual(challengeRange(v, 8, 0, 16), { min: 5, max: 8 });
   assert.deepEqual(challengeRange(v, 2, 0, 16), { min: 1, max: 5 });           // top three: three below as well
   assert.deepEqual(challengeRange(v, 4, 0, 16), { min: 1, max: 4 });           // rank 4 is not a top player
-  assert.deepEqual(challengeRange(v, 12, 2, 16), { min: 1, max: 12 });         // two wins: any higher position
+  assert.deepEqual(challengeRange(v, 12, 2, 16), { min: 7, max: 12 });         // two wins: at most five positions above
   assert.equal(inChallengeRange(v, 8, 4, 0, 16), false);
-  assert.equal(inChallengeRange(v, 8, 4, 2, 16), true);
+  assert.equal(inChallengeRange(v, 8, 3, 2, 16), true);
+  assert.equal(inChallengeRange(v, 8, 2, 2, 16), false);
+  assert.equal(inChallengeRange(v, 3, 6, 0, 16), true);
+  assert.equal(inChallengeRange(v, 3, 7, 2, 16), false);
+  assert.equal(inChallengeRange(v, 4, 5, 2, 16), false);
   assert.equal(inChallengeRange(v, 8, 8, 0, 16), false);
   assert.equal(inChallengeRange(v, 15, 17, 0, 16), false);
   const c = custom({ challenge: { maxUp: 2 }, top: { threshold: 1, maxDown: 5 }, streak: { wins: 3, maxUp: 6 } });

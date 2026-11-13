@@ -19,7 +19,7 @@ export default function ResultCelebration({ challenge: c, onClose, onViewStandin
     <div className="result-content">
       <button className="secondary small result-close" aria-label="Skip result animation" autoFocus onClick={onClose}><Icon name="close" size={18} /></button>
       <p className="eyebrow">Match confirmed</p>
-      <h2 id="result-title">{won ? moved ? 'Up you go!' : 'A win to remember.' : 'The climb continues.'}</h2>
+      <h2 id="result-title">{!playerId ? moved ? 'Up the ladder, down the snake!' : 'Match result' : won ? moved ? 'Up you go!' : 'A win to remember.' : 'The climb continues.'}</h2>
       <p id="result-summary">{winner.name} wins{c.result.score ? ` · ${c.result.score}` : ` · ${c.result.kind === 'noShow' ? 'No-show' : 'Walkover'}`}</p>
       {moved ? <div className="result-board" aria-hidden="true">
         <svg viewBox="0 0 600 265" fill="none">
