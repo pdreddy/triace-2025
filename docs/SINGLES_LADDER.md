@@ -15,6 +15,7 @@ One app, several formats. `/home` is Player Home; TRIACE 2.0 and the Singles Lad
 | `/ladder/activity` | Points breakdown, notifications, exemption requests |
 | `/ladder/rules` | Rules, written from the season's configuration |
 | `/ladder/organizer` | Organizer dashboard (admins only; enforced on the server) |
+| `/ladder/2026` | Ladder 2026 as played: champions and playoffs, the four groups with records and results by week. Read-only, built from `scripts/migration/ladder-2026.psv` with names settled by `name-decisions.json`; add new result rows to that file and the page (and the next PPRC refresh) picks them up |
 | `/po`, `/koc` | Reserved, Coming Soon |
 
 "All Formats" is in the header of every TRIACE and Ladder page. Netlify (`netlify.toml`) and Firebase Hosting

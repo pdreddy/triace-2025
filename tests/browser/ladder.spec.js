@@ -129,3 +129,22 @@ test('phone layout: no sideways scrolling on Home or the Ladder', async ({ page 
     expect((await signOut.boundingBox()).x + (await signOut.boundingBox()).width, `${path} header fits`).toBeLessThanOrEqual(360);
   }
 });
+
+test('Ladder 2026: champions and playoffs, the four groups, PPRC names linked to profiles', async ({ page }) => {
+  await page.goto('/ladder');
+  await page.getByRole('navigation', { name: 'Ladder navigation' }).getByRole('link', { name: '2026' }).click();
+  await expect(page).toHaveURL(/\/ladder\/2026$/);
+  await expect(page.getByRole('heading', { name: 'Ladder 2026', level: 1 })).toBeVisible();
+  await expect(page.getByText('62 players · 96 results')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Champion to be decided' })).toBeVisible();      // no final in the results yet
+  await expect(page.locator('.l26-match')).toHaveCount(2);                                         // the two quarter-finals played so far
+  await expect(page.getByRole('tab')).toHaveCount(5);
+  await page.getByRole('tab', { name: 'Group B' }).click();
+  const record = page.getByRole('list', { name: 'Group B record' });
+  await expect(record.getByRole('link', { name: 'Vivekvardhan Reddy Mereddy' })).toHaveAttribute('href', '/pprc/p_vivekvardhan_reddy_mereddy');
+  await expect(record.getByRole('link', { name: 'Joel Kodoru' })).toBeVisible();
+  await expect(page.getByText('Joel Kodooru')).toHaveCount(0);                                     // the typed spelling is never shown
+  await expect(page.getByText('Awaiting confirmation')).toHaveCount(2);
+  await page.setViewportSize({ width: 360, height: 740 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+});

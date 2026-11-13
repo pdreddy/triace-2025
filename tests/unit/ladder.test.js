@@ -13,16 +13,16 @@ test('sets are read from the home side; a match tiebreak counts one game', () =>
   assert.deepEqual(parseSets('—'), []);
 });
 
-test('Ladder 2026: 92 results read; ties, walkovers and the unconfirmed bye are left out; winners agree with the sets', () => {
+test('Ladder 2026: 96 results read; ties, walkovers and unconfirmed results are left out; winners agree with the sets', () => {
   const { matches, report } = parseLadder(file('ladder-2026.psv'));
-  assert.equal(report.read, 92);
-  assert.equal(report.counted, 86);
-  assert.deepEqual(report.skipped.map(s => s.reason).sort(), ['status "Pending Confirmation"', 'tie', 'tie', 'walkover', 'walkover', 'walkover']);
+  assert.equal(report.read, 96);
+  assert.equal(report.counted, 88);
+  assert.deepEqual(report.skipped.map(s => s.reason).sort(), ['status "Pending Confirmation"', 'status "Pending Confirmation"', 'status "Pending Confirmation"', 'tie', 'tie', 'walkover', 'walkover', 'walkover']);
   for (const m of Object.values(matches)) {
     const [line] = m.lines, home = line.sets.filter(s => s.team1 > s.team2).length, away = line.sets.filter(s => s.team2 > s.team1).length;
     assert.equal(line.winnerTeamNum, home > away ? 1 : 2, `${m.t1} v ${m.t2}`);
   }
-  assert.equal(Object.values(matches).filter(m => m.isPlayoff).length, 1);
+  assert.equal(Object.values(matches).filter(m => m.isPlayoff).length, 2);
   assert.ok(Object.values(matches).every(m => m.lines.length === 1 && m.lines[0].type === 'singles'), 'a singles ladder');
 });
 
@@ -36,7 +36,7 @@ test('the ladder is rated with the UTR file as the starting point, under one nam
   const seeds = parseUtrFile(file('utr-seeds.csv'), 'utr-seeds.csv').rows;
   const overrides = JSON.parse(file('name-decisions.json'));
   const { tree, report } = buildMultiClub({ [LADDER.path]: parseLadder(file('ladder-2026.psv')).matches }, { seeds, overrides });
-  assert.equal(report.courts.rated, 86);
+  assert.equal(report.courts.rated, 88);
   assert.equal(report.decisions.length, 0);
   const names = Object.values(tree.pprcMaster.players).map(p => p.name);
   assert.ok(names.includes('Sridhar Kuppuswamy') && !names.includes('Sridhar Kuppusamy'), 'the ladder spelling joins the KOC player');
@@ -67,4 +67,19 @@ test('the Ladder badge reads "Ladder 2026" with a ladder icon', () => {
   const ladder = badges.find(b => b.label === 'Ladder 2026');
   assert.equal(ladder.icon, 'ladder');
   assert.equal(ladder.club, 'ladder');
+});
+
+test('Ladder 2026 for display: every row, PPRC spellings, group records, playoffs and the champion once a final exists', async () => {
+  const { ladderSeason } = await import('../../functions/lib/ladder.js');
+  const decisions = JSON.parse(file('name-decisions.json')), season = ladderSeason(file('ladder-2026.psv'), decisions);
+  assert.deepEqual([season.players, season.matches, season.groups.map(g => g.name).join(), season.playoffs.length, season.champion], [62, 96, 'Group A,Group B,Group C,Group D', 2, null]);
+  const names = season.groups.flatMap(g => g.players.map(p => p.name));
+  for (const [typed, pprc] of [['Dinesh Timmareddy', 'Dinesh Reddy Timmareddy'], ['Vivekvardhan Mereddy', 'Vivekvardhan Reddy Mereddy'], ['Joel Kodooru', 'Joel Kodoru'], ['Sridhar Kuppusamy', 'Sridhar Kuppuswamy']]) { assert.ok(names.includes(pprc), pprc); assert.ok(!names.includes(typed), typed); }
+  const b = season.groups[1], joel = b.players.find(p => p.name === 'Joel Kodoru');
+  assert.deepEqual([joel.played, joel.won, joel.lost], [3, 2, 1]);            // the result still waiting for confirmation is listed but not counted
+  assert.equal(b.matches.filter(m => !m.confirmed).length, 2);
+  const tie = season.groups[3].matches.find(m => m.kind === 'tie');
+  assert.deepEqual([tie.winner, tie.sets], [null, '']);
+  const done = ladderSeason('Stage|Group|Round|Home|Away|Winner|WinType|Date|Sets|Status\nPlayoffs|—|Final|Ann Lee|Bo Diaz|Bo Diaz|Score|2026-12-01 01:00|4-6, 3-6|Locked\nPlayoffs|—|SF|Ann Lee|Cy Roe|Ann Lee|Score|2026-11-20 01:00|6-1, 6-1|Locked');
+  assert.deepEqual([done.champion.name, done.runnerUp.name, done.playoffs.map(m => m.round)], ['Bo Diaz', 'Ann Lee', ['SF', 'Final']]);
 });

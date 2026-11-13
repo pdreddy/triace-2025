@@ -18,6 +18,7 @@ const LadderMatches = lazy(() => import('./features/ladder/Matches'));
 const LadderActivity = lazy(() => import('./features/ladder/Activity'));
 const LadderRules = lazy(() => import('./features/ladder/RulesPage'));
 const LadderOrganizer = lazy(() => import('./features/ladder/Organizer'));
+const Ladder2026 = lazy(() => import('./features/ladder/Ladder2026'));
 const Rules = lazy(() => import('./pages/Rules'));
 const Register = lazy(() => import('./pages/Register'));
 const Tiers = lazy(() => import('./pages/Tiers'));
@@ -96,6 +97,7 @@ function Layout() {
             <NavLink to="/ladder/matches"><Icon name="ball" /><span>Matches</span></NavLink>
             <NavLink to="/ladder/activity"><Icon name="bolt" /><span>Activity</span></NavLink>
             <NavLink to="/ladder/rules"><Icon name="rules" /><span>Rules</span></NavLink>
+            <NavLink to="/ladder/2026"><Icon name="trophy" /><span>2026</span></NavLink>
             {user?.admin && <NavLink to="/ladder/organizer"><Icon name="shield" /><span>Organizer</span></NavLink>}
           </nav>}
           <div className="topbar-actions">
@@ -136,6 +138,7 @@ function Layout() {
                 <Route path="organizer" element={<LadderOrganizer />} />
               </Route>
             </Route>
+            <Route path="/ladder/2026" element={<Ladder2026 />} />
             {MODULES.filter(m => m.status === 'soon').map(m => <Route key={m.id} path={m.path} element={<ComingSoon name={m.name} />} />)}
             <Route path="/triace" element={<Rules />} />
             <Route path="/register" element={accepted ? <Register /> : <Navigate to="/triace" replace />} />
