@@ -64,3 +64,23 @@ test('rules deployment passes a validated snapshot to Firebase and preserves its
     assert.deepEqual(JSON.parse(readFileSync(join(root, 'database.rules.json'))), expected);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('merge-rules replaces only this app’s subtree and keeps every other app’s live rules', async () => {
+  const { mergeRules } = await import('../../scripts/merge-rules.mjs'), { validateMergedRules } = await import('../../scripts/deploy-rules.mjs');
+  const { readFileSync } = await import('node:fs');
+  const generated = JSON.parse(readFileSync(new URL('../../database.rules.json', import.meta.url), 'utf8'));
+  const live = { rules: { '.read': false, '.write': false, clubs: { koc: { '.read': 'auth != null', secret: { '.read': false } } }, importLog: { '.read': false }, traice2_0: { settings: { '.read': true }, singlesLadder: { '.read': true } }, pprcMaster: { '.read': true } } };
+  const copy = structuredClone(live), { merged, report } = mergeRules(live, generated, 'traice2_0');
+  assert.deepEqual(live, copy);
+  assert.deepEqual(merged.rules.clubs, live.rules.clubs);
+  assert.deepEqual(merged.rules.importLog, live.rules.importLog);
+  assert.deepEqual(merged.rules.traice2_0, generated.rules.traice2_0);
+  assert.deepEqual(merged.rules.pprcMaster, live.rules.pprcMaster);
+  assert.deepEqual(report.added, ['pprcClubs']);
+  assert.deepEqual(report.kept.sort(), ['clubs', 'importLog', 'pprcMaster']);
+  assert.ok(report.newUnderRoot.includes('ladder'));
+  assert.deepEqual(report.removedUnderRoot, ['singlesLadder']);
+  validateMergedRules(merged, generated, 'traice2_0', 'traice2_0/season1');   // the deploy script accepts it
+  assert.throws(() => mergeRules({}, generated, 'traice2_0'), /live rules/);
+  assert.throws(() => mergeRules(live, generated, 'nowhere'), /no rules for/);
+});
